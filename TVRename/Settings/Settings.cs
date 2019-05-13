@@ -259,6 +259,7 @@ namespace TVRename
         [NotNull]
         public string[] VideoExtensionsArray => Convert(VideoExtensionsString);
 
+        public bool AutoAddAsPartOfQuickRename = true;
         public bool UseFullPathNameToMatchSearchFolders = false;
         public bool UseFullPathNameToMatchLibraryFolders = false;
 
@@ -481,6 +482,7 @@ namespace TVRename
             XmlHelper.WriteElementToXml(writer, "IgnoreAllSpecials", IgnoreAllSpecials);
             XmlHelper.WriteElementToXml(writer, "UseFullPathNameToMatchLibraryFolders", UseFullPathNameToMatchLibraryFolders);
             XmlHelper.WriteElementToXml(writer, "UseFullPathNameToMatchSearchFolders", UseFullPathNameToMatchSearchFolders);
+            XmlHelper.WriteElementToXml(writer, "AutoAddAsPartOfQuickRename", AutoAddAsPartOfQuickRename);
 
             TheSearchers.WriteXml(writer);
             WriteReplacements(writer);
@@ -1233,6 +1235,7 @@ namespace TVRename
             IgnoreAllSpecials = xmlSettings.ExtractBool("IgnoreAllSpecials",false);
             UseFullPathNameToMatchLibraryFolders = xmlSettings.ExtractBool("UseFullPathNameToMatchLibraryFolders",false);
             UseFullPathNameToMatchSearchFolders = xmlSettings.ExtractBool("UseFullPathNameToMatchSearchFolders",false);
+            AutoAddAsPartOfQuickRename = xmlSettings.ExtractBool("AutoAddAsPartOfQuickRename", true);
 
             Tidyup.load(xmlSettings);
             RSSURLs = xmlSettings.Descendants("RSSURLs").FirstOrDefault()?.ReadStringsFromXml("URL");
