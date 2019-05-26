@@ -31,7 +31,7 @@ namespace TVRename
                         continue;
                     }
 
-                    ActionCopyMoveRename acmr = (ActionCopyMoveRename)action;
+                    ActionCopyMoveRename acmr = (ActionCopyMoveRename) action;
                     writer.WriteStartElement("Item");
 
                     XmlHelper.WriteAttributeToXml(writer, "Operation", acmr.Name);
@@ -45,6 +45,7 @@ namespace TVRename
 
                     writer.WriteEndElement(); //Item                                
                 }
+
                 writer.WriteEndElement(); // Name
                 writer.WriteEndElement(); // tvrename
                 writer.WriteEndDocument();
