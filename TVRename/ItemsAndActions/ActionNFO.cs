@@ -188,7 +188,9 @@ namespace TVRename
                         {
                             lang = SelectedShow.PreferredLanguage.Abbreviation;
                         }
-                        XmlHelper.WriteElementToXml(writer, "episodeguideurl",TheTVDB.BuildUrl(SelectedShow.TvdbCode,lang));
+
+                        XmlHelper.WriteElementToXml(writer, "episodeguideurl",
+                            TheTVDB.BuildUrl(SelectedShow.TvdbCode, lang));
 
                         XmlHelper.WriteElementToXml(writer, "plot", SelectedShow.TheSeries()?.Overview);
 
@@ -224,6 +226,7 @@ namespace TVRename
                         {
                             XmlHelper.WriteElementToXml(writer, "runtime", rt + " minutes");
                         }
+
                         writer.WriteEndElement(); // tvshow
                     }
                 }

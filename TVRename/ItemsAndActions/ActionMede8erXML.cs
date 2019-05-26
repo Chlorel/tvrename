@@ -110,7 +110,7 @@ namespace TVRename
 
                 //Genres...taken from overall Series, not episode specific due to thetvdb
                 writer.WriteStartElement("genres");
-                string genre = string.Join(" / ", Episode.Show.TheSeries()?.Genres()??new string[]{});
+                string genre = string.Join(" / ", Episode.Show.TheSeries()?.Genres() ?? new string[] { });
                 if (!string.IsNullOrEmpty(genre))
                 {
                     XmlHelper.WriteElementToXml(writer, "genre", genre);
@@ -124,13 +124,8 @@ namespace TVRename
                     string epDirector = Episode.EpisodeDirector;
                     if (!string.IsNullOrEmpty(epDirector))
                     {
-                        foreach (string daa in epDirector.Split('|'))
+                        foreach (string daa in epDirector.Split('|').Where(daa => !string.IsNullOrEmpty(daa)))
                         {
-                            if (string.IsNullOrEmpty(daa))
-                            {
-                                continue;
-                            }
-
                             XmlHelper.WriteElementToXml(writer, "director", daa);
                         }
                     }
@@ -151,13 +146,9 @@ namespace TVRename
                 // actors...
                 if (Episode.Show != null)
                 {
-                    foreach (string aa in Episode.Show.TheSeries()?.GetActorNames()??new string[]{})
+                    foreach (string aa in (Episode.Show.TheSeries()?.GetActorNames() ?? new string[] { }).Where(aa =>
+                        !string.IsNullOrEmpty(aa)))
                     {
-                        if (string.IsNullOrEmpty(aa))
-                        {
-                            continue;
-                        }
-
                         XmlHelper.WriteElementToXml(writer, "actor", aa);
                     }
                 }
@@ -179,7 +170,7 @@ namespace TVRename
                 XmlHelper.WriteElementToXml(writer, "title", SelectedShow.ShowName);
 
                 writer.WriteStartElement("genres");
-                string genre = string.Join(" / ", SelectedShow.TheSeries()?.Genres()??new List<string>());
+                string genre = string.Join(" / ", SelectedShow.TheSeries()?.Genres() ?? new List<string>());
                 if (!string.IsNullOrEmpty(genre))
                 {
                     XmlHelper.WriteElementToXml(writer, "genre", genre);
@@ -190,7 +181,7 @@ namespace TVRename
                 XmlHelper.WriteElementToXml(writer, "year", SelectedShow.TheSeries()?.Year);
 
                 //Mede8er Ratings are on a 100 point scale; TVDB are on a 10 point scale
-                float siteRating = SelectedShow.TheSeries()?.SiteRating ??0 * 10;
+                float siteRating = SelectedShow.TheSeries()?.SiteRating ?? 0 * 10;
                 int intSiteRating = (int) siteRating;
                 if (intSiteRating > 0)
                 {
@@ -211,7 +202,9 @@ namespace TVRename
                 writer.WriteStartElement("cast");
 
                 // actors...
-                foreach (string aa in SelectedShow.TheSeries()?.GetActorNames().Where(aa => !string.IsNullOrEmpty(aa))??new List<string>())
+                foreach (string aa in
+                    SelectedShow.TheSeries()?.GetActorNames().Where(aa => !string.IsNullOrEmpty(aa)) ??
+                    new List<string>())
                 {
                     XmlHelper.WriteElementToXml(writer, "actor", aa);
                 }
