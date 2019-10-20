@@ -22,7 +22,7 @@ namespace TVRename.Forms.Tools
             InitializeComponent();
 
             mDoc.TheActionList.Clear();
-            parent.FillActionList();
+            parent.FillActionList(false);
 
             txtFileFormatPreview.Text = TVSettings.Instance.NamingStyle.StyleString;
             txtFileFormatPreview.Enabled = false;
@@ -48,7 +48,7 @@ namespace TVRename.Forms.Tools
                 ProcessUnknown(droppedFile);
             }
 
-            parent.FillActionList();
+            parent.FillActionList(true);
             parent.FocusOnScanResults();
             
             Logger.Info("Finished quick rename.");
@@ -99,9 +99,9 @@ namespace TVRename.Forms.Tools
                 return;
             }
 
-            ShowItem bestShow = cbShowList.SelectedItem == "<Auto>"
+            ShowItem bestShow = (string)cbShowList.SelectedItem == "<Auto>"
                 ? FinderHelper.FindBestMatchingShow(droppedFile, mDoc.Library.Shows)
-                : mDoc.Library.Shows.FirstOrDefault(item => item.ShowName == cbShowList.SelectedItem);
+                : mDoc.Library.Shows.FirstOrDefault(item => item.ShowName == (string)cbShowList.SelectedItem);
 
             if (bestShow is null)
             {

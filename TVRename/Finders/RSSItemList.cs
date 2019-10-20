@@ -24,20 +24,16 @@ namespace TVRename
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         // ReSharper disable once InconsistentNaming
-        public bool DownloadRSS([NotNull] string url, List<TVSettings.FilenameProcessorRE> rexps)
+        public bool DownloadRSS([NotNull] string url, List<TVSettings.FilenameProcessorRE> rexps, bool useCloudflareProtection)
         {
             regxps = rexps;
             string response = null;
 
             try
             {
-                WebClient client = new WebClient();
-                client.Headers.Add("user-agent",
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36");
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
-                response = client.DownloadString(url);
+                response = HttpHelper.GetUrl(url, useCloudflareProtection);
 
-                XElement x = XElement.Load(new System.IO.StringReader(response));
+                XElement x = XElement.Load(new System.IO.StringReader(response??""));
 
                 if (x.Name.LocalName != "rss")
                 {
@@ -51,7 +47,7 @@ namespace TVRename
             }
             catch (WebException  e)
             {
-                Logger.Warn($"Cound not download RSS page at:{url} got the following message: {e.Status} {e.Message}");
+                Logger.Warn($"Could not download RSS page at: {url} got the following message: {e.Status} {e.Message}");
                 return false;
             }
             catch (XmlException e)
@@ -72,10 +68,7 @@ namespace TVRename
             return true;
         }
 
-        private bool ReadChannel([NotNull] XElement x)
-        {
-            return x.Descendants("item").All(ReadItem);
-        }
+        private bool ReadChannel([NotNull] XElement x) => x.Descendants("item").All(ReadItem);
 
         private bool ReadItem([NotNull] XElement itemElement)
         {

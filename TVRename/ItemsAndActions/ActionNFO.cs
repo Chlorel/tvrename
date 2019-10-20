@@ -34,14 +34,33 @@ namespace TVRename
         [NotNull]
         public override string Name => "Write KODI Metadata";
 
-        private void WriteEpisodeDetailsFor([NotNull] Episode episode, [NotNull] XmlWriter writer,bool multi,bool dvdOrder)
+        private static void WriteEpisodeDetailsFor([NotNull] Episode episode,[CanBeNull] ShowItem show, [NotNull] XmlWriter writer,bool multi,bool dvdOrder)
         {
             // See: http://xbmc.org/wiki/?title=Import_-_Export_Library#TV_Episodes
             writer.WriteStartElement("episodedetails");
 
             writer.WriteElement("title", episode.Name);
-            writer.WriteElement("showtitle", Episode.Show.ShowName );
-            writer.WriteElement("rating", episode.EpisodeRating);
+            writer.WriteElement("originaltitle", show?.ShowName);
+            writer.WriteElement("showtitle", show?.ShowName );
+
+            string showRating = episode.EpisodeRating;
+            if (showRating !=null)
+            {
+                writer.WriteStartElement("ratings");
+
+                writer.WriteStartElement("rating");
+                writer.WriteAttributeString("name", "tvdb");
+                writer.WriteAttributeString("max", "10");
+                writer.WriteAttributeString("default", "true");
+
+                writer.WriteElement("value", showRating);
+                writer.WriteElement("votes", episode.SiteRatingCount??0, true);
+
+                writer.WriteEndElement(); //rating
+
+                writer.WriteEndElement(); //ratings
+            }
+
             if (dvdOrder)
             {
                 writer.WriteElement("season", episode.DvdSeasonNumber);
@@ -54,6 +73,7 @@ namespace TVRename
             }
 
             writer.WriteElement("plot", episode.Overview);
+            writer.WriteElement("studio", episode.TheSeries?.Network);
 
             writer.WriteStartElement("aired");
             if (episode.FirstAired != null)
@@ -63,7 +83,7 @@ namespace TVRename
 
             writer.WriteEndElement();
 
-            writer.WriteElement("mpaa", Episode.Show?.TheSeries()?.ContentRating,true);
+            writer.WriteElement("mpaa", show?.TheSeries()?.ContentRating,true);
 
             //Director(s)
             string epDirector = episode.EpisodeDirector;
@@ -90,9 +110,9 @@ namespace TVRename
             {
                 string recurringActors = "";
 
-                if (Episode.Show != null)
+                if (show != null)
                 {
-                    recurringActors = string.Join("|", Episode.Show.TheSeries()?.GetActorNames()??new List<string>());
+                    recurringActors = string.Join("|", show.TheSeries()?.GetActorNames()??new List<string>());
                 }
 
                 string guestActors = episode.EpisodeGuestStars;
@@ -110,9 +130,9 @@ namespace TVRename
             }
 
             // actors...
-            if (Episode.Show != null)
+            if (show != null)
             {
-                foreach (Actor aa in (Episode.Show.TheSeries()?.GetActors()??new List<Actor>())
+                foreach (Actor aa in (show.TheSeries()?.GetActors()??new List<Actor>())
                     .Where(aa => !string.IsNullOrEmpty(aa.ActorName)))
                 {
                     writer.WriteStartElement("actor");
@@ -135,15 +155,18 @@ namespace TVRename
                 //For now we only put art in for multipart episodes. Kodi finds the art appropriately
                 //without our help for the others
 
-                ShowItem episodeSi = Episode.Show??SelectedShow;
-                string filename =
-                    TVSettings.Instance.FilenameFriendly(
-                        TVSettings.Instance.NamingStyle.GetTargetEpisodeName(episodeSi,episode,episodeSi.GetTimeZone(), episodeSi.DvdOrder));
+                if (show != null)
+                {
+                    string filename =
+                        TVSettings.Instance.FilenameFriendly(
+                            TVSettings.Instance.NamingStyle.GetTargetEpisodeName(show, episode, show.GetTimeZone(),
+                                show.DvdOrder));
 
-                string thumbFilename =  filename + ".jpg";
-                writer.WriteElement("thumb",thumbFilename);
-                //Should be able to do this using the local filename, but only seems to work if you provide a URL
-                //XMLHelper.WriteElementToXML(writer, "thumb", TheTVDB.Instance.GetTVDBDownloadURL(episode.GetFilename()))
+                    string thumbFilename = filename + ".jpg";
+                    writer.WriteElement("thumb", thumbFilename);
+                    //Should be able to do this using the local filename, but only seems to work if you provide a URL
+                    //XMLHelper.WriteElementToXML(writer, "thumb", TheTVDB.Instance.GetTVDBDownloadURL(episode.GetFilename()))
+                }
             }
             writer.WriteEndElement(); // episodedetails
         }
@@ -172,23 +195,43 @@ namespace TVRename
                         {
                             foreach (Episode ep in Episode.SourceEpisodes)
                             {
-                                WriteEpisodeDetailsFor(ep, writer, true, Episode.Show.DvdOrder);
+                                ShowItem si = Episode.Show ?? SelectedShow;
+                                WriteEpisodeDetailsFor(ep,si, writer, true, si.DvdOrder);
                             }
                         }
                         else
                         {
-                            WriteEpisodeDetailsFor(Episode, writer, false, Episode.Show.DvdOrder);
+                            ShowItem si = Episode.Show ?? SelectedShow;
+                            WriteEpisodeDetailsFor(Episode, si, writer, false, si.DvdOrder);
                         }
                     }
                     else if (SelectedShow != null) // show overview (tvshow.nfo)
                     {
-                        // http://www.xbmc.org/wiki/?title=Import_-_Export_Library#TV_Shows
+                        SeriesInfo series = SelectedShow.TheSeries();
+
+                        // https://kodi.wiki/view/NFO_files/TV_shows
                         writer.WriteStartElement("tvshow");
 
                         writer.WriteElement("title", SelectedShow.ShowName);
-                        writer.WriteElement("originaltitle", SelectedShow.TheSeries()?.Name);
+                        writer.WriteElement("originaltitle", series?.Name);
+                        writer.WriteElement("studio",series?.Network);
+                        float? showRating = series?.SiteRating;
+                        if (showRating.HasValue)
+                        {
+                            writer.WriteStartElement("ratings");
 
-                        writer.WriteElement("rating", SelectedShow.TheSeries()?.ContentRating);
+                            writer.WriteStartElement("rating");
+                            writer.WriteAttributeString("name", "tvdb");
+                            writer.WriteAttributeString("max", "10");
+                            writer.WriteAttributeString("default", "true");
+
+                            writer.WriteElement("value", showRating.Value);
+                            writer.WriteElement("votes", series.SiteRatingVotes, true);
+
+                            writer.WriteEndElement(); //rating
+
+                            writer.WriteEndElement(); //ratings
+                        }
 
                         string lang = TVSettings.Instance.PreferredLanguageCode;
                         if (SelectedShow.UseCustomLanguage && SelectedShow.PreferredLanguage != null)
@@ -199,21 +242,32 @@ namespace TVRename
                         writer.WriteElement("episodeguideurl",
                             TheTVDB.BuildUrl(SelectedShow.TvdbCode, lang));
 
-                        writer.WriteElement("plot", SelectedShow.TheSeries()?.Overview);
+                        if (!(series is null))
+                        {
+                            writer.WriteElement("id", series.SeriesId);
+                            writer.WriteElement("runtime", series.Runtime, true);
+                            writer.WriteElement("mpaa", series.ContentRating,true);
 
-                        writer.WriteElement("mpaa", SelectedShow.TheSeries()?.ContentRating);
+                            writer.WriteStartElement("uniqueid");
+                            writer.WriteAttributeString("type", "tvdb");
+                            writer.WriteAttributeString("default", "true");
+                            writer.WriteValue(series.TvdbCode);
+                            writer.WriteEndElement();
+
+                            writer.WriteStartElement("uniqueid");
+                            writer.WriteAttributeString("type", "imdb");
+                            writer.WriteAttributeString("default", "false");
+                            writer.WriteValue(series.Imdb);
+                            writer.WriteEndElement();
+
+                            writer.WriteElement("plot", series.Overview);
+
+                            writer.WriteElement("premiered", series.FirstAired);
+                            writer.WriteElement("year", series.Year);
+                            writer.WriteElement("status", series.Status);
+                        }
 
                         writer.WriteStringsToXml("genre", SelectedShow.Genres);
-
-                        writer.WriteElement("premiered", SelectedShow.TheSeries()?.FirstAired);
-                        writer.WriteElement("year", SelectedShow.TheSeries()?.Year);
-                        writer.WriteElement("status", SelectedShow.TheSeries()?.Status);
-
-                        writer.WriteInfo("id", "moviedb", "imdb", SelectedShow.TheSeries()?.Imdb);
-
-                        writer.WriteElement("tvdbid", SelectedShow.TheSeries()?.TvdbCode);
-
-                        writer.WriteElement("runtime", SelectedShow.TheSeries()?.Runtime, true);
 
                         // actors...
                         foreach (Actor aa in SelectedShow.Actors.Where(aa => !string.IsNullOrEmpty(aa.ActorName)))

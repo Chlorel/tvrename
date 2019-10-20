@@ -169,6 +169,9 @@ namespace TVRename
         public bool OfflineMode = false;
         public bool DetailedRSSJSONLogging = false;
         public bool ShowBasicShowDetails = false;
+        public bool RSSUseCloudflare = true;
+        public bool SearchJSONUseCloudflare = true;
+        public bool qBitTorrentDownloadFilesFirst = true;
 
         public BetaMode mode = BetaMode.ProductionOnly;
         public float upgradeDirtyPercent = 20;
@@ -259,6 +262,10 @@ namespace TVRename
         [NotNull]
         public string[] VideoExtensionsArray => Convert(VideoExtensionsString);
 
+        [NotNull]
+        public string USER_AGENT =>
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36";
+
         public bool AutoAddAsPartOfQuickRename = true;
         public bool UseFullPathNameToMatchSearchFolders = false;
         public bool UseFullPathNameToMatchLibraryFolders = false;
@@ -292,6 +299,20 @@ namespace TVRename
         public PreviouslySeenEpisodes PreviouslySeenEpisodes;
         public bool IgnoreAllSpecials = false;
 
+        public bool DefShowIncludeNoAirdate = false;
+        public bool DefShowIncludeFuture = false;
+        public bool DefShowNextAirdate = true;
+        public bool DefShowDVDOrder = false;
+        public bool DefShowDoRenaming = true;
+        public bool DefShowDoMissingCheck = true;
+        public bool DefShowSequentialMatching = false;
+        public bool DefShowSpecialsCount = false;
+        public bool DefShowAutoFolders = true;
+        public bool DefShowUseDefLocation = false;
+        public string DefShowLocation;
+        public bool DefShowUseBase = false;
+        public bool DefShowUseSubFolders = true;
+
         private TVSettings()
         {
             SetToDefaults();
@@ -321,14 +342,10 @@ namespace TVRename
             guesses[2] = "c:\\Program Files (x86)\\uTorrent\\uTorrent.exe";
 
             uTorrentPath = "";
-            foreach (string g in guesses)
+            foreach (FileInfo f in guesses.Select(g => new FileInfo(g)).Where(f => f.Exists))
             {
-                FileInfo f = new FileInfo(g);
-                if (f.Exists)
-                {
-                    uTorrentPath = f.FullName;
-                    break;
-                }
+                uTorrentPath = f.FullName;
+                break;
             }
 
             // ResumeDatPath
@@ -348,6 +365,9 @@ namespace TVRename
             writer.WriteElement("OfflineMode", OfflineMode);
             writer.WriteElement("ShowBasicShowDetails", ShowBasicShowDetails);
             writer.WriteElement("DetailedRSSJSONLogging", DetailedRSSJSONLogging);
+            writer.WriteElement("RSSUseCloudflare", RSSUseCloudflare);
+            writer.WriteElement("SearchJSONUseCloudflare", SearchJSONUseCloudflare);
+            writer.WriteElement("qBitTorrentDownloadFilesFirst", qBitTorrentDownloadFilesFirst);
             writer.WriteElement("ReplaceWithBetterQuality", ReplaceWithBetterQuality);
             writer.WriteElement("ExportWTWRSS", ExportWTWRSS);
             writer.WriteElement("ExportWTWRSSTo", ExportWTWRSSTo);
@@ -485,6 +505,20 @@ namespace TVRename
             writer.WriteElement("UseFullPathNameToMatchLibraryFolders", UseFullPathNameToMatchLibraryFolders);
             writer.WriteElement("UseFullPathNameToMatchSearchFolders", UseFullPathNameToMatchSearchFolders);
             writer.WriteElement("AutoAddAsPartOfQuickRename", AutoAddAsPartOfQuickRename);
+
+            writer.WriteElement("DefShowIncludeNoAirdate", DefShowIncludeNoAirdate);
+            writer.WriteElement("DefShowIncludeFuture", DefShowIncludeFuture);
+            writer.WriteElement("DefShowNextAirdate", DefShowNextAirdate);
+            writer.WriteElement("DefShowDVDOrder", DefShowDVDOrder);
+            writer.WriteElement("DefShowDoRenaming", DefShowDoRenaming);
+            writer.WriteElement("DefShowDoMissingCheck", DefShowDoMissingCheck);
+            writer.WriteElement("DefShowSequentialMatching", DefShowSequentialMatching);
+            writer.WriteElement("DefShowSpecialsCount", DefShowSpecialsCount);
+            writer.WriteElement("DefShowAutoFolders", DefShowAutoFolders);
+            writer.WriteElement("DefShowUseDefLocation", DefShowUseDefLocation);
+            writer.WriteElement("DefShowLocation", DefShowLocation);
+            writer.WriteElement("DefShowUseBase", DefShowUseBase);
+            writer.WriteElement("DefShowUseSubFolders", DefShowUseSubFolders);
 
             TheSearchers.WriteXml(writer);
             WriteReplacements(writer);
@@ -1100,6 +1134,9 @@ namespace TVRename
         public void load([NotNull] XElement xmlSettings)
         {
             SetToDefaults();
+            RSSUseCloudflare = xmlSettings.ExtractBool("RSSUseCloudflare", true);
+            SearchJSONUseCloudflare = xmlSettings.ExtractBool("SearchJSONUseCloudflare", true);
+            qBitTorrentDownloadFilesFirst = xmlSettings.ExtractBool("qBitTorrentDownloadFilesFirst", true);
             BGDownload = xmlSettings.ExtractBool("BGDownload",false);
             OfflineMode = xmlSettings.ExtractBool("OfflineMode",false);
             ShowBasicShowDetails = xmlSettings.ExtractBool("ShowBasicShowDetails",false);
@@ -1238,6 +1275,20 @@ namespace TVRename
             UseFullPathNameToMatchLibraryFolders = xmlSettings.ExtractBool("UseFullPathNameToMatchLibraryFolders",false);
             UseFullPathNameToMatchSearchFolders = xmlSettings.ExtractBool("UseFullPathNameToMatchSearchFolders",false);
             AutoAddAsPartOfQuickRename = xmlSettings.ExtractBool("AutoAddAsPartOfQuickRename", true);
+
+            DefShowIncludeNoAirdate = xmlSettings.ExtractBool("DefShowIncludeNoAirdate", false);
+            DefShowIncludeFuture = xmlSettings.ExtractBool("DefShowIncludeFuture", false);
+            DefShowNextAirdate = xmlSettings.ExtractBool("DefShowNextAirdate", true);
+            DefShowDVDOrder = xmlSettings.ExtractBool("DefShowDVDOrder", false);
+            DefShowDoRenaming = xmlSettings.ExtractBool("DefShowDoRenaming", true);
+            DefShowDoMissingCheck = xmlSettings.ExtractBool("DefShowDoMissingCheck", true);
+            DefShowSequentialMatching = xmlSettings.ExtractBool("DefShowSequentialMatching", false);
+            DefShowSpecialsCount = xmlSettings.ExtractBool("DefShowSpecialsCount", false);
+            DefShowAutoFolders = xmlSettings.ExtractBool("DefShowAutoFolders", true);
+            DefShowUseDefLocation = xmlSettings.ExtractBool("DefShowUseDefLocation", false);
+            DefShowUseBase = xmlSettings.ExtractBool("DefShowUseBase", false);
+            DefShowUseSubFolders = xmlSettings.ExtractBool("DefShowUseSubFolders", true);
+            DefShowLocation = xmlSettings.ExtractString("DefShowLocation");
 
             Tidyup.load(xmlSettings);
             RSSURLs = xmlSettings.Descendants("RSSURLs").FirstOrDefault()?.ReadStringsFromXml("URL");

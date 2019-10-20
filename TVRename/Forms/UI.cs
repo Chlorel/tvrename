@@ -79,7 +79,7 @@ namespace TVRename
         #endregion
 
         private int busy;
-        private TVDoc mDoc;
+        private readonly TVDoc mDoc;
         private bool internalCheckChange;
         private int lastDlRemaining;
 
@@ -1498,30 +1498,31 @@ namespace TVRename
                 ToolStripMenuItem tsis = new ToolStripMenuItem("Watch Epsiodes");
 
                 // for each episode in season, find it on disk
-                foreach (ProcessedEpisode epds in si.SeasonEpisodes[seas.SeasonNumber])
+                if (si.SeasonEpisodes.ContainsKey(seas.SeasonNumber))
                 {
-                    List<FileInfo> fl = FinderHelper.FindEpOnDisk(null, epds);
-                    if (fl.Count <= 0)
+                    foreach (ProcessedEpisode epds in si.SeasonEpisodes[seas.SeasonNumber])
                     {
-                        continue;
-                    }
-
-                    int n = mLastFl.Count;
-                    foreach (FileInfo fi in fl)
-                    {
-                        mLastFl.Add(fi);
-                        ToolStripMenuItem tsisi = new ToolStripMenuItem("Watch: " + fi.FullName)
+                        List<FileInfo> fl = FinderHelper.FindEpOnDisk(null, epds);
+                        if (fl.Count <= 0)
                         {
-                            Tag = (int) RightClickCommands.kWatchBase + n
-                        };
+                            continue;
+                        }
 
-                        int n1 = n;
-                        tsisi.Click += (s, ev) => {
-                            WatchEpisode(n1); 
-                        };
+                        int n = mLastFl.Count;
+                        foreach (FileInfo fi in fl)
+                        {
+                            mLastFl.Add(fi);
+                            ToolStripMenuItem tsisi = new ToolStripMenuItem("Watch: " + fi.FullName)
+                            {
+                                Tag = (int) RightClickCommands.kWatchBase + n
+                            };
 
-                        n++;
-                        tsis.DropDownItems.Add(tsisi);
+                            int n1 = n;
+                            tsisi.Click += (s, ev) => { WatchEpisode(n1); };
+
+                            n++;
+                            tsis.DropDownItems.Add(tsisi);
+                        }
                     }
                 }
 
@@ -1793,7 +1794,7 @@ namespace TVRename
                         IgnoreSelectedSeasons();
 
                         mLastActionsClicked = null;
-                        FillActionList();
+                        FillActionList(true);
                         break;
                     }
                 case RightClickCommands.kActionDelete:
@@ -1873,7 +1874,7 @@ namespace TVRename
                 FileFinder.KeepTogether(mDoc.TheActionList, false, true);
             }
 
-            FillActionList();
+            FillActionList(true);
         }
 
         private void OpenFolderForShow(int foldernum)
@@ -2106,6 +2107,17 @@ namespace TVRename
             {
                 Hide();
             }
+
+            bool showCheckboxes = Width > 1100;
+            label1.Visible = showCheckboxes;
+            cbAll.Visible = showCheckboxes;
+            cbCopyMove.Visible = showCheckboxes;
+            cbDeleteFiles.Visible = showCheckboxes;
+            cbDownload.Visible = showCheckboxes;
+            cbModifyMetadata.Visible = showCheckboxes;
+            cbRename.Visible = showCheckboxes;
+            cbSaveImages.Visible = showCheckboxes;
+            cbWriteMetadata.Visible = showCheckboxes;
         }
 
         private void UI_LocationChanged(object sender, EventArgs e)
@@ -2438,7 +2450,11 @@ namespace TVRename
             if (airdt.Value.CompareTo(DateTime.Now) < 0) // has aired
             {
                 List<FileInfo> fl = dfc.FindEpOnDisk(pe);
-                if (fl.Count > 0 && fl.All(file => file.Name.StartsWith(TVSettings.Instance.FilenameFriendly(TVSettings.Instance.NamingStyle.NameFor(pe)), StringComparison.OrdinalIgnoreCase)))
+                bool appropriateFileNameFound = !TVSettings.Instance.RenameCheck
+                           || !pe.Show.DoRename
+                           || fl.All(file => file.Name.StartsWith(TVSettings.Instance.FilenameFriendly(TVSettings.Instance.NamingStyle.NameFor(pe)), StringComparison.OrdinalIgnoreCase));
+
+                if (fl.Count > 0 && appropriateFileNameFound)
                 {
                     lvi.ImageIndex = 0;
                 }
@@ -2495,26 +2511,26 @@ namespace TVRename
             mDoc.PreventAutoScan("Add Show");
             ShowItem si = new ShowItem();
 
-                AddEditShow aes = new AddEditShow(si);
-                DialogResult dr = aes.ShowDialog();
-                if (dr == DialogResult.OK)
+            AddEditShow aes = new AddEditShow(si);
+            DialogResult dr = aes.ShowDialog();
+            if (dr == DialogResult.OK)
+            {
+                lock (TheTVDB.SERIES_LOCK)
                 {
-                    lock (TheTVDB.SERIES_LOCK)
-                    {
-                        mDoc.Library.Add(si);
-                    }
-
-                    ShowAddedOrEdited(false,false);
-                    SelectShow(si);
-
-                    Logger.Info("Added new show called {0}", si.ShowName);
-                }
-                else
-                {
-                    Logger.Info("Cancelled adding new show");
+                    mDoc.Library.Add(si);
                 }
 
-                ShowAddedOrEdited(true,false);
+                ShowAddedOrEdited(false,false);
+                SelectShow(si);
+
+                Logger.Info("Added new show called {0}", si.ShowName);
+            }
+            else
+            {
+                Logger.Info("Cancelled adding new show");
+            }
+
+            ShowAddedOrEdited(true,false);
 
             LessBusy();
             mDoc.AllowAutoScan();
@@ -2618,7 +2634,7 @@ namespace TVRename
                 {
                     List<ProcessedEpisode> pel = ShowLibrary.GenerateEpisodes(si, ser, seasnum, false);
 
-                    EditRules er = new EditRules(si, pel, seasnum, TVSettings.Instance.NamingStyle);
+                    EditSeason er = new EditSeason(si, pel, seasnum, TVSettings.Instance.NamingStyle);
                     DialogResult dr = er.ShowDialog();
                     if (dr == DialogResult.OK)
                     {
@@ -2676,7 +2692,7 @@ namespace TVRename
                     mDoc.ForceUpdateImages(si);
                 }
 
-                FillActionList();
+                FillActionList(false);
             }
         }
 
@@ -2991,7 +3007,7 @@ namespace TVRename
             }
 
             FillMyShows(); // scanning can download more info to be displayed in my shows
-            FillActionList();
+            FillActionList(false);
         }
 
         [NotNull]
@@ -3044,12 +3060,32 @@ namespace TVRename
             e.Item = LviForItem(item);
         }
 
-        public void FillActionList()
+        public void FillActionList(bool preserveExistingCheckboxes)
         {
             internalCheckChange = true;
 
             // Save where the list is currently scrolled too
             int currentTop = lvAction.GetScrollVerticalPos();
+
+            List<Item> selectedItems = new List<Item>();
+            List<Item> deSelectedItems = new List<Item>();
+            if (preserveExistingCheckboxes)
+            {
+                //get checkboxes
+                foreach (object index in lvAction.CheckedItems)
+                {
+                    selectedItems.Add((Item) ((ListViewItem) index).Tag);
+                }
+
+                foreach (object index in lvAction.Items)
+                {
+                    Item chosenItem = (Item)((ListViewItem)index).Tag;
+                    if (!selectedItems.Contains(chosenItem))
+                    {
+                        deSelectedItems.Add(chosenItem);
+                    }
+                }
+            }
 
             if (lvAction.VirtualMode)
             {
@@ -3063,6 +3099,23 @@ namespace TVRename
                 foreach (Item item in mDoc.TheActionList.ToList())
                 {
                     ListViewItem lvi = LviForItem(item);
+
+                    if (preserveExistingCheckboxes)
+                    {
+                        if (selectedItems.Contains(item))
+                        {
+                            lvi.Checked = true;
+                        }
+                        else if (deSelectedItems.Contains(item))
+                        {
+                            lvi.Checked = false;
+                        }
+                        else
+                        {
+                            //must be a newly added item, so leave with default checked status
+                        }
+                    }
+
                     lvAction.Items.Add(lvi);
                 }
 
@@ -3185,7 +3238,7 @@ namespace TVRename
                 }
             }
 
-            FillActionList();
+            FillActionList(true);
             RefreshWTW(false,unattended);
             mDoc.AllowAutoScan();
         }
@@ -3242,7 +3295,7 @@ namespace TVRename
                 mDoc.TheActionList.Remove(toRemove);
             }
 
-            FillActionList();
+            FillActionList(true);
             RefreshWTW(false,false);
         }
 
@@ -3396,7 +3449,7 @@ namespace TVRename
                 mDoc.TheActionList.Remove((Item) lvi.Tag);
             }
 
-            FillActionList();
+            FillActionList(true);
         }
 
         private void lvAction_KeyDown(object sender, [NotNull] KeyEventArgs e)
@@ -3702,7 +3755,7 @@ namespace TVRename
             {
                 mDoc.SetDirty();
                 mDoc.RemoveIgnored();
-                FillActionList();
+                FillActionList(true);
             }
         }
 
@@ -3716,7 +3769,7 @@ namespace TVRename
         {
             UseWaitCursor = true;
             ShowSummary f = new ShowSummary(mDoc);
-            await Task.Run(() => f.GenerateData());
+            await Task.Run(() => f.GenerateData()).ConfigureAwait(false);
             f.PopulateGrid();
             UseWaitCursor = false;
             f.Show();
