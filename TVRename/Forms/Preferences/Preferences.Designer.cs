@@ -3626,7 +3626,7 @@ namespace TVRename
             // cbShowCollections
             // 
             this.cbShowCollections.AutoSize = true;
-            this.cbShowCollections.Location = new System.Drawing.Point(13, 230);
+            this.cbShowCollections.Location = new System.Drawing.Point(266, 222);
             this.cbShowCollections.Name = "cbShowCollections";
             this.cbShowCollections.Size = new System.Drawing.Size(145, 17);
             this.cbShowCollections.TabIndex = 24;
