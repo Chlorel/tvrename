@@ -197,6 +197,9 @@ namespace TVRename
 
             UpdateReplacement(s);
 
+            s.RSSUseCloudflare = cbRSSCloudflareProtection.Checked;
+            s.SearchJSONUseCloudflare = cbJSONCloudflareProtection.Checked;
+            s.qBitTorrentDownloadFilesFirst = cbDownloadTorrentBeforeDownloading.Checked;
             s.ShowBasicShowDetails = chkBasicShowDetails.Checked;
             s.DetailedRSSJSONLogging = cbDetailedRSSJSONLogging.Checked;
             s.ExportWTWRSS = cbWTWRSS.Checked;
@@ -346,77 +349,28 @@ namespace TVRename
                 ? TVSettings.WTWDoubleClickAction.Scan
                 : TVSettings.WTWDoubleClickAction.Search;
 
-            s.SampleFileMaxSizeMB = IntFrom(txtMaxSampleSize.Text, 50);
-            s.upgradeDirtyPercent = PercentFrom(tbPercentDirty.Text, 20);
-            s.replaceMargin = PercentFrom(tbPercentBetter.Text, 10);
-            s.ParallelDownloads = IntFrom(txtMaxSampleSize.Text, 1, 4, 8);
+            s.SampleFileMaxSizeMB = txtMaxSampleSize.Text.ToInt(50);
+            s.upgradeDirtyPercent = tbPercentDirty.Text.ToPercent(20);
+            s.replaceMargin = tbPercentBetter.Text.ToPercent(10);
+            s.ParallelDownloads = txtMaxSampleSize.Text.ToInt( 1, 4, 8);
 
             UpdateRSSURLs(s);
 
             s.ShowStatusColors = GetShowStatusColouring();
-        }
 
-        private static int IntFrom(string text, int min, int def, int max)
-        {
-            int value;
-            try
-            {
-                value = int.Parse(text);
-            }
-            catch
-            {
-                return def;
-            }
-
-            if (value < min)
-            {
-                return min;
-            }
-
-            if (value > max)
-            {
-                return max;
-            }
-
-            return value;
-        }
-
-        private static int IntFrom(string text, int def)
-        {
-            try
-            {
-                return int.Parse(text);
-            }
-            catch
-            {
-                return def;
-            }
-
-        }
-
-        private static float PercentFrom(string text, float def)
-        {
-            float value;
-            try
-            {
-                value = float.Parse(text);
-            }
-            catch
-            {
-                return def;
-            }
-
-            if (value < 1)
-            {
-                return 1;
-            }
-
-            if (value > 100)
-            {
-                return 100;
-            }
-
-            return value;
+            s.DefShowIncludeFuture = cbDefShowIncludeFuture.Checked;
+            s.DefShowIncludeNoAirdate = cbDefShowIncludeNoAirdate.Checked;
+            s.DefShowNextAirdate = cbDefShowNextAirdate.Checked;
+            s.DefShowDoMissingCheck = cbDefShowDoMissingCheck.Checked;
+            s.DefShowDoRenaming = cbDefShowDoRenaming.Checked;
+            s.DefShowDVDOrder = cbDefShowDVDOrder.Checked;
+            s.DefShowAutoFolders = cbDefShowAutoFolders.Checked;
+            s.DefShowLocation = (string)cmbDefShowLocation.SelectedItem;
+            s.DefShowSequentialMatching = cbDefShowSequentialMatching.Checked;
+            s.DefShowSpecialsCount = cbDefShowSpecialsCount.Checked;
+            s.DefShowUseBase = rbDefShowUseBase.Checked;
+            s.DefShowUseDefLocation = cbDefShowUseDefLocation.Checked;
+            s.DefShowUseSubFolders = rbDefShowUseSubFolders.Checked;
         }
 
         private TVSettings.ScanType ScanTypeMode()
@@ -702,6 +656,9 @@ namespace TVRename
 
             txtMaxSampleSize.Text = s.SampleFileMaxSizeMB.ToString();
 
+            cbRSSCloudflareProtection.Checked= s.RSSUseCloudflare;
+            cbJSONCloudflareProtection.Checked= s.SearchJSONUseCloudflare;
+            cbDownloadTorrentBeforeDownloading.Checked= s.qBitTorrentDownloadFilesFirst;
             chkBasicShowDetails.Checked = s.ShowBasicShowDetails;
             cbDetailedRSSJSONLogging.Checked = s.DetailedRSSJSONLogging;
             cbWTWRSS.Checked = s.ExportWTWRSS;
@@ -847,12 +804,27 @@ namespace TVRename
             tbMovieTerms.Text = s.AutoAddMovieTerms;
             tbIgnoreSuffixes.Text = s.AutoAddIgnoreSuffixes;
 
+            cbDefShowIncludeFuture.Checked= s.DefShowIncludeFuture;
+            cbDefShowIncludeNoAirdate.Checked= s.DefShowIncludeNoAirdate;
+            cbDefShowNextAirdate.Checked= s.DefShowNextAirdate;
+            cbDefShowDoMissingCheck.Checked= s.DefShowDoMissingCheck;
+            cbDefShowDoRenaming.Checked= s.DefShowDoRenaming;
+            cbDefShowDVDOrder.Checked= s.DefShowDVDOrder;
+            cbDefShowAutoFolders.Checked= s.DefShowAutoFolders;
+            cmbDefShowLocation.SelectedText= s.DefShowLocation;
+            cbDefShowSequentialMatching.Checked= s.DefShowSequentialMatching;
+            cbDefShowSpecialsCount.Checked= s.DefShowSpecialsCount;
+            rbDefShowUseBase.Checked= s.DefShowUseBase;
+            cbDefShowUseDefLocation.Checked= s.DefShowUseDefLocation;
+            rbDefShowUseSubFolders.Checked= s.DefShowUseSubFolders;
+
             tbPriorityOverrideTerms.Text = s.PriorityReplaceTerms;
 
             PopulateFromEnums(s);
 
             FillSearchFolderList();
             FillFolderStringLists();
+            PopulateAndSetDefShowLocation(s.DefShowLocation);
 
             foreach (string row in s.RSSURLs)
             {
@@ -959,6 +931,34 @@ namespace TVRename
             lstFMMonitorFolders.EndUpdate();
         }
 
+        private void UpdateDefShowLocation()
+        {
+            string oldValue = (string) cmbDefShowLocation.SelectedItem;
+            PopulateAndSetDefShowLocation(oldValue);
+        }
+
+        private void PopulateAndSetDefShowLocation([NotNull] string path)
+        {
+            TVSettings.Instance.LibraryFolders.Sort();
+
+            cmbDefShowLocation.BeginUpdate();
+            cmbDefShowLocation.Items.Clear();
+
+            cmbDefShowLocation.Items.Add(path);
+
+            foreach (string folder in TVSettings.Instance.LibraryFolders)
+            {
+                if (folder == path)
+                {
+                    continue;
+                }
+                cmbDefShowLocation.Items.Add(folder);
+            }
+
+            cmbDefShowLocation.SelectedItem = path;
+
+            cmbDefShowLocation.EndUpdate();
+        }
         private void PopulateReplacements([NotNull] TVSettings s)
         {
             foreach (TVSettings.Replacement rep in s.Replacements)
@@ -1476,15 +1476,36 @@ namespace TVRename
 
         private void bnAddSearchFolder_Click(object sender, EventArgs e)
         {
-            int n = lbSearchFolders.SelectedIndex;
-            folderBrowser.SelectedPath = n != -1 ? TVSettings.Instance.DownloadFolders[n] : "";
-
-            if (folderBrowser.ShowDialog() == DialogResult.OK)
+            //Setup the UI
+            FolderBrowserDialogEx searchFolderBrowser = new FolderBrowserDialogEx
             {
-                TVSettings.Instance.DownloadFolders.Add(folderBrowser.SelectedPath);
-                mDoc.SetDirty();
+                SelectedPath = "",
+                Title = "Add New Search Folder...",
+                ShowEditbox = true,
+                StartPosition = FormStartPosition.CenterScreen
+            };
+
+            //Populate the popup with the right path
+            if (lbSearchFolders.SelectedIndex != -1)
+            {
+                int n = lbSearchFolders.SelectedIndex;
+                searchFolderBrowser.SelectedPath = TVSettings.Instance.DownloadFolders[n];
             }
 
+            //Show dialog
+            if (searchFolderBrowser.ShowDialog(this) != DialogResult.OK)
+            {
+                return;
+            }
+
+            //exit if nothing is selected
+            if (!Directory.Exists(searchFolderBrowser.SelectedPath))
+            {
+                return;
+            }
+
+            TVSettings.Instance.DownloadFolders.Add(searchFolderBrowser.SelectedPath);
+            mDoc.SetDirty();
             FillSearchFolderList();
         }
 
@@ -1559,6 +1580,7 @@ namespace TVRename
 
             mDoc.SetDirty();
             FillFolderStringLists();
+            UpdateDefShowLocation();
         }
 
         private void bnAddMonFolder_Click(object sender, EventArgs e)
@@ -1566,7 +1588,7 @@ namespace TVRename
             FolderBrowserDialogEx searchFolderBrowser = new FolderBrowserDialogEx
             {
                 SelectedPath = "",
-                Title = "Add New Monitor Folder...",
+                Title = "Add New Library Folder...",
                 ShowEditbox = true,
                 StartPosition = FormStartPosition.CenterScreen
             };
@@ -1577,14 +1599,12 @@ namespace TVRename
                 searchFolderBrowser.SelectedPath = TVSettings.Instance.LibraryFolders[n];
             }
 
-            if (searchFolderBrowser.ShowDialog(this) == DialogResult.OK)
+            if (searchFolderBrowser.ShowDialog(this) == DialogResult.OK && Directory.Exists(searchFolderBrowser.SelectedPath))
             {
-                if (Directory.Exists(searchFolderBrowser.SelectedPath))
-                {
-                    TVSettings.Instance.LibraryFolders.Add(searchFolderBrowser.SelectedPath);
-                    mDoc.SetDirty();
-                    FillFolderStringLists();
-                }
+                TVSettings.Instance.LibraryFolders.Add(searchFolderBrowser.SelectedPath);
+                mDoc.SetDirty();
+                FillFolderStringLists();
+                UpdateDefShowLocation();
             }
         }
 
@@ -1660,6 +1680,7 @@ namespace TVRename
         private void pictureBox7_Click(object sender, EventArgs e) => OpenInfoWindow("/#the-media-center-tab");
         private void pictureBox1_Click(object sender, EventArgs e) => OpenInfoWindow("/#the-torrents--nzb-tab");
         private void pbLibraryFolders_Click(object sender, EventArgs e) => OpenInfoWindow("/#the-library-folders-tab");
+        private void PictureBox1_Click_1(object sender, EventArgs e) => OpenInfoWindow("/#the-folder-defaults-tab");
 
         private static void OpenInfoWindow(string page)
         {
@@ -1675,6 +1696,11 @@ namespace TVRename
             cntfw = new CustomNameTagsFloatingWindow(pe: t);
             cntfw.Show(this);
             Focus();
+        }
+
+        private void CbDefShowUseDefLocation_CheckedChanged(object sender, EventArgs e)
+        {
+            cmbDefShowLocation.Enabled = cbDefShowUseDefLocation.Checked;
         }
     }
 }

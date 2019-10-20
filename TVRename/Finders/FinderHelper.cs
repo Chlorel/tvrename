@@ -403,11 +403,11 @@ namespace TVRename
             return ((seas != -1) && (ep != -1));
         }
 
-        private static (int seas, int ep, int maxEp) IdentifyEpisode(ShowItem si, [NotNull] Match m, TVSettings.FilenameProcessorRE re)
+        private static (int seas, int ep, int maxEp) IdentifyEpisode([CanBeNull] ShowItem si, [NotNull] Match m, TVSettings.FilenameProcessorRE re)
         {
             if (!int.TryParse(m.Groups["s"].ToString(), out int seas))
             {
-                if (!re.RegExpression.Contains("<s>") && si.AppropriateSeasons()?.Count == 1)
+                if (!re.RegExpression.Contains("<s>") && (si?.AppropriateSeasons()?.Count??0) == 1)
                 {
                     seas = 1;
                 }
@@ -502,9 +502,11 @@ namespace TVRename
                 }
                 catch (FormatException)
                 {
+                    //didn't work - just try the next one
                 }
                 catch (ArgumentException)
                 {
+                    //didn't work - just try the next one
                 }
             }
 

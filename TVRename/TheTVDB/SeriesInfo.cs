@@ -55,7 +55,7 @@ namespace TVRename
 
         public IEnumerable<KeyValuePair<int, Banner>> AllBanners => banners.AllBanners;
 
-        public int MinYear
+        public int? MinYear
         {
             get
             {
@@ -64,11 +64,16 @@ namespace TVRename
                 {
                     min = Math.Min(min, s.MinYear());
                 }
+
+                if (min == 9999)
+                {
+                    return null;
+                }
                 return min;
             }
         }
 
-        public int MaxYear
+        public int? MaxYear
         {
             get
             {
@@ -76,6 +81,10 @@ namespace TVRename
                 foreach (Season s in AiredSeasons.Values)
                 {
                     max = Math.Max(max, s.MaxYear());
+                }
+                if (max == 0)
+                {
+                    return null;
                 }
                 return max;
             }
@@ -108,8 +117,8 @@ namespace TVRename
             }
         }
 
-        [NotNull]
-        public string Year => FirstAired != null ? FirstAired.Value.ToString("yyyy") : string.Empty;
+      [NotNull]
+      public string Year => FirstAired?.ToString("yyyy") ?? $"{MinYear}";
 
         // note: "SeriesID" in a <Series> is the tv.com code,
         // "seriesid" in an <Episode> is the tvdb code!
@@ -637,12 +646,9 @@ namespace TVRename
                 {
                     if (s.SeasonNumber == seasF)
                     {
-                        foreach (Episode pe in s.Episodes.Values)
+                        foreach (Episode pe in s.Episodes.Values.Where(pe => pe.AiredEpNum == epF))
                         {
-                            if (pe.AiredEpNum == epF)
-                            {
-                                return pe;
-                            }
+                            return pe;
                         }
                     }
                 }

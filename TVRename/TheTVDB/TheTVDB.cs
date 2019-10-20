@@ -965,9 +965,10 @@ namespace TVRename
                 long maxUpdateTime = updateTimes.DefaultIfEmpty(0).Max();
 
                 //Add a day to take into account any timezone issues
-                if (maxUpdateTime > DateTime.UtcNow.ToUnixTime()+(24*60*60))
+                long nowTime = DateTime.UtcNow.ToUnixTime() + (24 * 60 * 60);
+                if (maxUpdateTime > nowTime)
                 {
-                    Logger.Error($"Assuming up to date: Could not parse update time {maxUpdateTime} from: {jsonUpdateResponse}");
+                    Logger.Error($"Assuming up to date: Could not parse update time {maxUpdateTime} compared to {nowTime} from: {jsonUpdateResponse}");
                     return DateTime.UtcNow.ToUnixTime();
                 }
                 return maxUpdateTime;
@@ -985,23 +986,11 @@ namespace TVRename
 
             // we can use the oldest thing we have locally.  It isn't safe to use the newest thing.
             // This will only happen the first time we do an update, so a false _all update isn't too bad.
-            foreach (SeriesInfo ser in series.Values)
+            foreach (SeriesInfo ser in series.Values.Where(ser => ser.SrvLastUpdated != 0))
             {
-                if (((ser.SrvLastUpdated != 0) && (ser.SrvLastUpdated < (theTime??long.MaxValue))))
+                if (ser.SrvLastUpdated < (theTime ?? long.MaxValue))
                 {
                     theTime = ser.SrvLastUpdated;
-                }
-
-                //We can use AiredSeasons as it does not matter which order we do this in Aired or DVD
-                foreach (Season seas in ser.AiredSeasons.Values)
-                {
-                    foreach (long seasonUpdateTime in seas.Episodes.Values.Select(episode => episode.SrvLastUpdated).Where(l => l>0))
-                    {
-                        if ((seasonUpdateTime < (theTime ?? long.MaxValue)))
-                        {
-                            theTime = seasonUpdateTime;
-                        }
-                    }
                 }
             }
 
@@ -1084,12 +1073,10 @@ namespace TVRename
                     if (ex.Status == WebExceptionStatus.ProtocolError && !(ex.Response is null) && ex.Response is HttpWebResponse resp &&
                         resp.StatusCode == HttpStatusCode.NotFound)
                     {
-                        Logger.Warn($"Show with Id {id} is no longer available from TVDB (got a 404). Error obtaining page { pageNumber} of { episodeUri} in lang {lang} using url { ex.Response.ResponseUri.AbsoluteUri}");
+                        Logger.Warn(
+                            $"Episodes were not found for {id} from TVDB (got a 404). Error obtaining page { pageNumber} of { episodeUri} in lang {lang} using url { ex.Response.ResponseUri.AbsoluteUri}");
 
-                        if (TvdbIsUp())
-                        {
-                            throw new ShowNotFoundException(id);
-                        }
+                        return null;
                     }
 
                     Logger.Error(ex, $"Error obtaining {episodeUri}");
@@ -1286,6 +1273,11 @@ namespace TVRename
             Say(GenerateMessage(code, episodesToo, bannersToo));
 
             string requestedLanguageCode = useCustomLangCode ? langCode : TVSettings.Instance.PreferredLanguageCode;
+            if (string.IsNullOrWhiteSpace(requestedLanguageCode))
+            {
+                Logger.Error($"An error has occurred and identified in DownloadSeriesNow and series {code} has a blank language code. Using the default instead for now: {TVSettings.Instance.PreferredLanguageCode}");
+                requestedLanguageCode = TVSettings.Instance.PreferredLanguageCode;
+            }
 
             SeriesInfo si;
             try
@@ -1631,7 +1623,7 @@ namespace TVRename
                     }
                 }
             }
-            catch (WebException ex)
+            catch (WebException)
             {
                 //no images for chosen language
                 Logger.Warn($"Looking for images, but none found for seriesId {code} via {uriImages} in language {requestedLanguageCode}");
@@ -1691,18 +1683,17 @@ namespace TVRename
                             return true;
                         case HttpStatusCode.NotFound:
                             return false;
+                        case HttpStatusCode.OK:
+                            return true;
+                        default:
+                            return false;
                     }
                 }
 
                 return false;
             }
 
-            if (!jsonResponse.HasValues)
-            {
-                return false;
-            }
-
-            return true;
+            return jsonResponse.HasValues;
         }
 
         private void ReloadEpisodes(int code, bool useCustomLangCode, string langCode)
