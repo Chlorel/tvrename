@@ -354,7 +354,7 @@ namespace TVRename
             s.SampleFileMaxSizeMB = txtMaxSampleSize.Text.ToInt(50);
             s.upgradeDirtyPercent = tbPercentDirty.Text.ToPercent(20);
             s.replaceMargin = tbPercentBetter.Text.ToPercent(10);
-            s.ParallelDownloads = txtMaxSampleSize.Text.ToInt( 1, 4, 8);
+            s.ParallelDownloads = txtParallelDownloads.Text.ToInt( 1, 4, 8);
 
             UpdateRSSURLs(s);
 
@@ -941,14 +941,14 @@ namespace TVRename
             PopulateAndSetDefShowLocation(oldValue);
         }
 
-        private void PopulateAndSetDefShowLocation([NotNull] string path)
+        private void PopulateAndSetDefShowLocation([CanBeNull] string path)
         {
             TVSettings.Instance.LibraryFolders.Sort();
 
             cmbDefShowLocation.BeginUpdate();
             cmbDefShowLocation.Items.Clear();
 
-            cmbDefShowLocation.Items.Add(path);
+            cmbDefShowLocation.Items.Add(path??string.Empty);
 
             foreach (string folder in TVSettings.Instance.LibraryFolders)
             {
