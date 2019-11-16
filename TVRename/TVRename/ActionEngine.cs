@@ -69,7 +69,7 @@ namespace TVRename
                 if (action != null)
                 {
                     Logger.Trace("Triggering Action: {0} - {1} - {2}", action.Name, action.Produces, action.ToString());
-                    action.Go(ref actionPause, mStats);
+                    action.Go(mStats);
                 }
             }
             catch (ThreadAbortException)
@@ -164,6 +164,7 @@ namespace TVRename
                 {
                     string message =
                         $"Action Processor called with object that is not a ActionQueue[], instead called with a {queuesIn.GetType().FullName}";
+
                     Logger.Fatal(message);
                     throw new ArgumentException(message);
                 }
@@ -192,7 +193,9 @@ namespace TVRename
                 }
             }
             catch (ThreadAbortException)
-            { }
+            {
+                //Ignore this Exception as we can be aborting threads
+            }
             catch (Exception e)
             {
                 Logger.Fatal(e, "Unhandled Exception in ActionProcessor");

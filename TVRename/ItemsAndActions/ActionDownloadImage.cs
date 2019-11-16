@@ -85,7 +85,7 @@ namespace TVRename
             return bmPhoto;
         }
 
-        public override bool Go(ref bool pause, TVRenameStats stats)
+        public override bool Go(TVRenameStats stats)
         {
             byte[] theData = TheTVDB.Instance.GetTvdbDownload(path);
             if ((theData is null) || (theData.Length == 0))
@@ -98,33 +98,7 @@ namespace TVRename
 
             if (shrinkLargeMede8ErImage)
             {
-                // shrink images down to a maximum size of 156x232
-                Image im = new Bitmap(new System.IO.MemoryStream(theData));
-                if (Episode is null)
-                {
-                    if ((im.Width > 156) || (im.Height > 232))
-                    {
-                        im = MaxSize(im, 156, 232);
-
-                        using (System.IO.MemoryStream m = new System.IO.MemoryStream())
-                        {
-                            im.Save(m, ImageFormat.Jpeg);
-                            theData = m.ToArray();
-                        }
-                    }
-                }
-                else {
-                    if ((im.Width > 232) || (im.Height > 156))
-                    {
-                        im = MaxSize(im, 232, 156);
-
-                        using (System.IO.MemoryStream m = new System.IO.MemoryStream())
-                        {
-                            im.Save(m, ImageFormat.Jpeg);
-                            theData = m.ToArray();
-                        }
-                    }
-                }
+                theData = ConvertBytes(theData);
             }
 
             try
@@ -144,6 +118,47 @@ namespace TVRename
 
             Done = true;
             return true;
+        }
+
+        [NotNull]
+        private byte[] ConvertBytes(byte[] theData)
+        {
+            try
+            {
+                // shrink images down to a maximum size of 156x232
+                Image im = new Bitmap(new System.IO.MemoryStream(theData));
+                if (Episode is null)
+                {
+                    if ((im.Width > 156) || (im.Height > 232))
+                    {
+                        im = MaxSize(im, 156, 232);
+
+                        using (System.IO.MemoryStream m = new System.IO.MemoryStream())
+                        {
+                            im.Save(m, ImageFormat.Jpeg);
+                            theData = m.ToArray();
+                        }
+                    }
+                }
+                else
+                {
+                    if ((im.Width > 232) || (im.Height > 156))
+                    {
+                        im = MaxSize(im, 232, 156);
+
+                        using (System.IO.MemoryStream m = new System.IO.MemoryStream())
+                        {
+                            im.Save(m, ImageFormat.Jpeg);
+                            theData = m.ToArray();
+                        }
+                    }
+                }
+            }
+            catch (ArgumentException)
+            {
+            }
+
+            return theData;
         }
 
         #endregion
