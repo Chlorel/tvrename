@@ -51,15 +51,10 @@ namespace TVRename
             foreach (XElement x in settings.Descendants("Choice"))
             {
                 string url = x.Attribute("URL")?.Value;
-                if (url is null)
-                {
-                    url = x.Attribute("URL2")?.Value;
-                }
-                else
-                {
-                    // old-style URL, replace "!" with "{ShowName}+{Season}+{Episode}"
-                    url = url.Replace("!", "{ShowName}+S{Season:2}E{Episode}");
-                }
+                url = url is null
+                    ? x.Attribute("URL2")?.Value
+                    : url.Replace("!", "{ShowName}+S{Season:2}E{Episode}");
+
                 Add(x.Attribute("Name")?.Value,url);
             }
         }
@@ -111,41 +106,15 @@ namespace TVRename
 
         public int Count() => choices.Count;
 
-        public string Name(int n)
+        public string Name(int n) => choices.Count == 0 ? string.Empty : choices[Between(n, 0, choices.Count - 1)].Name;
+
+        public string Url(int n) => choices.Count == 0 ? string.Empty : choices[Between(n,0,choices.Count - 1)].Url2;
+
+        private static int Between(int n, int min, int max)
         {
-            if (choices.Count == 0)
-            {
-                return string.Empty;
-            }
-
-            if (n >= choices.Count)
-            {
-                n = choices.Count - 1;
-            }
-            else if (n < 0)
-            {
-                n = 0;
-            }
-
-            return choices[n].Name;
-        }
-
-        public string Url(int n)
-        {
-            if (choices.Count == 0)
-            {
-                return string.Empty;
-            }
-            if (n >= choices.Count)
-            {
-                n = choices.Count - 1;
-            }
-            else if (n < 0)
-            {
-                n = 0;
-            }
-
-            return choices[n].Url2;
+            return n < min ? min
+                : n > max ? max
+                : n;
         }
     }
 }

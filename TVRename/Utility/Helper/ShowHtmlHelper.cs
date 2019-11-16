@@ -111,8 +111,12 @@ namespace TVRename
         }
 
         [NotNull]
-        public static string YearRange([NotNull] SeriesInfo ser)
+        public static string YearRange([CanBeNull] SeriesInfo ser)
         {
+            if (ser is null)
+            {
+                return string.Empty;
+            }
             int? minYear = ser.MinYear;
             int? maxYear = ser.MaxYear;
 
@@ -330,9 +334,8 @@ namespace TVRename
             string explorerButton = string.Empty;
             if (fl != null)
             {
-                foreach (FileInfo fi in fl)
+                foreach (string urlFilename in fl.Select(fi => Uri.EscapeDataString(fi.FullName)))
                 {
-                    string urlFilename = Uri.EscapeDataString(fi.FullName);
                     viewButton += CreateButton($"{UI.WATCH_PROXY}{urlFilename}", "<i class=\"far fa-eye\"></i>","Watch Now");
                     explorerButton += CreateButton($"{UI.EXPLORE_PROXY}{urlFilename}", "<i class=\"far fa-folder-open\"></i>","Open Containing Folder");
                 }
@@ -436,7 +439,7 @@ namespace TVRename
             return string.IsNullOrEmpty(url) ? "" : $"<h2>{title}</h2><img width={width} height={height} src=\"{url}\"><br/>";
         }
 
-        private static List<ProcessedEpisode> GetBestEpisodes([NotNull] ShowItem si, [NotNull] Season s)
+        private static IEnumerable<ProcessedEpisode> GetBestEpisodes([NotNull] ShowItem si, [NotNull] Season s)
         {
             return si.SeasonEpisodes.ContainsKey(s.SeasonNumber)
                 ? si.SeasonEpisodes[s.SeasonNumber]
@@ -630,14 +633,7 @@ namespace TVRename
             bool first = true;
             foreach (Actor aa in si.Actors.Where(aa => !string.IsNullOrEmpty(aa.ActorName)))
             {
-                if (!first)
-                {
-                    body += ", ";
-                }
-                else
-                {
-                    body += "<h2>Actors</h2>";
-                }
+                body += first ? "<h2>Actors</h2>" : ", ";
 
                 body += "<A HREF=\"http://www.imdb.com/find?s=nm&q=" + aa.ActorName + "\">" + aa.ActorName + $"</a> as {aa.ActorRole}";
                 first = false;
@@ -655,9 +651,9 @@ namespace TVRename
                 }
             }
 
-            string yearRange = ser is null ? string.Empty : YearRange(ser);
+            string yearRange = YearRange(ser);
 
-            string siteRating = ser?.SiteRating > 0 ? ser.SiteRating + "/10" : "";
+            string siteRating = ser?.SiteRating > 0 ? ser.SiteRating + "/10" : string.Empty;
             string tvdbLink = TheTVDB.Instance.WebsiteUrl(si.TvdbCode, -1, true);
 
             string tableHtml = string.Empty;

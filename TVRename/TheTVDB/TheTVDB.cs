@@ -31,7 +31,7 @@ namespace TVRename
     // ReSharper disable once InconsistentNaming
     public class TheTVDB : iTVSource
     {
-        [Serializable()]
+        [Serializable]
         // ReSharper disable once InconsistentNaming
         public class TVDBException : Exception
         {
@@ -1022,6 +1022,12 @@ namespace TVRename
             }
         }
 
+        private enum PagingMethod
+        {
+            proper, // uses the links/next method
+            brute, //keeps asking until we get a 0 length response
+        }
+
         [CanBeNull]
         private List<JObject> GetEpisodes(int id,string lang)
         {
@@ -1034,23 +1040,35 @@ namespace TVRename
 
             int pageNumber = 1;
             bool morePages = true;
+            const PagingMethod METHOD = PagingMethod.brute;
 
             while (morePages)
             {
                 try
                 {
                     JObject jsonEpisodeResponse = HttpHelper.JsonHttpGetRequest(episodeUri,
-                        new Dictionary<string, string> { { "page", pageNumber.ToString() } },
-                        tvDbTokenProvider,lang,true);
+                        new Dictionary<string, string> {{"page", pageNumber.ToString()}},
+                        tvDbTokenProvider, lang, true);
 
                     episodeResponses.Add(jsonEpisodeResponse);
                     try
                     {
                         int numberOfResponses = ((JArray) jsonEpisodeResponse["data"]).Count;
-                        JToken x = jsonEpisodeResponse["links"]["next"];
-                        bool moreResponses = !string.IsNullOrWhiteSpace(x.ToString());
-                        Logger.Info(
-                            $"Page {pageNumber} of {GetSeries(id)?.Name} had {numberOfResponses} episodes listed in {lang} with {(moreResponses ? "" : "no ")}more to come");
+                        bool moreResponses;
+
+                        if (METHOD == PagingMethod.proper)
+                        {
+                            JToken x = jsonEpisodeResponse["links"]["next"];
+                            moreResponses = !string.IsNullOrWhiteSpace(x.ToString());
+                            Logger.Info(
+                                $"Page {pageNumber} of {GetSeries(id)?.Name} had {numberOfResponses} episodes listed in {lang} with {(moreResponses ? "" : "no ")}more to come");
+                        }
+                        else
+                        {
+                            moreResponses = numberOfResponses > 0;
+                            Logger.Info(
+                                $"Page {pageNumber} of {GetSeries(id)?.Name} had {numberOfResponses} episodes listed in {lang} with {(moreResponses ? "maybe " : "no ")}more to come");
+                        }
 
                         if (numberOfResponses < 100 || !moreResponses)
                         {
@@ -1065,22 +1083,36 @@ namespace TVRename
                     {
                         Logger.Error(nre,
                             $"Error obtaining page {pageNumber} of {episodeUri} in lang {lang} using url {episodeUri}: Response was {jsonEpisodeResponse}");
+
                         morePages = false;
                     }
                 }
                 catch (WebException ex)
                 {
-                    if (ex.Status == WebExceptionStatus.ProtocolError && !(ex.Response is null) && ex.Response is HttpWebResponse resp &&
+                    if (ex.Status == WebExceptionStatus.ProtocolError && !(ex.Response is null) &&
+                        ex.Response is HttpWebResponse resp &&
                         resp.StatusCode == HttpStatusCode.NotFound)
                     {
-                        Logger.Warn(
-                            $"Episodes were not found for {id} from TVDB (got a 404). Error obtaining page { pageNumber} of { episodeUri} in lang {lang} using url { ex.Response.ResponseUri.AbsoluteUri}");
+                        if (pageNumber > 1 && METHOD == PagingMethod.brute)
+                        {
+                            Logger.Info(
+                                $"Have got to the end of episodes for this show: Episodes were not found for {id} from TVDB (got a 404). Error obtaining page {pageNumber} of {episodeUri} in lang {lang} using url {ex.Response.ResponseUri.AbsoluteUri}");
 
+                            morePages = false;
+                        }
+                        else
+                        {
+                            Logger.Warn(
+                                $"Episodes were not found for {id} from TVDB (got a 404). Error obtaining page {pageNumber} of {episodeUri} in lang {lang} using url {ex.Response.ResponseUri.AbsoluteUri}");
+
+                            return null;
+                        }
+                    }
+                    else
+                    {
+                        Logger.Error(ex, $"Error obtaining {episodeUri}");
                         return null;
                     }
-
-                    Logger.Error(ex, $"Error obtaining {episodeUri}");
-                    return null;
                 }
                 catch (System.IO.IOException ex)
                 {
@@ -1602,8 +1634,7 @@ namespace TVRename
                 }
                 catch (WebException webEx)
                 {
-                    Logger.Info(webEx,
-                        $"Looking for {imageType} images (in {languageCode}), but none found for seriesId {code}");
+                    Logger.Info($"Looking for {imageType} images (in {languageCode}), but none found for seriesId {code}: {webEx.Message}");
                 }
             }
 
@@ -2136,7 +2167,7 @@ namespace TVRename
                 {
                     if (ex.Response is null) //probably a timeout
                     {
-                        Logger.Error("Error obtaining " + uri + ": " + ex.Message);
+                        Logger.Error($"Error obtaining {uri} for search term '{text}' in {DefaultLanguageCode}: {ex.Message}");
                         LastError = ex.Message;
                         Say("");
                     }
@@ -2147,7 +2178,7 @@ namespace TVRename
                     }
                     else
                     {
-                        Logger.Error("Error obtaining " + uri + ": " + ex.Message);
+                        Logger.Error($"Error obtaining {ex.Response.ResponseUri} for search term '{text}' in {DefaultLanguageCode}: {ex.Message}");
                         LastError = ex.Message;
                         Say("");
                     }
