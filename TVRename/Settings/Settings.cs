@@ -179,6 +179,7 @@ namespace TVRename
         public bool ReplaceWithBetterQuality = false;
         public KeepTogetherModes keepTogetherMode = KeepTogetherModes.All;
 
+        public bool ShowCollections = false;
         public bool BulkAddIgnoreRecycleBin = false;
         public bool BulkAddCompareNoVideoFolders = false;
 
@@ -360,6 +361,7 @@ namespace TVRename
         public void WriteXML([NotNull] XmlWriter writer)
         {
             writer.WriteStartElement("Settings");
+
             writer.WriteElement("BGDownload", BGDownload);
             writer.WriteElement("OfflineMode", OfflineMode);
             writer.WriteElement("ShowBasicShowDetails", ShowBasicShowDetails);
@@ -480,6 +482,8 @@ namespace TVRename
             writer.WriteElement("EmptyMaxSizeCheck", Tidyup.EmptyMaxSizeCheck);
             writer.WriteElement("EmptyMaxSizeMB", Tidyup.EmptyMaxSizeMB);
             writer.WriteElement("BetaMode", (int) mode);
+       			writer.WriteElement("ShowCollections", ShowCollections);
+       			writer.WriteElement("ShowCollections", ShowCollections);
             writer.WriteElement("PercentDirtyUpgrade", upgradeDirtyPercent);
             writer.WriteElement("PercentBetter", replaceMargin);
             writer.WriteElement("BaseSeasonName", defaultSeasonWord);
@@ -1259,6 +1263,7 @@ namespace TVRename
             mode= xmlSettings.ExtractEnum("BetaMode", BetaMode.ProductionOnly);
             upgradeDirtyPercent = xmlSettings.ExtractFloat("PercentDirtyUpgrade",20);
             replaceMargin = xmlSettings.ExtractFloat("PercentBetter",10);
+            ShowCollections = xmlSettings.ExtractBool("ShowCollections") ?? false;
             defaultSeasonWord = xmlSettings.ExtractString("BaseSeasonName", "Season");
             searchSeasonWordsString = xmlSettings.ExtractString("SearchSeasonNames", "Season;Series;Saison;Temporada;Seizoen");
             preferredRSSSearchTermsString = xmlSettings.ExtractString("PreferredRSSSearchTerms", "720p;1080p");
