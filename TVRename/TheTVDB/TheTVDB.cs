@@ -28,9 +28,17 @@ using Alphaleonis.Win32.Filesystem;
 
 namespace TVRename
 {
+    public enum ApiVersion 
+    {
+        v2,
+        v3
+    }
+
     // ReSharper disable once InconsistentNaming
     public class TheTVDB : iTVSource
     {
+        public const ApiVersion VERS = ApiVersion.v2;
+
         [Serializable]
         // ReSharper disable once InconsistentNaming
         public class TVDBException : Exception
@@ -104,6 +112,8 @@ namespace TVRename
 
         // ReSharper disable once ConvertToConstant.Local
         private static readonly string WebsiteRoot = "http://thetvdb.com";
+        // ReSharper disable once ConvertToConstant.Local
+        private static readonly string WebsiteImageRoot = "http://artworks.thetvdb.com";
 
         private FileInfo cacheFile;
         public bool Connected;
@@ -443,7 +453,7 @@ namespace TVRename
         [NotNull]
         public static string GetImageURL(string url)
         {
-            string mirr = WebsiteRoot;
+            string mirr = WebsiteImageRoot;
 
             if (url.StartsWith("/", StringComparison.Ordinal))
             {
@@ -455,7 +465,7 @@ namespace TVRename
                 mirr += "/";
             }
 
-            return mirr + "banners/" + url;
+            return (url.StartsWith("series/") ? mirr +  url : mirr + "banners/" + url); //needed to work around TVDB issue
         }
 
         public byte[] GetTvdbDownload(string url) => GetTvdbDownload(url, false);
@@ -1040,7 +1050,7 @@ namespace TVRename
 
             int pageNumber = 1;
             bool morePages = true;
-            const PagingMethod METHOD = PagingMethod.brute;
+            const PagingMethod METHOD = PagingMethod.proper;
 
             while (morePages)
             {
@@ -1491,11 +1501,9 @@ namespace TVRename
         private bool CanFindEpisodesFor(int code, string requestedLanguageCode)
         {
             string uri = TvDbTokenProvider.TVDB_API_URL + "/series/" + code + "/episodes";
-            JObject jsonResponse;
             try
             {
-                jsonResponse =
-                    HttpHelper.JsonHttpGetRequest(uri, null, tvDbTokenProvider, requestedLanguageCode, true);
+                JObject _ = HttpHelper.JsonHttpGetRequest(uri, null, tvDbTokenProvider, requestedLanguageCode, true);
             }
             catch (WebException ex)
             {
