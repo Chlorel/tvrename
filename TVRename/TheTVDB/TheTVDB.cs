@@ -444,9 +444,15 @@ namespace TVRename
 
         [NotNull]
         internal static string BuildUrl(int code, string lang)
-            //would rather make this private to hide api key from outside world
+        //would rather make this private to hide api key from outside world
+        //https://forum.kodi.tv/showthread.php?tid=323588
+        //says that we need a format like this:
+        //https://api.thetvdb.com/login?{&quot;apikey&quot;:&quot;((API-KEY))&quot;,&quot;id&quot;:((ID))}|Content-Type=application/json
+
         {
-            return $"{WebsiteRoot}/api/{TvDbTokenProvider.TVDB_API_KEY}/series/{code}/all/{lang}.zip";
+            return $"{WebsiteRoot}/login?"
+                   + "{&quot;apikey&quot;:&quot;" + TvDbTokenProvider.TVDB_API_KEY + "&quot;,&quot;id&quot;:" + code + "}"
+                   + "|Content-Type=application/json";
         }
 
         // ReSharper disable once InconsistentNaming
@@ -465,7 +471,7 @@ namespace TVRename
                 mirr += "/";
             }
 
-            return (url.StartsWith("series/") ? mirr +  url : mirr + "banners/" + url); //needed to work around TVDB issue
+            return  mirr + "banners/" + url;
         }
 
         public byte[] GetTvdbDownload(string url) => GetTvdbDownload(url, false);
@@ -1066,6 +1072,7 @@ namespace TVRename
                         int numberOfResponses = ((JArray) jsonEpisodeResponse["data"]).Count;
                         bool moreResponses;
 
+                        // ReSharper disable once ConditionIsAlwaysTrueOrFalse
                         if (METHOD == PagingMethod.proper)
                         {
                             JToken x = jsonEpisodeResponse["links"]["next"];
@@ -1074,7 +1081,9 @@ namespace TVRename
                                 $"Page {pageNumber} of {GetSeries(id)?.Name} had {numberOfResponses} episodes listed in {lang} with {(moreResponses ? "" : "no ")}more to come");
                         }
                         else
+                            // ReSharper disable once HeuristicUnreachableCode
                         {
+                            // ReSharper disable once HeuristicUnreachableCode
                             moreResponses = numberOfResponses > 0;
                             Logger.Info(
                                 $"Page {pageNumber} of {GetSeries(id)?.Name} had {numberOfResponses} episodes listed in {lang} with {(moreResponses ? "maybe " : "no ")}more to come");
@@ -1103,13 +1112,17 @@ namespace TVRename
                         ex.Response is HttpWebResponse resp &&
                         resp.StatusCode == HttpStatusCode.NotFound)
                     {
+                        // ReSharper disable once ConditionIsAlwaysTrueOrFalse
                         if (pageNumber > 1 && METHOD == PagingMethod.brute)
+                            // ReSharper disable once HeuristicUnreachableCode
                         {
+                            // ReSharper disable once HeuristicUnreachableCode
                             Logger.Info(
                                 $"Have got to the end of episodes for this show: Episodes were not found for {id} from TVDB (got a 404). Error obtaining page {pageNumber} of {episodeUri} in lang {lang} using url {ex.Response.ResponseUri.AbsoluteUri}");
 
                             morePages = false;
                         }
+                        // ReSharper disable once RedundantIfElseBlock
                         else
                         {
                             Logger.Warn(
@@ -1118,6 +1131,7 @@ namespace TVRename
                             return null;
                         }
                     }
+                    // ReSharper disable once RedundantIfElseBlock
                     else
                     {
                         Logger.Error(ex, $"Error obtaining {episodeUri}");
