@@ -450,7 +450,7 @@ namespace TVRename
         //https://api.thetvdb.com/login?{&quot;apikey&quot;:&quot;((API-KEY))&quot;,&quot;id&quot;:((ID))}|Content-Type=application/json
 
         {
-            return $"{WebsiteRoot}/login?"
+            return $"{TvDbTokenProvider.TVDB_API_URL}/login?"
                    + "{&quot;apikey&quot;:&quot;" + TvDbTokenProvider.TVDB_API_KEY + "&quot;,&quot;id&quot;:" + code + "}"
                    + "|Content-Type=application/json";
         }
@@ -459,6 +459,11 @@ namespace TVRename
         [NotNull]
         public static string GetImageURL(string url)
         {
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return string.Empty;
+            }
+
             string mirr = WebsiteImageRoot;
 
             if (url.StartsWith("/", StringComparison.Ordinal))
@@ -471,7 +476,7 @@ namespace TVRename
                 mirr += "/";
             }
 
-            return  mirr + "banners/" + url;
+            return  url.StartsWith("banners/",StringComparison.Ordinal) ?mirr+url: mirr + "banners/" + url;
         }
 
         public byte[] GetTvdbDownload(string url) => GetTvdbDownload(url, false);
@@ -1149,10 +1154,7 @@ namespace TVRename
         }
 
         [NotNull]
-        private static string EpisodeUri(int id)
-        {
-            return TvDbTokenProvider.TVDB_API_URL + "/series/" + id + "/episodes";
-        }
+        private static string EpisodeUri(int id) => $"{TvDbTokenProvider.TVDB_API_URL}/series/{id}/episodes";
 
         private void ProcessXmlBannerCache([NotNull] XElement r)
         {
@@ -1887,20 +1889,20 @@ namespace TVRename
                 return true;
             }
 
-            string requestLangCode;
-            if (series.ContainsKey(seriesId))
-            {
-                Episode ep = FindEpisodeById(episodeId);
-                string eptxt = EpisodeDescription(dvdOrder, episodeId, ep);
-                requestLangCode =  (series[seriesId].UseCustomLanguage)? series[seriesId].TargetLanguageCode: TVSettings.Instance.PreferredLanguageCode;
-                Say(series[seriesId].Name + " (" + eptxt + ")");
-            }
-            else
+            if (!series.ContainsKey(seriesId))
             {
                 return false; // shouldn't happen
             }
 
-            string uri = TvDbTokenProvider.TVDB_API_URL + "/episodes/" + episodeId;
+            Episode ep = FindEpisodeById(episodeId);
+            string eptxt = EpisodeDescription(dvdOrder, episodeId, ep);
+            string requestLangCode = (series[seriesId].UseCustomLanguage)
+                ? series[seriesId].TargetLanguageCode
+                : TVSettings.Instance.PreferredLanguageCode;
+
+            Say($"{series[seriesId].Name} ({eptxt}) in {requestLangCode}");
+
+            string uri = $"{TvDbTokenProvider.TVDB_API_URL}/episodes/{episodeId}";
             JObject jsonEpisodeResponse;
             JObject jsonEpisodeDefaultLangResponse = new JObject();
 

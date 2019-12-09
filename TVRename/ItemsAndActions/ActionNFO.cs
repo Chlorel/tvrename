@@ -139,7 +139,7 @@ namespace TVRename
                     writer.WriteElement("name", aa.ActorName);
                     writer.WriteElement("role", aa.ActorRole);
                     writer.WriteElement("order", aa.ActorSortOrder);
-                    writer.WriteElement("thumb", aa.ActorImage);
+                    writer.WriteElement("thumb", TheTVDB.GetImageURL(aa.ActorImage),true);
                     writer.WriteEndElement(); // actor
                 }
             }
@@ -265,7 +265,7 @@ namespace TVRename
             writer.WriteStartElement("url");
             writer.WriteAttributeString("post", "yes");
             writer.WriteAttributeString("cache", "auth.json");
-            writer.WriteValue(TheTVDB.BuildUrl(SelectedShow.TvdbCode, lang));
+            writer.WriteRaw(TheTVDB.BuildUrl(SelectedShow.TvdbCode, lang));
             writer.WriteEndElement(); //url
             writer.WriteEndElement(); //episodeguide
 
@@ -303,7 +303,7 @@ namespace TVRename
                 writer.WriteElement("name", aa.ActorName);
                 writer.WriteElement("role", aa.ActorRole);
                 writer.WriteElement("order", aa.ActorSortOrder);
-                writer.WriteElement("thumb", aa.ActorImage);
+                writer.WriteElement("thumb", TheTVDB.GetImageURL(aa.ActorImage),true);
                 writer.WriteEndElement(); // actor
             }
 
