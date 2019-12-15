@@ -145,6 +145,7 @@ namespace TVRename
         public string ExportRecentASXTo = "";
         public bool ExportRecentWPL = false;
         public string ExportRecentWPLTo = "";
+        public bool UseColoursOnWtw = false;
         public List<FilenameProcessorRE> FNPRegexs = DefaultFNPList();
         public bool FolderJpg = false;
         public FolderJpgIsType FolderJpgIs = FolderJpgIsType.Poster;
@@ -266,6 +267,7 @@ namespace TVRename
         public string USER_AGENT =>
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36";
 
+        public bool CleanLibraryAfterActions = false;
         public bool AutoAddAsPartOfQuickRename = true;
         public bool UseFullPathNameToMatchSearchFolders = false;
         public bool UseFullPathNameToMatchLibraryFolders = false;
@@ -361,7 +363,7 @@ namespace TVRename
         public void WriteXML([NotNull] XmlWriter writer)
         {
             writer.WriteStartElement("Settings");
-
+            writer.WriteElement("UseColoursOnWtw", UseColoursOnWtw);
             writer.WriteElement("BGDownload", BGDownload);
             writer.WriteElement("OfflineMode", OfflineMode);
             writer.WriteElement("ShowBasicShowDetails", ShowBasicShowDetails);
@@ -506,6 +508,7 @@ namespace TVRename
             writer.WriteElement("UseFullPathNameToMatchLibraryFolders", UseFullPathNameToMatchLibraryFolders);
             writer.WriteElement("UseFullPathNameToMatchSearchFolders", UseFullPathNameToMatchSearchFolders);
             writer.WriteElement("AutoAddAsPartOfQuickRename", AutoAddAsPartOfQuickRename);
+            writer.WriteElement("CleanLibraryAfterActions", CleanLibraryAfterActions);
 
             writer.WriteElement("DefShowIncludeNoAirdate", DefShowIncludeNoAirdate);
             writer.WriteElement("DefShowIncludeFuture", DefShowIncludeFuture);
@@ -1136,6 +1139,7 @@ namespace TVRename
         public void load([NotNull] XElement xmlSettings)
         {
             SetToDefaults();
+            UseColoursOnWtw = xmlSettings.ExtractBool("UseColoursOnWtw", false);
             RSSUseCloudflare = xmlSettings.ExtractBool("RSSUseCloudflare", true);
             SearchJSONUseCloudflare = xmlSettings.ExtractBool("SearchJSONUseCloudflare", true);
             qBitTorrentDownloadFilesFirst = xmlSettings.ExtractBool("qBitTorrentDownloadFilesFirst", true);
@@ -1277,6 +1281,7 @@ namespace TVRename
             UseFullPathNameToMatchLibraryFolders = xmlSettings.ExtractBool("UseFullPathNameToMatchLibraryFolders",false);
             UseFullPathNameToMatchSearchFolders = xmlSettings.ExtractBool("UseFullPathNameToMatchSearchFolders",false);
             AutoAddAsPartOfQuickRename = xmlSettings.ExtractBool("AutoAddAsPartOfQuickRename", true);
+            CleanLibraryAfterActions = xmlSettings.ExtractBool("CleanLibraryAfterActions", false);
 
             DefShowIncludeNoAirdate = xmlSettings.ExtractBool("DefShowIncludeNoAirdate", false);
             DefShowIncludeFuture = xmlSettings.ExtractBool("DefShowIncludeFuture", false);

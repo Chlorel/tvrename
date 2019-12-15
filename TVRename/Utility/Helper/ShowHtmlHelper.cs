@@ -170,10 +170,11 @@ namespace TVRename
         [NotNull]
         private static string CreateHorizontalBannerHtml([NotNull] SeriesInfo ser)
         {
-            if ((!string.IsNullOrEmpty(ser.GetSeriesWideBannerPath())) &&
-                (!string.IsNullOrEmpty(TheTVDB.GetImageURL(ser.GetSeriesWideBannerPath()))))
+            string path = ser.GetSeriesWideBannerPath();
+            if ((!string.IsNullOrEmpty(path)) &&
+                (!string.IsNullOrEmpty(TheTVDB.GetImageURL(path))))
             {
-                return  $"<img class=\"rounded\" src=\"{TheTVDB.GetImageURL(ser.GetSeriesWideBannerPath())}\"><br/>&nbsp;";
+                return  $"<img class=\"rounded\" src=\"{TheTVDB.GetImageURL(path)}\"><br/>&nbsp;";
             }
 
             return string.Empty;
@@ -279,8 +280,6 @@ namespace TVRename
         private static string GetBestFolderLocationToOpen([NotNull] this ShowItem si,[NotNull] Season s )
         {
             Dictionary<int, List<string>> afl = si.AllExistngFolderLocations();
-            int[] keys = new int[afl.Count];
-            afl.Keys.CopyTo(keys, 0);
 
             if (afl.ContainsKey(s.SeasonNumber))
             {
@@ -448,14 +447,12 @@ namespace TVRename
 
         private static string HiddenOverview([NotNull] this ProcessedEpisode ei)
         {
-            string overviewString = ei.Overview;
-
             if (TVSettings.Instance.HideMyShowsSpoilers && ei.HowLong() != "Aired")
             {
-                overviewString = "[Spoilers Hidden]";
+                return "[Spoilers Hidden]";
             }
 
-            return overviewString;
+            return ei.Overview;
         }
 
         [NotNull]
@@ -794,21 +791,12 @@ namespace TVRename
 
             if (!string.IsNullOrWhiteSpace(overviewString))
             {
-                return GetOverviewString(ei) + "<table border=0>" + overviewString + "</table>";
+                return ei.HiddenOverview() + "<table border=0>" + overviewString + "</table>";
             }
 
-            return GetOverviewString(ei);
+            return ei.HiddenOverview();
         }
 
-        private static string GetOverviewString([NotNull] ProcessedEpisode ei)
-        {
-            if (TVSettings.Instance.HideMyShowsSpoilers && ei.HowLong() != "Aired")
-            {
-                return "[Spoilers Hidden]";
-            }
-
-            return ei.Overview;
-        }
 
         [NotNull]
         private static string GetOverviewPart(string name, [CanBeNull] string value)

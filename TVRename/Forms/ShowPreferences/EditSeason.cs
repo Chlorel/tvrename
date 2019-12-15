@@ -58,7 +58,7 @@ namespace TVRename
             lvSeenEpisodes.Sort();
         }
 
-private void FillSeenEpisodes(bool keepSel)
+        private void FillSeenEpisodes(bool keepSel)
         {
             List<int> sel = new List<int>();
             if (keepSel)
@@ -70,7 +70,7 @@ private void FillSeenEpisodes(bool keepSel)
             }
 
             lvSeenEpisodes.Items.Clear();
-            foreach (ProcessedEpisode ep in mOriginalEps.Where(ep => TVSettings.Instance.PreviouslySeenEpisodes.Contains(ep.EpisodeId)))
+            foreach (ProcessedEpisode ep in mOriginalEps.Where(ep => ep.PreviouslySeen))
             {
                 ListViewItem lvi = new ListViewItem { Text = ep.AppropriateEpNum.ToString() };
                 lvi.SubItems.Add(ep.Name);
@@ -235,7 +235,7 @@ private void FillSeenEpisodes(bool keepSel)
 
             foreach (ProcessedEpisode epIdToAdd in episodesToAddToSeen)
             {
-                TVSettings.Instance.PreviouslySeenEpisodes.Add(epIdToAdd.EpisodeId);
+                TVSettings.Instance.PreviouslySeenEpisodes.EnsureAdded(epIdToAdd);
             }
         }
 
@@ -273,8 +273,15 @@ private void FillSeenEpisodes(bool keepSel)
             List<ProcessedEpisode> possibleEpisodes = new List<ProcessedEpisode>();
             foreach (ProcessedEpisode testEp in mOriginalEps)
             {
-                if (TVSettings.Instance.PreviouslySeenEpisodes.Contains(testEp.EpisodeId)) continue;
-                if (episodesToAddToSeen.Contains(testEp)) continue;
+                if (testEp.PreviouslySeen)
+                {
+                    continue;
+                }
+
+                if (episodesToAddToSeen.Contains(testEp))
+                {
+                    continue;
+                }
 
                 possibleEpisodes.Add(testEp);
             }
@@ -282,15 +289,22 @@ private void FillSeenEpisodes(bool keepSel)
 
             NewSeenEpisode nse = new NewSeenEpisode(possibleEpisodes);
             DialogResult dialogResult = nse.ShowDialog();
-            if (dialogResult == DialogResult.OK)
-            {
-                episodesToAddToSeen.Add(nse.ChosenEpisode);
 
-                ListViewItem lvi = new ListViewItem { Text = nse.ChosenEpisode.AppropriateEpNum.ToString() };
-                lvi.SubItems.Add(nse.ChosenEpisode.Name);
-                lvi.Tag = nse.ChosenEpisode;
-                lvSeenEpisodes.Items.Add(lvi);
+            if (dialogResult != DialogResult.OK )
+            {
+                return;
             }
+            if (nse.ChosenEpisode is null)
+            {
+                return;
+            }
+
+            episodesToAddToSeen.Add(nse.ChosenEpisode);
+
+            ListViewItem lvi = new ListViewItem { Text = nse.ChosenEpisode.AppropriateEpNum.ToString() };
+            lvi.SubItems.Add(nse.ChosenEpisode.Name);
+            lvi.Tag = nse.ChosenEpisode;
+            lvSeenEpisodes.Items.Add(lvi);
         }
 
         private void Button1_Click(object sender, System.EventArgs e)

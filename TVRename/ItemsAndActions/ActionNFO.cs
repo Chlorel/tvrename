@@ -43,6 +43,23 @@ namespace TVRename
             writer.WriteElement("originaltitle", show?.ShowName);
             writer.WriteElement("showtitle", show?.ShowName );
 
+            writer.WriteElement("id", episode.EpisodeId);
+
+            writer.WriteStartElement("uniqueid");
+            writer.WriteAttributeString("type", "tvdb");
+            writer.WriteAttributeString("default", "true");
+            writer.WriteValue(episode.EpisodeId);
+            writer.WriteEndElement();
+
+            if (!string.IsNullOrEmpty(episode.ImdbCode))
+            {
+                writer.WriteStartElement("uniqueid");
+                writer.WriteAttributeString("type", "imdb");
+                writer.WriteAttributeString("default", "false");
+                writer.WriteValue(episode.ImdbCode);
+                writer.WriteEndElement();
+            }
+
             string showRating = episode.EpisodeRating;
             if (showRating !=null)
             {
@@ -139,7 +156,7 @@ namespace TVRename
                     writer.WriteElement("name", aa.ActorName);
                     writer.WriteElement("role", aa.ActorRole);
                     writer.WriteElement("order", aa.ActorSortOrder);
-                    writer.WriteElement("thumb", aa.ActorImage);
+                    writer.WriteElement("thumb", TheTVDB.GetImageURL(aa.ActorImage),true);
                     writer.WriteEndElement(); // actor
                 }
             }
@@ -265,13 +282,13 @@ namespace TVRename
             writer.WriteStartElement("url");
             writer.WriteAttributeString("post", "yes");
             writer.WriteAttributeString("cache", "auth.json");
-            writer.WriteValue(TheTVDB.BuildUrl(SelectedShow.TvdbCode, lang));
+            writer.WriteRaw(TheTVDB.BuildUrl(SelectedShow.TvdbCode, lang));
             writer.WriteEndElement(); //url
             writer.WriteEndElement(); //episodeguide
 
             if (!(series is null))
             {
-                writer.WriteElement("id", series.SeriesId);
+                writer.WriteElement("id", series.TvdbCode);
                 writer.WriteElement("runtime", series.Runtime, true);
                 writer.WriteElement("mpaa", series.ContentRating, true);
 
@@ -303,7 +320,7 @@ namespace TVRename
                 writer.WriteElement("name", aa.ActorName);
                 writer.WriteElement("role", aa.ActorRole);
                 writer.WriteElement("order", aa.ActorSortOrder);
-                writer.WriteElement("thumb", aa.ActorImage);
+                writer.WriteElement("thumb", TheTVDB.GetImageURL(aa.ActorImage),true);
                 writer.WriteEndElement(); // actor
             }
 
