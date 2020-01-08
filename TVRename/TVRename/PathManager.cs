@@ -182,7 +182,6 @@ namespace TVRename
                     return GetFileInfo(UserDefinedBasePath, SHOWS_FILE_NAME);
                 }
                 return GetFileInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TVRename", "TVRename", (!string.IsNullOrEmpty(SHOWS_COLLECTION) ? SHOWS_COLLECTION : SHOWS_DEFAULT_COLLECTION)), (!string.IsNullOrEmpty(SHOWS_COLLECTION) ? SHOWS_FILE_NAME : SETTINGS_FILE_NAME));
-                }
             }
         }
     }
