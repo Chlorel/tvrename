@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using JetBrains.Annotations;
+using NodaTime;
 
 namespace TVRename
 {
@@ -112,10 +113,8 @@ namespace TVRename
             {
                 return AppropriateEpNum.ToString();
             }
-            else
-            {
-                return AppropriateEpNum + "-" + EpNum2;
-            }
+
+            return AppropriateEpNum + "-" + EpNum2;
         }
 
         public static int EpNumberSorter([NotNull] ProcessedEpisode e1, [NotNull] ProcessedEpisode e2)
@@ -137,9 +136,16 @@ namespace TVRename
 
         public DateTime? GetAirDateDt(bool inLocalTime)
         {
+            LocalDateTime? x = GetAirDateDt();
+
+            if (!inLocalTime && x.HasValue)
+            {
+                return x.Value.ToDateTimeUnspecified();
+            }
+
             if (!inLocalTime)
             {
-                return GetAirDateDt();
+                return null;
             }
 
             // do timezone adjustment
@@ -162,37 +168,33 @@ namespace TVRename
             {
                 return "Aired";
             }
-            else
-            {
-                int h = ts.Hours;
-                if (ts.TotalHours >= 1)
-                {
-                    if (ts.Minutes >= 30)
-                    {
-                        h += 1;
-                    }
 
-                    return ts.Days + "d " + h + "h";
-                }
-                else
+            int h = ts.Hours;
+            if (ts.TotalHours >= 1)
+            {
+                if (ts.Minutes >= 30)
                 {
-                    return Math.Round(ts.TotalMinutes) + "min";
+                    h += 1;
                 }
+
+                return ts.Days + "d " + h + "h";
             }
+
+            return Math.Round(ts.TotalMinutes) + "min";
         }
 
         [NotNull]
         public string DayOfWeek()
         {
             DateTime? dt = GetAirDateDt(true);
-            return (dt != null) ? dt.Value.ToString("ddd") : "-";
+            return dt != null ? dt.Value.ToString("ddd") : "-";
         }
 
         [NotNull]
         public string TimeOfDay()
         {
             DateTime? dt = GetAirDateDt(true);
-            return (dt != null) ? dt.Value.ToString("t") : "-";
+            return dt != null ? dt.Value.ToString("t") : "-";
         }
 
         public bool HasAired()
@@ -212,13 +214,13 @@ namespace TVRename
         public bool WithinDays(int days)
         {
             DateTime? dt = GetAirDateDt(true);
-            if ((dt is null) || (dt.Value.CompareTo(DateTime.MaxValue) == 0))
+            if (dt is null || dt.Value.CompareTo(DateTime.MaxValue) == 0)
             {
                 return false;
             }
 
             TimeSpan ts = dt.Value.Subtract(DateTime.Now);
-            return (ts.TotalHours >= (-24 * days)) && (ts.TotalHours <= 0);
+            return ts.TotalHours >= -24 * days && ts.TotalHours <= 0;
         }
 
         public bool IsInFuture(bool def)

@@ -12,7 +12,7 @@ namespace TVRename
         [NotNull]
         protected override string Checkname() => "Cleaned up empty library folders";
 
-        public override bool Active() => TVSettings.Instance.CleanLibraryAfterActions;
+        protected override bool Active() => TVSettings.Instance.CleanLibraryAfterActions;
 
         protected override void DoCheck(SetProgressDelegate prog)
         {
@@ -28,7 +28,7 @@ namespace TVRename
             }
         }
 
-        private void RemoveIfEmpty(string folderName)
+        private static void RemoveIfEmpty(string folderName)
         {
             if (CanRemove(folderName))
             {
@@ -36,17 +36,28 @@ namespace TVRename
             }
         }
 
-        private void RemoveDirectory(string folderName)
+        private static void RemoveDirectory([NotNull] string folderName)
         {
-            LOGGER.Info($"Removing {folderName} as part of the library clean up");
-            foreach (string file in Directory.GetFiles(folderName))
+            try
             {
-                LOGGER.Info($"    Folder contains {file}");
+                LOGGER.Info($"Removing {folderName} as part of the library clean up");
+                foreach (string file in Directory.GetFiles(folderName))
+                {
+                    LOGGER.Info($"    Folder contains {file}");
+                }
+
+                LOGGER.Info($"Recycling {folderName}");
+                Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(folderName,
+                    Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
+                    Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
             }
-            Directory.Delete(folderName,true);
+            catch (FileReadOnlyException)
+            {
+                LOGGER.Info($"Could not recycle {folderName} as we got a FileReadOnlyException");
+            }
         }
 
-        private bool CanRemove(string folderName)
+        private static bool CanRemove(string folderName)
         {
             if (!Directory.Exists(folderName))
             {

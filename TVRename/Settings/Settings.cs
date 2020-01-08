@@ -51,6 +51,13 @@ namespace TVRename
             }
         }
 
+        private const string VideoExtensionsStringDEFAULT =
+        ".avi;.mpg;.mpeg;.mkv;.mp4;.wmv;.divx;.ogm;.qt;.rm;.m4v;.webm;.vob;.ovg;.ogg;.mov;.m4p;.3gp;.wtv;.ts";
+
+        private const string OtherExtensionsStringDEFAULT = ".srt;.nfo;.txt;.tbn";
+        private const string keepTogetherExtensionsStringDEFAULT = ".srt;.nfo;.txt;.tbn";
+        private const string subtitleExtensionsStringDEFAULT = ".srt;.sub;.sbv;.idx";
+
         #region FolderJpgIsType enum
 
         public enum FolderJpgIsType
@@ -110,6 +117,7 @@ namespace TVRename
         public bool CheckqBitTorrent = false;
         public string qBitTorrentHost = "localhost";
         public string qBitTorrentPort = "8080";
+        public qBitTorrentAPIVersion qBitTorrentAPIVersion = qBitTorrentAPIVersion.v2;
         public bool EpTBNs = false;
         public bool EpJPGs = false;
         public bool SeriesJpg = false;
@@ -222,10 +230,7 @@ namespace TVRename
             return string.IsNullOrWhiteSpace(propertyString) ? new string[0] : propertyString.Split(';');
         }
 
-        internal bool IncludeBetaUpdates()
-        {
-            return (mode == BetaMode.BetaToo);
-        }
+        internal bool IncludeBetaUpdates() => mode == BetaMode.BetaToo;
 
         public string defaultSeasonWord = "Season";
         public ShowFilter Filter = new ShowFilter();
@@ -331,12 +336,10 @@ namespace TVRename
             LibraryFolders = new List<string>();
             IgnoredAutoAddHints = new List<string>();
 
-            VideoExtensionsString =
-                ".avi;.mpg;.mpeg;.mkv;.mp4;.wmv;.divx;.ogm;.qt;.rm;.m4v;.webm;.vob;.ovg;.ogg;.mov;.m4p;.3gp";
-
-            OtherExtensionsString = ".srt;.nfo;.txt;.tbn";
-            keepTogetherExtensionsString = ".srt;.nfo;.txt;.tbn";
-            subtitleExtensionsString = ".srt;.sub;.sbv;.idx";
+            VideoExtensionsString = VideoExtensionsStringDEFAULT;
+            OtherExtensionsString = OtherExtensionsStringDEFAULT;
+            keepTogetherExtensionsString = keepTogetherExtensionsStringDEFAULT;
+            subtitleExtensionsString = subtitleExtensionsStringDEFAULT;
 
             // have a guess at utorrent's path
             string[] guesses = new string[3];
@@ -444,6 +447,7 @@ namespace TVRename
             writer.WriteElement("CheckqBitTorrent", CheckqBitTorrent);
             writer.WriteElement("qBitTorrentHost", qBitTorrentHost);
             writer.WriteElement("qBitTorrentPort", qBitTorrentPort);
+            writer.WriteElement("qBitTorrentAPIVersion", (int)qBitTorrentAPIVersion);
             writer.WriteElement("RenameCheck", RenameCheck);
             writer.WriteElement("PreventMove", PreventMove);
             writer.WriteElement("MissingCheck", MissingCheck);
@@ -524,6 +528,7 @@ namespace TVRename
             writer.WriteElement("DefaultShowTimezoneName", DefaultShowTimezoneName);
             writer.WriteElement("DefShowUseBase", DefShowUseBase);
             writer.WriteElement("DefShowUseSubFolders", DefShowUseSubFolders);
+            writer.WriteElement("SampleFileMaxSizeMB", SampleFileMaxSizeMB); 
 
             TheSearchers.WriteXml(writer);
             WriteReplacements(writer);
@@ -638,7 +643,7 @@ namespace TVRename
             string[] t = s.Split(';');
             foreach (string s2 in t)
             {
-                if ((string.IsNullOrEmpty(s2)) || (!s2.StartsWith(".", StringComparison.Ordinal)) || s2.ContainsAnyCharctersFrom(CompulsoryReplacements()) || s2.ContainsAnyCharctersFrom(Path.GetInvalidFileNameChars()))
+                if (string.IsNullOrEmpty(s2) || !s2.StartsWith(".", StringComparison.Ordinal) || s2.ContainsAnyCharctersFrom(CompulsoryReplacements()) || s2.ContainsAnyCharctersFrom(Path.GetInvalidFileNameChars()))
                 {
                     return false;
                 }
@@ -688,11 +693,8 @@ namespace TVRename
         }
 
         [NotNull]
-        public static string CompulsoryReplacements()
-        {
-            return "*?<>:/\\|\""; // invalid filename characters, must be in the list!
-        }
-
+        public static string CompulsoryReplacements() => "*?<>:/\\|\""; // invalid filename characters, must be in the list!
+        
         [NotNull]
         public static List<FilenameProcessorRE> DefaultFNPList()
         {
@@ -777,7 +779,7 @@ namespace TVRename
 
         private static string TabNameForNumber(int n)
         {
-            if ((n >= 0) && (n < TabNames().Length))
+            if (n >= 0 && n < TabNames().Length)
             {
                 return TabNames()[n];
             }
@@ -810,7 +812,7 @@ namespace TVRename
                 return true;
             }
 
-            return (otherExtensionsToo) && OtherExtensionsArray
+            return otherExtensionsToo && OtherExtensionsArray
                                             .Where(s => !string.IsNullOrWhiteSpace(s))
                                             .Any(s => file.Name.EndsWith(s, StringComparison.InvariantCultureIgnoreCase));
         }
@@ -847,7 +849,7 @@ namespace TVRename
                 return "";
             }
 
-            string url = (epi.Show.UseCustomSearchUrl && !string.IsNullOrWhiteSpace(epi.Show.CustomSearchUrl))
+            string url = epi.Show.UseCustomSearchUrl && !string.IsNullOrWhiteSpace(epi.Show.CustomSearchUrl)
                 ? epi.Show.CustomSearchUrl
                 : TheSearchers.CurrentSearchUrl();
 
@@ -881,13 +883,13 @@ namespace TVRename
         {
             // Return true iff we need to download season specific images
             // There are 4 possible reasons
-            return (SeasonSpecificFolderJPG() || KODIImages || SeriesJpg || FanArtJpg);
+            return SeasonSpecificFolderJPG() || KODIImages || SeriesJpg || FanArtJpg;
         }
 
         // ReSharper disable once InconsistentNaming
         public bool SeasonSpecificFolderJPG()
         {
-            return (FolderJpgIsType.SeasonPoster == FolderJpgIs);
+            return FolderJpgIsType.SeasonPoster == FolderJpgIs;
         }
 
         public bool KeepTogetherFilesWithType(string fileExtension)
@@ -1043,26 +1045,10 @@ namespace TVRename
                 {
                     if (IsMetaType)
                     {
-                        if (IsShowLevel)
-                        {
-                            return $"Show Seasons Status: {StatusTextForDisplay}";
-                        }
-                        else
-                        {
-                            return $"Season Status: {StatusTextForDisplay}";
-                        }
+                        return IsShowLevel ? "Show Seasons" : "Season" +$" Status: { StatusTextForDisplay}";
                     }
-                    else
-                    {
-                        if (IsShowLevel)
-                        {
-                            return $"Show Status: {StatusTextForDisplay}";
-                        }
-                        else
-                        {
-                            return string.Empty;
-                        }
-                    }
+
+                    return IsShowLevel ? $"Show Status: {StatusTextForDisplay}" : string.Empty;
                 }
             }
 
@@ -1160,10 +1146,9 @@ namespace TVRename
                                           xmlSettings.ExtractInt("DefaultNamingStyle",1)); // old naming style
             NotificationAreaIcon = xmlSettings.ExtractBool("NotificationAreaIcon",false);
             VideoExtensionsString = xmlSettings.ExtractString("VideoExtensions",
-                                    xmlSettings.ExtractString("GoodExtensions",
-                                        ".avi;.mpg;.mpeg;.mkv;.mp4;.wmv;.divx;.ogm;.qt;.rm;.m4v;.webm;.vob;.ovg;.ogg;.mov;.m4p;.3gp"));
-            OtherExtensionsString = xmlSettings.ExtractString("OtherExtensions", ".srt;.nfo;.txt;.tbn");
-            subtitleExtensionsString = xmlSettings.ExtractString("SubtitleExtensions", ".srt;.sub;.sbv;.idx");
+                                    xmlSettings.ExtractString("GoodExtensions",VideoExtensionsStringDEFAULT));
+            OtherExtensionsString = xmlSettings.ExtractString("OtherExtensions",OtherExtensionsStringDEFAULT);
+            subtitleExtensionsString = xmlSettings.ExtractString("SubtitleExtensions", subtitleExtensionsStringDEFAULT);
             ExportRSSMaxDays = xmlSettings.ExtractInt("ExportRSSMaxDays",7);
             ExportRSSMaxShows = xmlSettings.ExtractInt("ExportRSSMaxShows",10);
             ExportRSSDaysPast = xmlSettings.ExtractInt("ExportRSSDaysPast",0);
@@ -1235,6 +1220,7 @@ namespace TVRename
             CheckqBitTorrent = xmlSettings.ExtractBool("CheckqBitTorrent",false);
             qBitTorrentHost = xmlSettings.ExtractString("qBitTorrentHost", "localhost");
             qBitTorrentPort = xmlSettings.ExtractString("qBitTorrentPort", "8080");
+            qBitTorrentAPIVersion = xmlSettings.ExtractEnum( "qBitTorrentAPIVersion", qBitTorrentAPIVersion.v2);
             MissingCheck = xmlSettings.ExtractBool("MissingCheck",true);
             MoveLibraryFiles = xmlSettings.ExtractBool("MoveLibraryFiles",true);
             CorrectFileDates = xmlSettings.ExtractBool("UpdateFileDates",false);
@@ -1272,7 +1258,7 @@ namespace TVRename
             searchSeasonWordsString = xmlSettings.ExtractString("SearchSeasonNames", "Season;Series;Saison;Temporada;Seizoen");
             preferredRSSSearchTermsString = xmlSettings.ExtractString("PreferredRSSSearchTerms", "720p;1080p");
             keepTogetherMode = xmlSettings.ExtractEnum("KeepTogetherType", KeepTogetherModes.All);
-            keepTogetherExtensionsString = xmlSettings.ExtractString("KeepTogetherExtensions", ".srt;.nfo;.txt;.tbn");
+            keepTogetherExtensionsString = xmlSettings.ExtractString("KeepTogetherExtensions", keepTogetherExtensionsStringDEFAULT);
             ExportWTWRSS = xmlSettings.ExtractBool("ExportWTWRSS",false);
             CopyFutureDatedEpsFromSearchFolders = xmlSettings.ExtractBool("CopyFutureDatedEpsFromSearchFolders",false);
             ShareLogs = xmlSettings.ExtractBool("ShareLogs",true);
@@ -1326,7 +1312,7 @@ namespace TVRename
                 ShowRating = xmlSettings.Descendants("ShowFilters").Descendants("ShowRatingFilter").Attributes("ShowRating")
                     .FirstOrDefault()?.Value,
                 ShowNetwork = xmlSettings.Descendants("ShowFilters").Descendants("ShowNetworkFilter").Attributes("ShowNetwork")
-                    .FirstOrDefault()?.Value,
+                    .FirstOrDefault()?.Value
             };
 
             foreach (XAttribute rep in xmlSettings.Descendants("ShowFilters").Descendants("GenreFilter").Attributes("Genre"))
