@@ -351,6 +351,7 @@ namespace TVRename
 
             s.FolderJpgIs = FolderJpgMode();
             s.MonitoredFoldersScanType = ScanTypeMode();
+            s.qBitTorrentAPIVersion = qBitTorrentAPIVersionMode();
 
             s.mode = cbMode.Text == "Beta" ? TVSettings.BetaMode.BetaToo : TVSettings.BetaMode.ProductionOnly;
 
@@ -404,6 +405,20 @@ namespace TVRename
             return TVSettings.ScanType.Full;
         }
 
+        // ReSharper disable once InconsistentNaming
+        private qBitTorrentAPIVersion qBitTorrentAPIVersionMode()
+        {
+            if (rdoqBitTorrentAPIVersionv0.Checked)
+            {
+                return qBitTorrentAPIVersion.v0;
+            }
+            if (rdoqBitTorrentAPIVersionv1.Checked)
+            {
+                return qBitTorrentAPIVersion.v1;
+            }
+
+            return qBitTorrentAPIVersion.v2;
+        }
         private TVSettings.FolderJpgIsType FolderJpgMode()
         {
             if (rbFolderFanArt.Checked)
@@ -586,7 +601,7 @@ namespace TVRename
             ReplacementsGrid[r, 1] = new SourceGrid.Cells.Cell(to, typeof(string));
             ReplacementsGrid[r, 2] = new SourceGrid.Cells.CheckBox(null, ins);
             if (!string.IsNullOrEmpty(from) &&
-                (TVSettings.CompulsoryReplacements().IndexOf(from, StringComparison.Ordinal) != -1))
+                TVSettings.CompulsoryReplacements().IndexOf(from, StringComparison.Ordinal) != -1)
             {
                 ReplacementsGrid[r, 0].Editor.EnableEdit = false;
                 ReplacementsGrid[r, 0].View = roModel;
@@ -638,7 +653,7 @@ namespace TVRename
             s.RSSURLs.Clear();
             for (int i = 1; i < RSSGrid.RowsCount; i++)
             {
-                string url = (string) (RSSGrid[i, 0].Value);
+                string url = (string) RSSGrid[i, 0].Value;
                 if (!string.IsNullOrEmpty(url))
                 {
                     s.RSSURLs.Add(url);
@@ -651,9 +666,9 @@ namespace TVRename
             s.Replacements.Clear();
             for (int i = 1; i < ReplacementsGrid.RowsCount; i++)
             {
-                string from = (string) (ReplacementsGrid[i, 0].Value);
-                string to = (string) (ReplacementsGrid[i, 1].Value);
-                bool ins = (bool) (ReplacementsGrid[i, 2].Value);
+                string from = (string) ReplacementsGrid[i, 0].Value;
+                string to = (string) ReplacementsGrid[i, 1].Value;
+                bool ins = (bool) ReplacementsGrid[i, 2].Value;
                 if (!string.IsNullOrEmpty(from))
                 {
                     s.Replacements.Add(new TVSettings.Replacement(from, to, ins));
@@ -863,18 +878,18 @@ namespace TVRename
             switch (s.WTWDoubleClick)
             {
                 case TVSettings.WTWDoubleClickAction.Search:
-                default:
                     rbWTWSearch.Checked = true;
                     break;
                 case TVSettings.WTWDoubleClickAction.Scan:
                     rbWTWScan.Checked = true;
                     break;
+                default:
+                    throw new InvalidOperationException("Unexpected value s.WTWDoubleClick = " + s.WTWDoubleClick);
             }
 
             switch (s.keepTogetherMode)
             {
                 case TVSettings.KeepTogetherModes.All:
-                default:
                     cbKeepTogetherMode.Text = "All";
                     break;
                 case TVSettings.KeepTogetherModes.AllBut:
@@ -883,17 +898,20 @@ namespace TVRename
                 case TVSettings.KeepTogetherModes.Just:
                     cbKeepTogetherMode.Text = "Just";
                     break;
+                default:
+                    throw new InvalidOperationException("Unexpected value s.keepTogetherMode = " + s.keepTogetherMode);
             }
 
             switch (s.mode)
             {
                 case TVSettings.BetaMode.ProductionOnly:
-                default:
                     cbMode.Text = "Production";
                     break;
                 case TVSettings.BetaMode.BetaToo:
                     cbMode.Text = "Beta";
                     break;
+                default:
+                    throw new InvalidOperationException("Unexpected value s.mode = " + s.mode);
             }
 
             switch (s.FolderJpgIs)
@@ -907,9 +925,29 @@ namespace TVRename
                 case TVSettings.FolderJpgIsType.SeasonPoster:
                     rbFolderSeasonPoster.Checked = true;
                     break;
-                default:
+                case TVSettings.FolderJpgIsType.Poster:
                     rbFolderPoster.Checked = true;
                     break;
+                default:
+                    throw new InvalidOperationException("Unexpected value s.FolderJpgIs = " + s.FolderJpgIs);
+            }
+
+            switch (s.qBitTorrentAPIVersion)
+            {
+                case qBitTorrentAPIVersion.v0:
+                    rdoqBitTorrentAPIVersionv0.Checked = true;
+                    break;
+
+                case qBitTorrentAPIVersion.v1:
+                    rdoqBitTorrentAPIVersionv1.Checked = true;
+                    break;
+
+                case qBitTorrentAPIVersion.v2:
+                    rdoqBitTorrentAPIVersionv2.Checked = true;
+                    break;
+
+                default:
+                    throw new InvalidOperationException("Unexpected value s.qBitTorrentAPIVersion = " + s.qBitTorrentAPIVersion);
             }
 
             switch (s.MonitoredFoldersScanType)
@@ -920,8 +958,15 @@ namespace TVRename
                 case TVSettings.ScanType.Recent:
                     rdoRecentScan.Checked = true;
                     break;
-                default:
+                case TVSettings.ScanType.Full:
                     rdoFullScan.Checked = true;
+                    break;
+
+                case TVSettings.ScanType.SingleShow:
+                    throw new InvalidOperationException("Unexpected value s.MonitoredFoldersScanType = SingleShow");
+                    break;
+                default:
+                    throw new InvalidOperationException("Unexpected value s.MonitoredFoldersScanType = " + s.MonitoredFoldersScanType);
                     break;
             }
         }
@@ -1010,7 +1055,7 @@ namespace TVRename
             }
         }
 
-        private void SetDropdownValue([NotNull] DomainUpDown control, int sPeriodCheckHours)
+        private static void SetDropdownValue([NotNull] DomainUpDown control, int sPeriodCheckHours)
         {
             foreach (object item in control.Items)
             {
@@ -1063,7 +1108,7 @@ namespace TVRename
         private void TxtNumberOnlyKeyPress(object sender, [NotNull] KeyPressEventArgs e)
         {
             // digits only
-            if ((e.KeyChar >= 32) && (!char.IsDigit(e.KeyChar)))
+            if (e.KeyChar >= 32 && !char.IsDigit(e.KeyChar))
             {
                 e.Handled = true;
             }
@@ -1143,7 +1188,7 @@ namespace TVRename
 
             if (rowsIndex.Length > 0)
             {
-                Helpers.SysOpen((string) (RSSGrid[rowsIndex[0], 0].Value));
+                Helpers.SysOpen((string) RSSGrid[rowsIndex[0], 0].Value);
             }
         }
 
@@ -1165,7 +1210,7 @@ namespace TVRename
         private void EnableDisable(object sender, EventArgs e)
         {
             bnRemoveDefinedColor.Enabled = lvwDefinedColors.SelectedItems.Count == 1;
-            txtKeepTogether.Enabled = (cbKeepTogether.Checked && cbKeepTogetherMode.Text != "All");
+            txtKeepTogether.Enabled = cbKeepTogether.Checked && cbKeepTogetherMode.Text != "All";
             gbRSS.Enabled = cbSearchRSS.Checked;
             gbJSON.Enabled = cbSearchJSON.Checked;
 
@@ -1180,7 +1225,7 @@ namespace TVRename
             }
 
             cbTxtToSub.Enabled = cbKeepTogether.Checked;
-            txtKeepTogether.Enabled = (cbKeepTogether.Checked && cbKeepTogetherMode.Text != "All");
+            txtKeepTogether.Enabled = cbKeepTogether.Checked && cbKeepTogetherMode.Text != "All";
             cbKeepTogetherMode.Enabled = cbKeepTogether.Checked;
             label39.Enabled = cbKeepTogether.Checked;
 
@@ -1268,9 +1313,9 @@ namespace TVRename
             {
                 // don't delete compulsory items
                 int n = rowsIndex[0];
-                string from = (string) (ReplacementsGrid[n, 0].Value);
+                string from = (string) ReplacementsGrid[n, 0].Value;
                 if (string.IsNullOrEmpty(from) ||
-                    (TVSettings.CompulsoryReplacements().IndexOf(from, StringComparison.Ordinal) == -1))
+                    TVSettings.CompulsoryReplacements().IndexOf(from, StringComparison.Ordinal) == -1)
                 {
                     ReplacementsGrid.Rows.Remove(n);
                 }
@@ -1569,7 +1614,7 @@ namespace TVRename
 
         private void lbSearchFolders_DragDrop(object sender, [NotNull] DragEventArgs e)
         {
-            string[] files = (string[]) (e.Data.GetData(DataFormats.FileDrop));
+            string[] files = (string[]) e.Data.GetData(DataFormats.FileDrop);
             foreach (string path in files)
             {
                 try
@@ -1651,7 +1696,7 @@ namespace TVRename
 
         private void lstFMMonitorFolders_DragDrop(object sender, [NotNull] DragEventArgs e)
         {
-            string[] files = (string[]) (e.Data.GetData(DataFormats.FileDrop));
+            string[] files = (string[]) e.Data.GetData(DataFormats.FileDrop);
             foreach (string path in files)
             {
                 try
@@ -1674,14 +1719,14 @@ namespace TVRename
 
         private void lstFMMonitorFolders_SelectedIndexChanged(object sender, EventArgs e)
         {
-            bnRemoveMonFolder.Enabled = (lstFMMonitorFolders.SelectedIndices.Count > 0);
-            bnOpenMonFolder.Enabled = (lstFMMonitorFolders.SelectedIndices.Count > 0);
+            bnRemoveMonFolder.Enabled = lstFMMonitorFolders.SelectedIndices.Count > 0;
+            bnOpenMonFolder.Enabled = lstFMMonitorFolders.SelectedIndices.Count > 0;
         }
 
         private void lbSearchFolders_SelectedIndexChanged(object sender, EventArgs e)
         {
-            bnRemoveSearchFolder.Enabled = (lbSearchFolders.SelectedIndices.Count > 0);
-            bnOpenSearchFolder.Enabled = (lbSearchFolders.SelectedIndices.Count > 0);
+            bnRemoveSearchFolder.Enabled = lbSearchFolders.SelectedIndices.Count > 0;
+            bnOpenSearchFolder.Enabled = lbSearchFolders.SelectedIndices.Count > 0;
         }
 
         #endregion Folder Add & Remove
@@ -1713,7 +1758,7 @@ namespace TVRename
         {
             Season t = null;
             // ReSharper disable once ExpressionIsAlwaysNull
-            cntfw = new CustomNameTagsFloatingWindow(pe: t);
+            cntfw = new CustomNameTagsFloatingWindow(t);
             cntfw.Show(this);
             Focus();
         }
@@ -1721,6 +1766,11 @@ namespace TVRename
         private void CbDefShowUseDefLocation_CheckedChanged(object sender, EventArgs e)
         {
             cmbDefShowLocation.Enabled = cbDefShowUseDefLocation.Checked;
+        }
+
+        private void RadioButton1_CheckedChanged(object sender, EventArgs e)
+        {
+
         }
     }
 }

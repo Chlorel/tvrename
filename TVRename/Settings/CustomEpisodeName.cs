@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using JetBrains.Annotations;
+using NodaTime;
 
 // This builds the filenames to rename to, for any given episode (or multi-episode episode)
 
@@ -33,7 +34,7 @@ namespace TVRename
         public static string OldNStyle(int n)
         {
             // for now, this maps onto the presets
-            if ((n >= 0) && (n < 9))
+            if (n >= 0 && n < 9)
             {
                 return PRESETS[n];
             }
@@ -100,7 +101,7 @@ namespace TVRename
                 return r.Substring(0,Math.Min(maxFilenameLength, r.Length));
             }
 
-            bool needsSpacer = (!extension.StartsWith(".", StringComparison.Ordinal));
+            bool needsSpacer = !extension.StartsWith(".", StringComparison.Ordinal);
 
             if (needsSpacer)
             {
@@ -111,11 +112,11 @@ namespace TVRename
         }
 
         [NotNull]
-        public string GetTargetEpisodeName([NotNull] ShowItem show, [NotNull] Episode ep, TimeZoneInfo tz, bool dvdOrder)
+        public string GetTargetEpisodeName([NotNull] ShowItem show, [NotNull] Episode ep, DateTimeZone tz, bool dvdOrder)
             => GetTargetEpisodeName(show, ep,  tz, dvdOrder, false);
 
         [NotNull]
-        private string GetTargetEpisodeName([NotNull] ShowItem show, [NotNull] Episode ep, TimeZoneInfo tz, bool dvdOrder, bool urlEncode)
+        private string GetTargetEpisodeName([NotNull] ShowItem show, [NotNull] Episode ep, DateTimeZone tz, bool dvdOrder, bool urlEncode)
         {
             //note this is for an Episode and not a ProcessedEpisode
             string name = StyleString;

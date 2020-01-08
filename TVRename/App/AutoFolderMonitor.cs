@@ -45,7 +45,7 @@ namespace TVRename
                     continue;
                 }
 
-                if ((File.GetAttributes(efi) & System.IO.FileAttributes.Directory) != (System.IO.FileAttributes.Directory))  // not a folder
+                if ((File.GetAttributes(efi) & System.IO.FileAttributes.Directory) != System.IO.FileAttributes.Directory)  // not a folder
                 {
                     Logger.Warn($"Could not watch {efi} as it is not a file.");
                     continue;
@@ -71,14 +71,14 @@ namespace TVRename
             }
         }
 
-        void watcher_Changed(object sender, System.IO.FileSystemEventArgs e)
+        private void watcher_Changed(object sender, System.IO.FileSystemEventArgs e)
         {
             Logger.Trace("Restarted delay timer");
             mScanDelayTimer.Stop();
             mScanDelayTimer.Start();
         }
 
-        void mScanDelayTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        private void mScanDelayTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
             mScanDelayTimer.Stop();
             Stop();
@@ -90,22 +90,11 @@ namespace TVRename
                 Logger.Info("Auto scan fired");
                 if (mainForm != null)
                 {
-                    switch (TVSettings.Instance.MonitoredFoldersScanType)
+                    if (TVSettings.Instance.MonitoredFoldersScanType == TVSettings.ScanType.SingleShow)
                     {
-                        case TVSettings.ScanType.Full:
-                            mainForm.Invoke(mainForm.AfmFullScan);
-                            break;
-                        case TVSettings.ScanType.Recent:
-                            mainForm.Invoke(mainForm.AfmRecentScan);
-                            break;
-                        case TVSettings.ScanType.Quick:
-                            mainForm.Invoke(mainForm.AfmQuickScan);
-                            break;
-                        case TVSettings.ScanType.SingleShow:
-                        default:
-                            throw new ArgumentException("Inappropriate action for auto-scan " + TVSettings.Instance.MonitoredFoldersScanType);
+                        throw new ArgumentException("Inappropriate action for auto-scan " + TVSettings.Instance.MonitoredFoldersScanType);
                     }
-                    mainForm.Invoke(mainForm.AfmDoAll);
+                    mainForm.BeginInvoke(mainForm.ScanAndDo,TVSettings.Instance.MonitoredFoldersScanType);
                 }
             }
             else

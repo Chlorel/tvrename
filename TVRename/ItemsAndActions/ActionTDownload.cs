@@ -60,9 +60,16 @@ namespace TVRename
                     return false;
                 }
 
+                if (!TVSettings.Instance.qBitTorrentDownloadFilesFirst && TVSettings.Instance.CheckqBitTorrent)
+                {
+                    qBitTorrentFinder.StartTorrentDownload(url, null, false);
+                    Done = true;
+                    return true;
+                }
+
                 byte[] r = HttpHelper.GetUrlBytes(url,true);
 
-                if ((r is null) || (r.Length == 0))
+                if (r is null || r.Length == 0)
                 {
                     Error = true;
                     ErrorText = "No data downloaded";
@@ -114,7 +121,7 @@ namespace TVRename
 
         public override bool SameAs(Item o)
         {
-            return (o is ActionTDownload rss) && (rss.url == url);
+            return o is ActionTDownload rss && rss.url == url;
         }
 
         public override int Compare(Item o)

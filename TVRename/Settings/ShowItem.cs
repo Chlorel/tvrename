@@ -12,6 +12,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Xml.Linq;
 using JetBrains.Annotations;
+using NodaTime;
+using TimeZoneConverter;
 
 // These are what is used when processing folders for missing episodes, renaming, etc. of files.
 
@@ -50,7 +52,7 @@ namespace TVRename
         public bool ManualFoldersReplaceAutomatic;
 
         public string ShowTimeZone;
-        private TimeZoneInfo seriesTimeZone;
+        private DateTimeZone seriesTimeZone;
         private string lastFiguredTz;
 
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
@@ -91,27 +93,43 @@ namespace TVRename
 
             try
             {
-                seriesTimeZone = TimeZoneInfo.GetSystemTimeZones().First(info => info.StandardName ==tzstr);
+                //seriesTimeZone = TimeZoneInfo.GetSystemTimeZones().First(info => info.StandardName ==tzstr);
+                seriesTimeZone = DateTimeZoneProviders.Tzdb[tzstr];
+
             }
             catch (Exception ex)
             {
-                Logger.Warn(ex, $"Could not work out what timezone '{ShowName}' has. In the settings it uses '{tzstr}', but that is not valid. Please update. Using the default timezone {TimeZoneHelper.DefaultTimeZone()} for the show instead.");
                 try
                 {
-                    tzstr = TimeZoneHelper.DefaultTimeZone();
-                    seriesTimeZone = TimeZoneInfo.FindSystemTimeZoneById(tzstr);
+                    tzstr = TZConvert.WindowsToIana(tzstr);
+                    ShowTimeZone = tzstr;
+                    seriesTimeZone = DateTimeZoneProviders.Tzdb[tzstr];
                 }
-                catch (Exception)
+                catch (Exception ex2)
                 {
-                    Logger.Warn(ex, $"Could not work out what timezone '{ShowName}' has. In the settings it uses '{tzstr}', but that is not valid. Tried to use the default timezone {TimeZoneHelper.DefaultTimeZone()} for the show instead - also invalid.  Please update.");
-                    seriesTimeZone = TimeZoneInfo.Local;
+                    Logger.Warn(ex,
+                        $"Could not work out what timezone '{ShowName}' has. In the settings it uses '{tzstr}', but that is not valid. Please update. Using the default timezone {TimeZoneHelper.DefaultTimeZone()} for the show instead.");
+
+                    try
+                    {
+                        tzstr = TimeZoneHelper.DefaultTimeZone();
+                        seriesTimeZone = DateTimeZoneProviders.Tzdb[tzstr];
+                        //TimeZoneInfo.FindSystemTimeZoneById(tzstr);
+                    }
+                    catch (Exception)
+                    {
+                        Logger.Warn(ex,
+                            $"Could not work out what timezone '{ShowName}' has. In the settings it uses '{tzstr}', but that is not valid. Tried to use the default timezone {TimeZoneHelper.DefaultTimeZone()} for the show instead - also invalid.  Please update.");
+
+                        seriesTimeZone = DateTimeZoneProviders.Tzdb.GetSystemDefault(); // TimeZoneInfo.Local;
+                    }
                 }
             }
 
             lastFiguredTz = tzstr;
         }
 
-        public TimeZoneInfo GetTimeZone()
+        public DateTimeZone GetTimeZone()
         {
             if (seriesTimeZone is null || lastFiguredTz != ShowTimeZone)
             {
@@ -177,8 +195,8 @@ namespace TVRename
                 {
                     if (tempAutoAddFolderPerSeason)
                     {
-                        AutoAddCustomFolderFormat = tempAutoAddSeasonFolderName + ((tempPadSeasonToTwoDigits || TVSettings.Instance.LeadingZeroOnSeason) ? "{Season:2}" : "{Season}");
-                        AutoAddType = (AutoAddCustomFolderFormat == TVSettings.Instance.SeasonFolderFormat)
+                        AutoAddCustomFolderFormat = tempAutoAddSeasonFolderName + (tempPadSeasonToTwoDigits || TVSettings.Instance.LeadingZeroOnSeason ? "{Season:2}" : "{Season}");
+                        AutoAddType = AutoAddCustomFolderFormat == TVSettings.Instance.SeasonFolderFormat
                             ? AutomaticFolderType.libraryDefault
                             : AutomaticFolderType.custom;
                     }
@@ -345,30 +363,28 @@ namespace TVRename
         {
             get
             {
-                if (HasSeasonsAndEpisodes)
-                {
-                    if (HasAiredEpisodes && !HasUnairedEpisodes)
-                    {
-                        return ShowAirStatus.aired;
-                    }
-                    else if (HasUnairedEpisodes && !HasAiredEpisodes)
-                    {
-                        return ShowAirStatus.noneAired;
-                    }
-                    else if (HasAiredEpisodes && HasUnairedEpisodes)
-                    {
-                        return ShowAirStatus.partiallyAired;
-                    }
-                    else
-                    {
-                        //System.Diagnostics.Debug.Assert(false, "That is weird ... we have 'seasons and episodes' but none are aired, nor unaired. That case shouldn't actually occur !");
-                        return ShowAirStatus.noEpisodesOrSeasons;
-                    }
-                }
-                else
+                if (!HasSeasonsAndEpisodes)
                 {
                     return ShowAirStatus.noEpisodesOrSeasons;
                 }
+
+                if (HasAiredEpisodes && !HasUnairedEpisodes)
+                {
+                    return ShowAirStatus.aired;
+                }
+
+                if (HasUnairedEpisodes && !HasAiredEpisodes)
+                {
+                    return ShowAirStatus.noneAired;
+                }
+
+                if (HasAiredEpisodes && HasUnairedEpisodes)
+                {
+                    return ShowAirStatus.partiallyAired;
+                }
+
+                //System.Diagnostics.Debug.Assert(false, "That is weird ... we have 'seasons and episodes' but none are aired, nor unaired. That case shouldn't actually occur !");
+                return ShowAirStatus.noEpisodesOrSeasons;
             }
         }
 
@@ -733,7 +749,7 @@ namespace TVRename
                 }
             }
 
-            if (AutoAddNewSeasons() && (!string.IsNullOrEmpty(AutoAddFolderBase)))
+            if (AutoAddNewSeasons() && !string.IsNullOrEmpty(AutoAddFolderBase))
             {
                 foreach (int i in SeasonEpisodes.Keys.ToList())
                 {
@@ -840,12 +856,12 @@ namespace TVRename
             return null;
         }
 
-        public bool InOneFolder() => (AutoAddType == AutomaticFolderType.baseOnly);
+        public bool InOneFolder() => AutoAddType == AutomaticFolderType.baseOnly;
 
         [NotNull]
         public string AutoFolderNameForSeason(int snum) => AutoFolderNameForSeason(GetSeason(snum));
 
-        public bool AutoAddNewSeasons() => (AutoAddType != AutomaticFolderType.none);
+        public bool AutoAddNewSeasons() => AutoAddType != AutomaticFolderType.none;
 
         [NotNull]
         public IEnumerable<string> GetActorNames()

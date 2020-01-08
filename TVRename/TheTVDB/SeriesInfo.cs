@@ -144,7 +144,7 @@ namespace TVRename
             LoadXml(seriesXml);
         }
 
-        public SeriesInfo([NotNull] JObject json,int langId)
+        public SeriesInfo([NotNull] JObject json,int langId,bool miniSeriesData)
         {
             SetToDefaults();
             LanguageId = langId;
@@ -156,7 +156,7 @@ namespace TVRename
                Logger.Warn(json.ToString());
             }
 
-            if (SrvLastUpdated==0)
+            if (SrvLastUpdated==0 && !miniSeriesData)
             {
                 Logger.Warn("Issue with series (update time is 0) " + TvdbCode);
                 Logger.Warn(json.ToString());
@@ -173,6 +173,14 @@ namespace TVRename
                Logger.Warn("Issue with series " + TvdbCode );
                Logger.Warn(json.ToString());
                Logger.Info(jsonInDefaultLang .ToString());
+            }
+
+            if (SrvLastUpdated == 0)
+            {
+                Logger.Warn("Issue with series (update time is 0) " + TvdbCode);
+                Logger.Warn(json.ToString());
+                Logger.Info(jsonInDefaultLang.ToString());
+                SrvLastUpdated = 100;
             }
         }
 
@@ -249,12 +257,12 @@ namespace TVRename
                 SiteRatingVotes = o.SiteRatingVotes;
             }
 
-            if (!aliases.Any() || (o.aliases.Any() && useNewDataOverOld))
+            if (!aliases.Any() || o.aliases.Any() && useNewDataOverOld)
             {
                 aliases = o.aliases;
             }
 
-            if (!genres.Any() || (o.genres.Any() && useNewDataOverOld))
+            if (!genres.Any() || o.genres.Any() && useNewDataOverOld)
             {
                 genres = o.genres;
             }
@@ -264,12 +272,12 @@ namespace TVRename
                 AirsTime = o.AirsTime;
             }
 
-            if ((o.AiredSeasons != null) && (o.AiredSeasons.Count != 0))
+            if (o.AiredSeasons != null && o.AiredSeasons.Count != 0)
             {
                 AiredSeasons = o.AiredSeasons;
             }
 
-            if ((o.DvdSeasons != null) && (o.DvdSeasons.Count != 0))
+            if (o.DvdSeasons != null && o.DvdSeasons.Count != 0)
             {
                 DvdSeasons = o.DvdSeasons;
             }
@@ -511,11 +519,11 @@ namespace TVRename
             //backupLanguageR should be a series of name/value pairs (ie a JArray of JPropertes)
             //TVDB asserts that name and overview are the fields that are localised
 
-            if ((string.IsNullOrWhiteSpace(Name) && ((string)backupLanguageR["seriesName"] != null)) ){
+            if (string.IsNullOrWhiteSpace(Name) && (string)backupLanguageR["seriesName"] != null ){
                 Name = System.Web.HttpUtility.HtmlDecode((string)backupLanguageR["seriesName"]);
             }
 
-            if ((string.IsNullOrWhiteSpace(Overview) && ((string)backupLanguageR["overview"] != null)) ){
+            if (string.IsNullOrWhiteSpace(Overview) && (string)backupLanguageR["overview"] != null ){
                 Overview = System.Web.HttpUtility.HtmlDecode((string)backupLanguageR["overview"]);
             }
 
@@ -526,12 +534,12 @@ namespace TVRename
                 aliases = backupLanguageR["aliases"].Select(x => x.Value<string>()).ToList();
             }
 
-            if ((string.IsNullOrWhiteSpace(Runtime)))
+            if (string.IsNullOrWhiteSpace(Runtime))
             {
                 Runtime = (string)backupLanguageR["runtime"];
             }
 
-            if ((string.IsNullOrWhiteSpace(BannerString)))
+            if (string.IsNullOrWhiteSpace(BannerString))
             {
                 BannerString = (string)backupLanguageR["banner"];
             }
