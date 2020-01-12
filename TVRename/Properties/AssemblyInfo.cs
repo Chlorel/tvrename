@@ -14,7 +14,7 @@ using System.Resources;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("TV Rename")]
 [assembly: AssemblyProduct("TV Rename")]
-[assembly: AssemblyCopyright("Copyright © 2007-2019")]
+[assembly: AssemblyCopyright("Copyright © 2007-2020")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 [assembly: ComVisible(false)]
@@ -22,7 +22,7 @@ using System.Resources;
 [assembly: NeutralResourcesLanguageAttribute("")]
 
 
-[assembly: AssemblyVersion("3.0.4.0")]
-[assembly: AssemblyFileVersion("3.0.4")]
-[assembly: AssemblyInformationalVersion("3.0.4")] // Display version
+[assembly: AssemblyVersion("3.0.5.0")]
+[assembly: AssemblyFileVersion("3.0.5")]
+[assembly: AssemblyInformationalVersion("3.0.5")] // Display version
 
