@@ -22,7 +22,7 @@ using System.Resources;
 [assembly: NeutralResourcesLanguageAttribute("")]
 
 
-[assembly: AssemblyVersion("3.0.5.0")]
-[assembly: AssemblyFileVersion("3.0.5")]
-[assembly: AssemblyInformationalVersion("3.0.5")] // Display version
+[assembly: AssemblyVersion("3.0.7.0")]
+[assembly: AssemblyFileVersion("3.0.7")]
+[assembly: AssemblyInformationalVersion("3.0.7")] // Display version
 
