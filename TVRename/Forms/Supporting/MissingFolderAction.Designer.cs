@@ -192,10 +192,12 @@ namespace TVRename
             this.Controls.Add(this.label1);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
+            this.MaximizeBox = false;
+            this.MinimizeBox = false;
             this.Name = "MissingFolderAction";
-            this.ShowInTaskbar = false;
-            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             this.Text = "Missing Folder";
+            this.TopMost = true;
             this.DragDrop += new System.Windows.Forms.DragEventHandler(this.MissingFolderAction_DragDrop);
             this.DragOver += new System.Windows.Forms.DragEventHandler(this.MissingFolderAction_DragOver);
             this.ResumeLayout(false);

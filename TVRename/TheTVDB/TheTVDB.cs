@@ -10,6 +10,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
@@ -19,7 +20,9 @@ using System.Xml;
 using System.Xml.Linq;
 using JetBrains.Annotations;
 using TVRename.Forms.Utilities;
-using Alphaleonis.Win32.Filesystem;
+using DirectoryInfo = Alphaleonis.Win32.Filesystem.DirectoryInfo;
+using File = Alphaleonis.Win32.Filesystem.File;
+using FileInfo = Alphaleonis.Win32.Filesystem.FileInfo;
 
 // Talk to the TheTVDB web API, and get tv series info
 
@@ -276,6 +279,12 @@ namespace TVRename
 
         public void SaveCache()
         {
+            DirectoryInfo di = cacheFile.Directory;
+            if (!di.Exists)
+            {
+                di.Create();
+            }
+
             Logger.Info("Saving Cache to: {0}", cacheFile.FullName);
             try
             {
@@ -315,7 +324,7 @@ namespace TVRename
                             }
                             else
                             {
-                                Logger.Warn($"Cannot save {kvp.Value.TvdbCode} ({kvp.Value.Name}) as it has not been updated at all.");
+                                Logger.Info($"Cannot save {kvp.Value.TvdbCode} ({kvp.Value.Name}) as it has not been updated at all.");
                             }
                         }
 
@@ -419,6 +428,72 @@ namespace TVRename
             }
 
             return null;
+        }
+
+        internal void QuickRefresh()
+        {
+            List<string> issues = new List<string>();
+            lock (SERIES_LOCK)
+            {
+                foreach (SeriesInfo si in series.Values.ToList())
+                {
+                    int tvdbId = si.TvdbCode;
+
+                    SeriesInfo newSi = DownloadSeriesInfo(tvdbId, "en");
+                    if (newSi.SrvLastUpdated != si.SrvLastUpdated)
+                    {
+                        issues.Add($"{si.Name} is not up to date: Local is {si.SrvLastUpdated} server is {newSi.SrvLastUpdated}");
+                    }
+
+                    List<JObject> eps = GetEpisodes(tvdbId, "en");
+                    List<long> serverEpIds = new List<long>();
+
+                    if (eps != null)
+                    {
+                        foreach (JObject epJson in eps)
+                        {
+                            JToken episodeToUse = epJson["data"];
+                            foreach (JToken t in episodeToUse.Children())
+                            {
+                                long serverUpdateTime = (long) t["lastUpdated"];
+                                long epId = (long) t["id"];
+
+                                serverEpIds.Add(epId);
+                                try
+                                {
+                                    Episode ep = si.GetEpisode(epId);
+
+                                    if (serverUpdateTime != ep.SrvLastUpdated)
+                                    {
+                                        issues.Add(
+                                            $"{si.Name} S{ep.AiredSeasonNumber}E{ep.AiredEpNum} is not up to date: Local is {ep.SrvLastUpdated} server is {serverUpdateTime}");
+                                    }
+                                }
+                                catch (SeriesInfo.EpisodeNotFoundException)
+                                {
+                                    issues.Add(
+                                        $"{si.Name} {epId} is not found: Local is missing; server is {serverUpdateTime}");
+                                }
+                            }
+                        }
+                    }
+
+                    //Look for episodes that are local, but not on server
+                    IEnumerable<int> localEps = si.AiredSeasons.Values.SelectMany(s => s.Episodes.Values).Select(ep=>ep.EpisodeId);
+                    foreach (int localEpId in localEps)
+                    {
+                        if (!serverEpIds.Contains(localEpId))
+                        {
+                            issues.Add($"{si.Name} {localEpId} should be removed: Server is missing.");
+                        }
+                    }
+                }
+            }
+
+            foreach(string issue in issues)
+            {
+                Logger.Error(issue);
+            }
         }
 
         private Episode FindEpisodeById(int id)
@@ -1139,7 +1214,7 @@ namespace TVRename
                         return null;
                     }
                 }
-                catch (System.IO.IOException ex)
+                catch (IOException ex)
                 {
                     Logger.Warn(ex, "Connection to TVDB Failed whilst loading episode with Id {0}.", id);
                     return null;
@@ -1494,14 +1569,22 @@ namespace TVRename
                     Logger.Warn($"Show with Id {code} is no longer available from TVDB (got a 404). {uri}");
                     Say("");
 
-                    if (TvdbIsUp() && !CanFindEpisodesFor(code,requestedLanguageCode ))
+                    if (TvdbIsUp() && !CanFindEpisodesFor(code, requestedLanguageCode))
                     {
                         LastError = ex.Message;
                         throw new ShowNotFoundException(code);
                     }
                 }
 
-                Logger.Error(ex, $"Error obtaining {uri} in {requestedLanguageCode}");
+                if (ex.IsUnimportant())
+                {
+                    Logger.Warn($"Error obtaining {uri} in {requestedLanguageCode}: {ex.LoggableDetails()}");
+                }
+                else
+                {
+                    Logger.Error(ex, $"Error obtaining {uri} in {requestedLanguageCode}");
+                }
+
                 Say("");
                 LastError = ex.Message;
                 throw new TvdbSeriesDownloadException();
@@ -1691,7 +1774,21 @@ namespace TVRename
                 }
                 catch (WebException webEx)
                 {
-                    Logger.Info($"Looking for {imageType} images (in {languageCode}), but none found for seriesId {code}: {webEx.LoggableDetails()}");
+                    if (webEx.IsUnimportant())
+                    {
+                        Logger.Info(
+                            $"Looking for {imageType} images (in {languageCode}), but none found for seriesId {code}: {webEx.LoggableDetails()}");
+                    }
+                    else
+                    {
+                        Logger.Warn(
+                            $"Looking for {imageType} images (in {languageCode}), but none found for seriesId {code}: {webEx.LoggableDetails()}");
+                    }
+                }
+                catch (IOException ioe)
+                {
+                    Logger.Error(ioe,
+                        $"Looking for {imageType} images (in {languageCode}), but none found for seriesId {code}");
                 }
             }
 
@@ -2137,8 +2234,7 @@ namespace TVRename
                             $"Error obtaining {uri} for search term '{text}' in {DefaultLanguageCode}: {ex.LoggableDetails()}");
                         }
 
-
-                    LastError = ex.Message;
+                        LastError = ex.Message;
                         Say("");
                     }
                     else if(((HttpWebResponse)ex.Response).StatusCode == HttpStatusCode.NotFound)
