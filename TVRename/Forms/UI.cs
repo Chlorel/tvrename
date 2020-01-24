@@ -688,6 +688,12 @@ namespace TVRename
                     SaveLayoutXml();
                     mDoc.TidyTvdb();
                     mDoc.Closing();
+                    mAutoFolderMonitor.Dispose();
+                    BGDownloadTimer.Dispose();
+                    UpdateTimer.Dispose();
+                    quickTimer.Dispose();
+                    refreshWTWTimer.Dispose();
+                    statusTimer.Dispose();
                 }
             }
             catch (Exception ex)
@@ -4077,11 +4083,8 @@ namespace TVRename
                 foreach (ShowItem si in mDoc.Library.GetShowItems())
                 {
                     SeriesInfo ser = si.TheSeries();
-
                     if (ser != null)
                     {
-                        //si.ShowTimeZone = TimeZone.TimeZoneForNetwork(ser.getNetwork());
-
                         results.Add(ser.Network, si.ShowTimeZone, si.ShowName);
                     }
                 }
@@ -4202,9 +4205,9 @@ namespace TVRename
             //Show Log Pane
             logToolStripMenuItem_Click(sender, e);
 
-            Task.Run(() => {
-                TheTVDB.Instance.ServerAccuracyCheck();
-            });
+            Cursor.Current = Cursors.WaitCursor;
+            TheTVDB.Instance.ServerAccuracyCheck();
+            Cursor.Current = Cursors.Default;
         }
     }
 }
