@@ -18,6 +18,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Xml;
 using System.Xml.Linq;
+using Humanizer;
 using JetBrains.Annotations;
 using TVRename.Forms.Utilities;
 using DirectoryInfo = Alphaleonis.Win32.Filesystem.DirectoryInfo;
@@ -88,7 +89,7 @@ namespace TVRename
             public void Load([CanBeNull] string time)
             {
                 long newTime = time is null ? 0 : long.Parse(time);
-                if (newTime > DateTime.UtcNow.ToUnixTime() + 24 * 60 * 60)
+                if (newTime > DateTime.UtcNow.ToUnixTime() + 1.Days().TotalSeconds)
                 {
                     Logger.Error($"Asked to update time to: {newTime} by parsing {time}");
                     newTime = DateTime.UtcNow.ToUnixTime();
@@ -98,7 +99,7 @@ namespace TVRename
 
             public void RegisterServerUpdate(long maxUpdateTime)
             {
-                if (maxUpdateTime > DateTime.UtcNow.ToUnixTime() + 24 * 60 * 60)
+                if (maxUpdateTime > DateTime.UtcNow.ToUnixTime() + 1.Days().TotalSeconds)
                 {
                     Logger.Error($"Asked to update time to: {maxUpdateTime}");
                     newSrvTime = DateTime.UtcNow.ToUnixTime();
@@ -134,7 +135,6 @@ namespace TVRename
         public bool LoadOk;
         private UpdateTimeTracker latestUpdateTime;
         public static readonly object SERIES_LOCK = new object();
-        // TODO: make this private or a property. have online/offline state that controls auto downloading of needed info.
         private readonly ConcurrentDictionary<int, SeriesInfo> series = new ConcurrentDictionary<int, SeriesInfo>();
 
         public static readonly object LANGUAGE_LOCK = new object();
@@ -430,9 +430,12 @@ namespace TVRename
             return null;
         }
 
-        internal void ServerAccuracyCheck()
+        [NotNull]
+        internal IEnumerable<SeriesInfo> ServerAccuracyCheck()
         {
             List<string> issues = new List<string>();
+            List<SeriesInfo> showsToUpdate = new List<SeriesInfo>();
+
             lock (SERIES_LOCK)
             {
                 foreach (SeriesInfo si in series.Values.Where(info => !info.IsStub).ToList())
@@ -468,24 +471,42 @@ namespace TVRename
                                     {
                                         issues.Add(
                                             $"{si.Name} S{ep.AiredSeasonNumber}E{ep.AiredEpNum} is not up to date: Local is {ep.SrvLastUpdated} server is {serverUpdateTime}");
+
+                                        ep.Dirty = true;
+                                        if (!showsToUpdate.Contains(si))
+                                        {
+                                            showsToUpdate.Add(si);
+                                        }
                                     }
                                 }
                                 catch (SeriesInfo.EpisodeNotFoundException)
                                 {
                                     issues.Add(
                                         $"{si.Name} {epId} is not found: Local is missing; server is {serverUpdateTime}");
+                                    si.Dirty = true;
+                                    if (!showsToUpdate.Contains(si))
+                                    {
+                                        showsToUpdate.Add(si);
+                                    }
                                 }
                             }
                         }
                     }
 
                     //Look for episodes that are local, but not on server
-                    IEnumerable<int> localEps = si.AiredSeasons.Values.SelectMany(s => s.Episodes.Values).Select(ep=>ep.EpisodeId);
-                    foreach (int localEpId in localEps)
+                    IEnumerable<Episode> localEps = si.AiredSeasons.Values.SelectMany(s => s.Episodes.Values);
+                    foreach (Episode localEp in localEps)
                     {
+                        int localEpId = localEp.EpisodeId;
                         if (!serverEpIds.Contains(localEpId))
                         {
                             issues.Add($"{si.Name} {localEpId} should be removed: Server is missing.");
+                            localEp.Dirty = true;
+                            si.Dirty = true;
+                            if (!showsToUpdate.Contains(si))
+                            {
+                                showsToUpdate.Add(si);
+                            }
                         }
                     }
                 }
@@ -495,6 +516,8 @@ namespace TVRename
             {
                 Logger.Warn(issue);
             }
+
+            return showsToUpdate;
         }
 
         private Episode FindEpisodeById(int id)
@@ -719,14 +742,15 @@ namespace TVRename
             if (updateFromEpochTime == 0 && series.Values.Any(info => !info.IsStub))
             {
                 Say("");
-                Logger.Error($"Not updating as update time is 0. Need to do a Full Refresh. {latestUpdateTime}");
+                Logger.Error($"Not updating as update time is 0. Need to do a Full Refresh on {series.Values.Count(info => !info.IsStub)} shows. {latestUpdateTime}");
+                ForgetEverything();
                 return true; // that's it for now
             }
 
             if (updateFromEpochTime == 0)
             {
                 Say("");
-                Logger.Info($"We have no shows yet to get updates for. Not gatting latest updates.");
+                Logger.Warn("We have no shows yet to get updates for. Not getting latest updates.");
                 return true; // that's it for now
             }
 
@@ -818,9 +842,9 @@ namespace TVRename
 
                 long maxUpdateTime;
 
-                if (numberOfResponses == 0)
+                if (numberOfResponses == 0 && updateFromEpochTime + 7.Days().TotalSeconds <DateTime.UtcNow.ToUnixTime())
                 {
-                    maxUpdateTime = updateFromEpochTime + 7*24*60*60;
+                    maxUpdateTime = updateFromEpochTime + (int)7.Days().TotalSeconds;
                 }
                 else
                 {
@@ -844,7 +868,6 @@ namespace TVRename
                     {
                         updateFromEpochTime = maxUpdateTime;
                     }
-
                 }
 
                 //As a safety measure we check that no more than 52 calls are made
@@ -1104,7 +1127,7 @@ namespace TVRename
                 long maxUpdateTime = updateTimes.DefaultIfEmpty(0).Max();
 
                 //Add a day to take into account any timezone issues
-                long nowTime = DateTime.UtcNow.ToUnixTime() + 24 * 60 * 60;
+                long nowTime = DateTime.UtcNow.ToUnixTime() + (int) 1.Days().TotalSeconds;
                 if (maxUpdateTime > nowTime)
                 {
                     Logger.Error($"Assuming up to date: Could not parse update time {maxUpdateTime} compared to {nowTime} from: {jsonUpdateResponse}");
@@ -1397,7 +1420,7 @@ namespace TVRename
             {
                 if (!series.ContainsKey(e.SeriesId))
                 {
-                    throw new TVDBException("Can't find the series to add the episode to (TheTVDB).");
+                    throw new TVDBException($"Can't find the series to add the episode to (TheTVDB). EpId:{e.EpisodeId} SeriesId:{e.SeriesId} {e.Name}");
                 }
 
                 SeriesInfo ser = series[e.SeriesId];
@@ -2243,7 +2266,14 @@ namespace TVRename
                 }
                 else
                 {
-                    Logger.Error($"Error obtaining {ex.Response.ResponseUri} for search term '{text}': {ex.LoggableDetails()}");
+                    if (ex.IsUnimportant())
+                    {
+                        Logger.Info($"Error obtaining {uri} for search term '{text}': {ex.LoggableDetails()}");
+                    }
+                    else
+                    {
+                        Logger.Error($"Error obtaining {uri} for search term '{text}': {ex.LoggableDetails()}");
+                    }
                     LastError = ex.Message;
                     Say("");
                 }
