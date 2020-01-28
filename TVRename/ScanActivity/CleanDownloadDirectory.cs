@@ -317,7 +317,6 @@ namespace TVRename
                             $"Keeping {newFile.FullName}. Although it is better quality than {existingFile.FullName}, there are other shows ({string.Join(", ", matchingShows.Select(item => item.ShowName))}) that match.");
 
                         return false;
-
                     }
 
                 //the other cases of the files being the same or the existing file being better are not enough to save the file
@@ -328,7 +327,6 @@ namespace TVRename
                 default:
                     throw new ArgumentOutOfRangeException();
             }
-
             return null;
         }
 
@@ -336,11 +334,19 @@ namespace TVRename
         {
             switch (result)
             {
-                case FileHelper.VideoComparison.cantTell: return true;
-                case FileHelper.VideoComparison.same: return true;
-                case FileHelper.VideoComparison.similar: return true;
+                case FileHelper.VideoComparison.cantTell:
+                    return true;
+                case FileHelper.VideoComparison.same:
+                    return true;
+                case FileHelper.VideoComparison.similar:
+                    return true;
+                case FileHelper.VideoComparison.firstFileBetter:
+                    return false;
+                case FileHelper.VideoComparison.secondFileBetter:
+                    return false;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(result), result, null);
             }
-            return false;
         }
 
         private bool? AskUserAboutFileReplacement([NotNull] FileInfo newFile, [NotNull] FileInfo existingFile, [NotNull] ProcessedEpisode pep)
