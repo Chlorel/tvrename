@@ -295,7 +295,7 @@ namespace TVRename
                 ActionAction(true, UNATTENDED);
             }
 
-            if (a.Quit || a.Hide)
+            if (a.Quit)
             {
                 Close();
             }
@@ -348,7 +348,7 @@ namespace TVRename
         {
             ShowInTaskbar = TVSettings.Instance.ShowInTaskbar && !mDoc.Args.Hide;
 
-            foreach (TabPage tp in tabControl1.TabPages) // grr! TODO: why does it go white?
+            foreach (TabPage tp in tabControl1.TabPages) // grr! why does it go white?
             {
                 tp.BackColor = SystemColors.Control;
             }
@@ -362,8 +362,8 @@ namespace TVRename
                 Name = "Clear"
             };
 
-            filterButton.Location = new Point(filterTextBox.ClientSize.Width - filterButton.Width,
-                (filterTextBox.ClientSize.Height - 16) / 2 + 1);
+            int clientSizeHeight = (filterTextBox.ClientSize.Height - 16) / 2;
+            filterButton.Location = new Point(filterTextBox.ClientSize.Width - filterButton.Width, clientSizeHeight+1);
 
             filterButton.Click += filterButton_Click;
             filterTextBox.Controls.Add(filterButton);
@@ -964,7 +964,6 @@ namespace TVRename
             if (si.DvdOrder && snum >= 0 && ser.DvdSeasons.ContainsKey(snum))
             {
                 Season s = ser.DvdSeasons[snum];
-                //SetHtmlBody(webInformation, si.GetSeasonHtmlOverview(s, false));
                 SetHtmlBody(webImages, ShowHtmlHelper.CreateOldPage(si.GetSeasonImagesHtmlOverview(s)));
 
                 SetHtmlBody(webInformation, si.GetSeasonHtmlOverview(s, true));
@@ -972,7 +971,6 @@ namespace TVRename
             else if (!si.DvdOrder && snum >= 0 && ser.AiredSeasons.ContainsKey(snum))
             {
                 Season s = ser.AiredSeasons[snum];
-                //SetHtmlBody(webInformation, si.GetSeasonHtmlOverview(s, false));
                 SetHtmlBody(webImages, ShowHtmlHelper.CreateOldPage(si.GetSeasonImagesHtmlOverview(s)));
 
                 SetHtmlBody(webInformation, si.GetSeasonHtmlOverview(s, true));
@@ -980,7 +978,6 @@ namespace TVRename
             else
             {
                 // no epnum specified, just show an overview
-                //SetHtmlBody(webInformation, si.GetShowHtmlOverview(false));
                 SetHtmlBody(webImages, ShowHtmlHelper.CreateOldPage(si.GetShowImagesHtmlOverview()));
 
                 SetHtmlBody(webInformation, si.GetShowHtmlOverview(true));
@@ -1922,6 +1919,9 @@ namespace TVRename
 
                     break;
                 }
+
+                default:
+                    throw new ArgumentOutOfRangeException();
             }
             mLastEpClicked = null;
         }
@@ -1937,7 +1937,6 @@ namespace TVRename
             si.IgnoreSeasons.Add(seasonNumber);
             ShowAddedOrEdited(false, false);
         }
-
 
         private void BrowseForMissingItem([CanBeNull] ItemMissing mi)
         {
@@ -3998,8 +3997,8 @@ namespace TVRename
             if (filterTextBox.Controls.ContainsKey("Clear"))
             {
                 Control filterButton = filterTextBox.Controls["Clear"];
-                filterButton.Location = new Point(filterTextBox.ClientSize.Width - filterButton.Width,
-                    (filterTextBox.ClientSize.Height - 16) / 2 + 1);
+                int clientSizeHeight = (filterTextBox.ClientSize.Height - 16) / 2;
+                filterButton.Location = new Point(filterTextBox.ClientSize.Width - filterButton.Width,clientSizeHeight + 1);
 
                 // Send EM_SETMARGINS to prevent text from disappearing underneath the button
                 NativeMethods.SendMessage(filterTextBox.Handle, 0xd3, (IntPtr) 2, (IntPtr) (filterButton.Width << 16));
