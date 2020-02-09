@@ -499,7 +499,7 @@ namespace TVRename
             {
                 try
                 {
-                    if (!TheTVDB.Instance.Connected)
+                    if (!TheTVDB.Instance.IsConnected)
                     {
                         TheTVDB.Instance.Connect(true);
                     }
