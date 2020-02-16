@@ -33,5 +33,26 @@ namespace TVRename
         {
             return listToClone.Select(item => item).ToList();
         }
+        public static void ForEach<T>([NotNull] this IEnumerable<T> source, Action<T> action)
+        {   
+            foreach (T item in source) { action(item); }
+        }
+
+        [NotNull]
+        public static IEnumerable<int> Keys([NotNull] this IEnumerable<KeyValuePair<int, List<ProcessedEpisode>>> source )
+        {
+            return source.Select(pair => pair.Key).ToList();
+        }
+
+        public static int MaxOrDefault<T>([NotNull] this IEnumerable<T> enumeration, Func<T, int> selector, int defaultValue)
+        {
+            IEnumerable<T> enumerable = enumeration.ToList();
+            return enumerable.Any() ? enumerable.Max(selector) : defaultValue;
+        }
+        public static int MinOrDefault<T>([NotNull] this IEnumerable<T> enumeration, Func<T, int> selector, int defaultValue)
+        {
+            IEnumerable<T> enumerable = enumeration.ToList();
+            return enumerable.Any() ? enumerable.Min(selector) : defaultValue;
+        }
     }
 }

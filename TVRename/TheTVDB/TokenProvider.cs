@@ -1,17 +1,11 @@
-// 
-// Main website for TVRename is http://tvrename.com
-// 
-// Source code available at https://github.com/TV-Rename/tvrename
-// 
-// Copyright (c) TV Rename. This code is released under GPLv3 https://github.com/TV-Rename/tvrename/blob/master/LICENSE.md
-// 
-using Newtonsoft.Json.Linq;
 using System;
 using JetBrains.Annotations;
+using Newtonsoft.Json.Linq;
+using NLog;
 
-namespace TVRename
+namespace TVRename.TheTVDB
 {
-    public class TvDbTokenProvider
+    class TokenProvider
     {
         [NotNull]
         // ReSharper disable once InconsistentNaming
@@ -19,7 +13,7 @@ namespace TVRename
         {
             get
             {
-                switch (TheTVDB.VERS)
+                switch (LocalCache.VERS)
                 {
                     // ReSharper disable once ConditionIsAlwaysTrueOrFalse
                     case ApiVersion.v2:
@@ -42,12 +36,12 @@ namespace TVRename
         private string lastKnownToken = string.Empty;
         private DateTime lastRefreshTime = DateTime.MinValue;
 
-        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         public string GetToken()
         {
             //If we have not logged on at all then logon
-            if (!IsTokenAquired() )
+            if (!IsTokenAquired())
             {
                 AcquireToken();
             }
@@ -59,7 +53,7 @@ namespace TVRename
             //If we have logged on and have a valid token that is nearing its use-by date then refresh
             if (ShouldRefreshToken())
             {
-                 RefreshToken();
+                RefreshToken();
             }
 
             return lastKnownToken;
@@ -74,7 +68,7 @@ namespace TVRename
         {
             Logger.Info("Acquire a TheTVDB token... ");
             JObject request = new JObject(new JProperty("apikey", TVDB_API_KEY));
-            JObject jsonResponse = HttpHelper.JsonHttpPostRequest($"{TVDB_API_URL}/login", request,true);
+            JObject jsonResponse = HttpHelper.JsonHttpPostRequest($"{TVDB_API_URL}/login", request, true);
 
             UpdateToken((string)jsonResponse["token"]);
             Logger.Info("Performed login at " + DateTime.UtcNow);
