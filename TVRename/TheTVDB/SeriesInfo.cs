@@ -7,6 +7,7 @@
 // 
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -39,13 +40,22 @@ namespace TVRename
         public long SrvLastUpdated;
         public int TvdbCode;
         public bool IsStub;
+        public string Slug;
 
         private List<Actor> actors;
         private List<string> genres;
         private List<string> aliases;
 
-        public Dictionary<int, Season> AiredSeasons;
-        public Dictionary<int, Season> DvdSeasons;
+        private ConcurrentDictionary<int, Episode> sourceEpisodes;
+
+        [NotNull]
+        public ICollection<Episode> Episodes => sourceEpisodes.Values;
+
+        public void ClearEpisodes()
+        {
+            sourceEpisodes.Clear();
+        }
+
         private SeriesBanners banners;
 
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
@@ -58,17 +68,10 @@ namespace TVRename
         {
             get
             {
-                int min = 9999;
-                foreach (Season s in AiredSeasons.Values)
-                {
-                    min = Math.Min(min, s.MinYear());
-                }
-
-                if (min == 9999)
-                {
-                    return null;
-                }
-                return min;
+                return Episodes.Select(e => e.GetAirDateDt())
+                        .Where(adt => adt.HasValue)
+                        .Select(adt => adt.Value)
+                        .Min(airDateTime => (int?) airDateTime.Year);
             }
         }
 
@@ -76,43 +79,10 @@ namespace TVRename
         {
             get
             {
-                int max = 0;
-                foreach (Season s in AiredSeasons.Values)
-                {
-                    max = Math.Max(max, s.MaxYear());
-                }
-                if (max == 0)
-                {
-                    return null;
-                }
-                return max;
-            }
-        }
-
-        public DateTime? LastAiredDate
-        {
-            get
-            {
-                DateTime? returnValue = null;
-                foreach (Season s in AiredSeasons.Values) //We can use AiredSeasons as it does not matter which order we do this in Aired or DVD
-                {
-                    DateTime? seasonLastAirDate = s.LastAiredDate();
-
-                    if (!seasonLastAirDate.HasValue)
-                    {
-                        continue;
-                    }
-
-                    if (!returnValue.HasValue)
-                    {
-                        returnValue = seasonLastAirDate.Value;
-                    }
-                    else if (DateTime.Compare(seasonLastAirDate.Value, returnValue.Value) > 0)
-                    {
-                        returnValue = seasonLastAirDate.Value;
-                    }
-                }
-                return returnValue;
+                return Episodes.Select(e => e.GetAirDateDt())
+                    .Where(adt => adt.HasValue)
+                    .Select(adt => adt.Value)
+                    .Max(airDateTime => (int?)airDateTime.Year);
             }
         }
 
@@ -195,8 +165,7 @@ namespace TVRename
 
         private void SetToDefaults()
         {
-            AiredSeasons = new Dictionary<int, Season>();
-            DvdSeasons = new Dictionary<int, Season>();
+            sourceEpisodes = new ConcurrentDictionary<int, Episode>();
             actors=new List<Actor>();
             aliases = new List<string>();
             genres = new List<string>();
@@ -247,6 +216,7 @@ namespace TVRename
             SeriesId = ChooseBetter(SeriesId, useNewDataOverOld, o.SeriesId);
             Status = ChooseBetter(Status, useNewDataOverOld, o.Status);
             ContentRating = ChooseBetter(ContentRating, useNewDataOverOld, o.ContentRating);
+            Slug = ChooseBetter(Slug, useNewDataOverOld, o.Slug);
 
             if ( o.FirstAired.HasValue &&(useNewDataOverOld || !FirstAired.HasValue))
             {
@@ -280,14 +250,9 @@ namespace TVRename
                 AirsTime = o.AirsTime;
             }
 
-            if (o.AiredSeasons != null && o.AiredSeasons.Count != 0)
+            if (o.sourceEpisodes != null && o.sourceEpisodes.Count != 0)
             {
-                AiredSeasons = o.AiredSeasons;
-            }
-
-            if (o.DvdSeasons != null && o.DvdSeasons.Count != 0)
-            {
-                DvdSeasons = o.DvdSeasons;
+                sourceEpisodes = o.sourceEpisodes;
             }
 
             banners.MergeBanners(o.banners);
@@ -356,6 +321,7 @@ namespace TVRename
                 SeriesId = seriesXml.ExtractString("seriesId") ?? seriesXml.ExtractString("SeriesID");
                 Status = seriesXml.ExtractString("status") ?? seriesXml.ExtractString("Status");
                 SiteRatingVotes = seriesXml.ExtractInt("siteRatingCount") ?? seriesXml.ExtractInt("SiteRatingCount",0);
+                Slug = seriesXml.ExtractString("slug");
 
                 SiteRating = GetSiteRating(seriesXml);
                 FirstAired = ExtractFirstAired(seriesXml);
@@ -485,6 +451,7 @@ namespace TVRename
             TvdbCode = (int)r["id"];
             Imdb = ((string)r["imdbId"])?.Trim();
             Network =  ((string) r["network"])?.Trim();
+            Slug = ((string)r["slug"])?.Trim();
             Overview = System.Web.HttpUtility.HtmlDecode((string)r["overview"])?.Trim();
             ContentRating = ((string) r["rating"])?.Trim();
             Runtime = ((string) r["runtime"])?.Trim();
@@ -505,16 +472,13 @@ namespace TVRename
         }
 
         [NotNull]
-        internal Episode GetEpisode(long epId)
+        internal Episode GetEpisode(int epId)
         {
-            foreach (Season s in AiredSeasons.Values)
+            if (sourceEpisodes.TryGetValue(epId, out Episode returnValue))
             {
-                    foreach (Episode pe in s.Episodes.Values.Where(pe => pe.EpisodeId ==epId))
-                    {
-                        return pe;
-                    }
+                return returnValue;
             }
-            throw new EpisodeNotFoundException();
+            throw new ShowItem.EpisodeNotFoundException();
         }
 
         private static DateTime? ParseFirstAired([CanBeNull] string theDate)
@@ -591,6 +555,7 @@ namespace TVRename
             writer.WriteElement("status", Status);
             writer.WriteElement("siteRating", SiteRating,"0.##");
             writer.WriteElement("siteRatingCount", SiteRatingVotes);
+            writer.WriteElement("slug",Slug);
 
             if (FirstAired != null)
             {
@@ -621,82 +586,6 @@ namespace TVRename
             writer.WriteEndElement(); // series
         }
 
-        public Season GetOrAddAiredSeason(int num, int seasonId)
-        {
-            if (AiredSeasons.ContainsKey(num))
-            {
-                return AiredSeasons[num];
-            }
-
-            Season s = new Season(this, num, seasonId,Season.SeasonType.aired);
-            AiredSeasons[num] = s;
-
-            return s;
-        }
-
-        public Season GetOrAddDvdSeason(int num, int seasonId)
-        {
-            if (DvdSeasons.ContainsKey(num))
-            {
-                return DvdSeasons[num];
-            }
-
-            Season s = new Season(this, num, seasonId,Season.SeasonType.dvd);
-            DvdSeasons[num] = s;
-
-            return s;
-        }
-
-        [NotNull]
-        internal Episode GetEpisode(int seasF, int epF,bool dvdOrder)
-        {
-            if (dvdOrder)
-            {
-                foreach (Season s in DvdSeasons.Values)
-                {
-                    if (s.SeasonNumber == seasF)
-                    {
-                        foreach (Episode pe in s.Episodes.Values.Where(pe => pe.DvdEpNum == epF))
-                        {
-                            return pe;
-                        }
-                    }
-                }
-            }
-            else
-            {
-                foreach (Season s in AiredSeasons.Values)
-                {
-                    if (s.SeasonNumber == seasF)
-                    {
-                        foreach (Episode pe in s.Episodes.Values.Where(pe => pe.AiredEpNum == epF))
-                        {
-                            return pe;
-                        }
-                    }
-                }
-            }
-            throw new EpisodeNotFoundException();
-        }
-
-        [Serializable]
-        public class EpisodeNotFoundException : Exception
-        {
-        }
-
-        internal void RemoveEpisode(int episodeId)
-        {
-            //Remove from Aired and DVD Seasons
-            foreach (Season s in DvdSeasons.Values)
-            {
-                s.RemoveEpisode(episodeId);
-            }
-            foreach (Season s in AiredSeasons.Values)
-            {
-                s.RemoveEpisode(episodeId);
-            }
-        }
-
         public void ClearActors()
         {
             actors=new List<Actor>();
@@ -710,26 +599,6 @@ namespace TVRename
         [NotNull]
         public string GetImdbNumber() => Imdb is null? string.Empty: Imdb.StartsWith("tt", StringComparison.Ordinal) ? Imdb?.Substring(2): Imdb;
 
-        public int GetSeasonIndex(int seasonNumber, Season.SeasonType type)
-        {
-            Dictionary<int, Season> appropriateSeasons = type == Season.SeasonType.aired ? AiredSeasons : DvdSeasons;
-
-            List<int> seasonNumbers = new List<int>();
-            foreach (KeyValuePair<int, Season> sn in appropriateSeasons)
-            {
-                if (sn.Value.IsSpecial())
-                {
-                    continue;
-                }
-
-                seasonNumbers.Add(sn.Value.SeasonNumber);
-            }
-
-            seasonNumbers.Sort();
-
-            return seasonNumbers.IndexOf(seasonNumber) +1;
-        }
-
         [NotNull]
         public string GetSeriesFanartPath() => banners.GetSeriesFanartPath();
         [NotNull]
@@ -739,13 +608,6 @@ namespace TVRename
         public string GetSeriesWideBannerPath() => banners.GetSeriesWideBannerPath();
         public string GetSeasonWideBannerPath(int snum) => banners.GetSeasonWideBannerPath(snum);
         public void AddOrUpdateBanner([NotNull] Banner banner) => banners.AddOrUpdateBanner(banner);
-
-        public bool HasAnyAirdates(int snum, Season.SeasonType type)
-        {
-            Dictionary<int, Season> seasonsToUse = type==Season.SeasonType.dvd ? DvdSeasons : AiredSeasons;
-
-            return seasonsToUse.ContainsKey(snum) && seasonsToUse[snum].Episodes.Values.Any(e => e.FirstAired != null);
-        }
 
         public void UpdateBanners(List<int> latestBannerIds)
         {
@@ -764,6 +626,17 @@ namespace TVRename
             {
                 banners.Remove(removeBanner);
             }
+        }
+
+        public void AddEpisode([NotNull] Episode episode)
+        {
+            sourceEpisodes.TryAdd(episode.EpisodeId,episode);
+            episode.SetSeriesSeason(this);
+        }
+
+        public void RemoveEpisode(int episodeId)
+        {
+            sourceEpisodes.TryRemove(episodeId, out Episode _);
         }
     }
 }

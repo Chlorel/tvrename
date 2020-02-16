@@ -54,13 +54,13 @@ namespace TVRename
             string horizontalBanner = CreateHorizontalBannerHtml(ser);
             string poster = CreatePosterHtml(ser);
             string yearRange = YearRange(ser);
-            string episodeSummary = ser.AiredSeasons.Sum(pair => pair.Value.Episodes.Count).ToString();
+            string episodeSummary = ser.Episodes.Count.ToString();
             string stars = StarRating(ser.SiteRating/2);
             string genreIcons = string.Join("&nbsp;", ser.Genres().Select(GenreIconHtml));
             string siteRating = ser.SiteRating > 0 ? ser.SiteRating+ "/10" : "";
             string runTimeHtml = string.IsNullOrWhiteSpace(ser.Runtime) ? string.Empty : $"<br/> {ser.Runtime} min";
             string actorLinks = string.Join(", ", ser.GetActors().Select(ActorLinkHtml));
-            string tvdbLink = TheTVDB.Instance.WebsiteUrl(si.TvdbCode, -1, true);
+            string tvdbLink = TheTVDB.API.WebsiteShowUrl(si);
             string airsTime = ParseAirsTime(ser);
             string airsDay = ser.AirsDay;
             string dayTime = $"{airsDay} {airsTime}";
@@ -172,9 +172,9 @@ namespace TVRename
         {
             string path = ser.GetSeriesWideBannerPath();
             if (!string.IsNullOrEmpty(path) &&
-                !string.IsNullOrEmpty(TheTVDB.GetImageURL(path)))
+                !string.IsNullOrEmpty(TheTVDB.API.GetImageURL(path)))
             {
-                return  $"<img class=\"rounded\" src=\"{TheTVDB.GetImageURL(path)}\"><br/>&nbsp;";
+                return  $"<img class=\"rounded\" src=\"{TheTVDB.API.GetImageURL(path)}\"><br/>&nbsp;";
             }
 
             return string.Empty;
@@ -184,9 +184,9 @@ namespace TVRename
         private static string CreateHorizontalBannerHtml([NotNull] this Season s)
         {
             if (!string.IsNullOrEmpty(s.GetWideBannerPath()) &&
-                !string.IsNullOrEmpty(TheTVDB.GetImageURL(s.GetWideBannerPath())))
+                !string.IsNullOrEmpty(TheTVDB.API.GetImageURL(s.GetWideBannerPath())))
             {
-                return $"<img class=\"rounded w-100\" src=\"{TheTVDB.GetImageURL(s.GetWideBannerPath())}\"><br/>";
+                return $"<img class=\"rounded w-100\" src=\"{TheTVDB.API.GetImageURL(s.GetWideBannerPath())}\"><br/>";
             }
 
             return string.Empty;
@@ -196,9 +196,9 @@ namespace TVRename
         private static string CreatePosterHtml([NotNull] SeriesInfo ser)
         {
             if (!string.IsNullOrEmpty(ser.GetSeriesPosterPath()) &&
-                !string.IsNullOrEmpty(TheTVDB.GetImageURL(ser.GetSeriesPosterPath())))
+                !string.IsNullOrEmpty(TheTVDB.API.GetImageURL(ser.GetSeriesPosterPath())))
             {
-                return $"<img class=\"show-poster rounded w-100\" src=\"{TheTVDB.GetImageURL(ser.GetSeriesPosterPath())}\" alt=\"{ser.Name} Show Poster\">";
+                return $"<img class=\"show-poster rounded w-100\" src=\"{TheTVDB.API.GetImageURL(ser.GetSeriesPosterPath())}\" alt=\"{ser.Name} Show Poster\">";
             }
 
             return string.Empty;
@@ -222,12 +222,12 @@ namespace TVRename
                 return string.Empty;
             }
 
-            if (string.IsNullOrWhiteSpace(TheTVDB.GetImageURL(ei.Filename)))
+            if (string.IsNullOrWhiteSpace(TheTVDB.API.GetImageURL(ei.Filename)))
             {
                 return string.Empty;
             }
 
-            return $"<img class=\"rounded w-100\" src=\"{TheTVDB.GetImageURL(ei.Filename)}\" alt=\"{ei.Name} Screenshot\">";
+            return $"<img class=\"rounded w-100\" src=\"{TheTVDB.API.GetImageURL(ei.Filename)}\" alt=\"{ei.Name} Screenshot\">";
         }
 
         [NotNull]
@@ -238,7 +238,7 @@ namespace TVRename
             Color col = Color.FromName("ButtonFace");
             sb.AppendLine(HTMLHeader(10,col));
             sb.AppendSeason(s,si,col,includeDirectoryLinks);
-            foreach (ProcessedEpisode ep in GetBestEpisodes(si,s))
+            foreach (ProcessedEpisode ep in si.SeasonEpisodes[s.SeasonNumber])
             {
                 List<FileInfo> fl = dfc.FindEpOnDisk(ep);
                 sb.AppendEpisode(ep,fl,col);
@@ -254,9 +254,8 @@ namespace TVRename
                 return;
             }
 
-            SeriesInfo ser = s.TheSeries;
-            string seasonLink = TheTVDB.Instance.WebsiteUrl(ser.TvdbCode, s.SeasonId, false);
-            string showLink = TheTVDB.Instance.WebsiteUrl(si.TvdbCode, -1, true);
+            string seasonLink = TheTVDB.API.WebsiteSeasonUrl(s);
+            string showLink = TheTVDB.API.WebsiteShowUrl(si);
             string urlFilename = Uri.EscapeDataString(si.GetBestFolderLocationToOpen(s));
 
             string explorerButton = includeDirectoryLinks
@@ -269,7 +268,7 @@ namespace TVRename
 				{s.CreateHorizontalBannerHtml()}
 				<br/>
                 <div class=""row"">
-                    <div class=""col-8""><h1><A HREF=""{showLink}"">{ser.Name}</A> - <A HREF=""{seasonLink}"">{SeasonName(si, s.SeasonNumber)}</a></h1></div>
+                    <div class=""col-8""><h1><A HREF=""{showLink}"">{si.ShowName}</A> - <A HREF=""{seasonLink}"">{SeasonName(si, s.SeasonNumber)}</a></h1></div>
                     <div class=""col-4 text-right"">
                         {explorerButton}
                         {tvdbButton}
@@ -305,7 +304,7 @@ namespace TVRename
         private static void AppendEpisode([NotNull] this StringBuilder sb, [NotNull] ProcessedEpisode ep, [CanBeNull] IReadOnlyCollection<FileInfo> fl,Color backgroundColour)
         {
             string stars = StarRating(ep.EpisodeRating);
-            string episodeUrl = TheTVDB.WebsiteUrl(ep.SeriesId, ep.SeasonId, ep.EpisodeId);
+            string episodeUrl = TheTVDB.API.WebsiteEpisodeUrl(ep);
             bool ratingIsNumber = float.TryParse(ep.EpisodeRating, NumberStyles.AllowDecimalPoint | NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite, CultureInfo.CreateSpecificCulture("en-US"), out float rating);
             string siteRating = ratingIsNumber && rating > 0
                 ? rating + "/10" + AddRatingCount(ep.SiteRatingCount??0)
@@ -418,7 +417,7 @@ namespace TVRename
         public static string GetShowImagesHtmlOverview([NotNull] this ShowItem si)
         {
             string body =
-                $"<h1><A HREF=\"{TheTVDB.Instance.WebsiteUrl(si.TvdbCode, -1, true)}\">{si.ShowName}</A> </h1>";
+                $"<h1><A HREF=\"{TheTVDB.API.WebsiteShowUrl(si)}\">{si.ShowName}</A> </h1>";
 
             SeriesInfo ser = si.TheSeries();
             if (ser is null)
@@ -440,16 +439,9 @@ namespace TVRename
                 return "";
             }
 
-            string url = TheTVDB.GetImageURL(bannerPath);
+            string url = TheTVDB.API.GetImageURL(bannerPath);
 
             return string.IsNullOrEmpty(url) ? "" : $"<h2>{title}</h2><img width={width} height={height} src=\"{url}\"><br/>";
-        }
-
-        private static IEnumerable<ProcessedEpisode> GetBestEpisodes([NotNull] ShowItem si, [NotNull] Season s)
-        {
-            return si.SeasonEpisodes.ContainsKey(s.SeasonNumber)
-                ? si.SeasonEpisodes[s.SeasonNumber]
-                : ShowItem.ProcessedListFromEpisodes(s.Episodes.Values, si);
         }
 
         private static string HiddenOverview([NotNull] this ProcessedEpisode ei)
@@ -470,33 +462,29 @@ namespace TVRename
         [NotNull]
         public static string GetSeasonImagesHtmlOverview([NotNull] this ShowItem si, [NotNull] Season s)
         {
-            SeriesInfo ser = s.TheSeries;
             int snum = s.SeasonNumber;
             string body = "";
 
-            List<ProcessedEpisode> eis = si.SeasonEpisodes.ContainsKey(snum)
-                ? si.SeasonEpisodes[snum]
-                : ShowItem.ProcessedListFromEpisodes(s.Episodes.Values, si);
+            List<ProcessedEpisode> eis =si.SeasonEpisodes[snum];
 
             string seasText = Season.UIFullSeasonWord(snum);
 
             if (eis.Count > 0 && eis[0].SeasonId > 0)
             {
-                seasText = " - <A HREF=\"" + TheTVDB.Instance.WebsiteUrl(si.TvdbCode, eis[0].SeasonId, false) + "\">" +
-                           seasText + "</a>";
+                seasText = " - <A HREF=\"" + TheTVDB.API.WebsiteSeasonUrl(s) + "\">" + seasText + "</a>";
             }
             else
             {
                 seasText = " - " + seasText;
             }
 
-            body += "<h1><A HREF=\"" + TheTVDB.Instance.WebsiteUrl(si.TvdbCode, -1, true) + "\">" + si.ShowName +
+            body += "<h1><A HREF=\"" + TheTVDB.API.WebsiteShowUrl(si) + "\">" + si.ShowName +
                     "</A>" + seasText + "</h1>";
 
             if (TVSettings.Instance.NeedToDownloadBannerFile())
             {
-                body += ImageSection("Series Banner", 758, 140, ser.GetSeasonWideBannerPath(snum));
-                body += ImageSection("Series Poster", 350, 500, ser.GetSeasonBannerPath(snum));
+                body += ImageSection("Series Banner", 758, 140, si.TheSeries()?.GetSeasonWideBannerPath(snum));
+                body += ImageSection("Series Poster", 350, 500, si.TheSeries()?.GetSeasonBannerPath(snum));
             }
             else
             {
@@ -509,14 +497,19 @@ namespace TVRename
 
         public static string SeasonName([NotNull] ShowItem si, int snum)
         {
-            if (si.DvdOrder)
+            switch (si.Order)
             {
-                return snum == 0
-                    ? "Not Available on DVD"
-                    : "DVD " + Season.UISeasonWord(snum);
-            }
+                case Season.SeasonType.dvd:
+                    return snum == 0
+                        ? "Not Available on DVD"
+                        : "DVD " + Season.UISeasonWord(snum);
 
-            return Season.UIFullSeasonWord(snum);
+                case Season.SeasonType.aired:
+                    return Season.UIFullSeasonWord(snum);
+
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
         }
 
         [NotNull]
@@ -628,13 +621,13 @@ namespace TVRename
 
             if (!(ser is null) &&
                 !string.IsNullOrEmpty(ser.GetSeriesWideBannerPath()) &&
-                !string.IsNullOrEmpty(TheTVDB.GetImageURL(ser.GetSeriesWideBannerPath())))
+                !string.IsNullOrEmpty(TheTVDB.API.GetImageURL(ser.GetSeriesWideBannerPath())))
             {
-                body += "<img width=758 height=140 src=\"" + TheTVDB.GetImageURL(ser.GetSeriesWideBannerPath()) +
+                body += "<img width=758 height=140 src=\"" + TheTVDB.API.GetImageURL(ser.GetSeriesWideBannerPath()) +
                         "\"><br/>";
             }
 
-            body += $"<h1><A HREF=\"{TheTVDB.Instance.WebsiteUrl(si.TvdbCode, -1, true)}\">{si.ShowName}</A> </h1>";
+            body += $"<h1><A HREF=\"{TheTVDB.API.WebsiteShowUrl(si)}\">{si.ShowName}</A> </h1>";
 
             body += "<h2>Overview</h2>" + ser?.Overview; //get overview in either format
 
@@ -662,7 +655,7 @@ namespace TVRename
             string yearRange = YearRange(ser);
 
             string siteRating = (ser?.SiteRating??0) > 0 ? ser.SiteRating + "/10" : string.Empty;
-            string tvdbLink = TheTVDB.Instance.WebsiteUrl(si.TvdbCode, -1, true);
+            string tvdbLink = TheTVDB.API.WebsiteShowUrl(si);
 
             string tableHtml = string.Empty;
 
@@ -688,26 +681,24 @@ namespace TVRename
         [NotNull]
         public static string GetSeasonHtmlOverviewOffline([NotNull] this ShowItem si, [NotNull] Season s)
         {
-            SeriesInfo ser = s.TheSeries;
+            SeriesInfo ser = si.TheSeries();
             int snum = s.SeasonNumber;
             string body = "";
 
-            if (!string.IsNullOrEmpty(ser.GetSeriesWideBannerPath()) &&
-                !string.IsNullOrEmpty(TheTVDB.GetImageURL(ser.GetSeriesWideBannerPath())))
+            if (!string.IsNullOrEmpty(ser?.GetSeriesWideBannerPath()) &&
+                !string.IsNullOrEmpty(TheTVDB.API.GetImageURL(ser.GetSeriesWideBannerPath())))
             {
-                body += "<img width=758 height=140 src=\"" + TheTVDB.GetImageURL(ser.GetSeriesWideBannerPath()) +
+                body += "<img width=758 height=140 src=\"" + TheTVDB.API.GetImageURL(ser.GetSeriesWideBannerPath()) +
                         "\"><br/>";
             }
 
-            List<ProcessedEpisode> eis = si.SeasonEpisodes.ContainsKey(snum) ?
-                si.SeasonEpisodes[snum] :
-                ShowItem.ProcessedListFromEpisodes(s.Episodes.Values, si);
+            List<ProcessedEpisode> eis = si.SeasonEpisodes[snum];
 
             string seasText = SeasonName(si, snum);
 
             if (eis.Count > 0 && eis[0].SeasonId > 0)
             {
-                seasText = " - <A HREF=\"" + TheTVDB.Instance.WebsiteUrl(ser.TvdbCode, eis[0].SeasonId, false) + "\">" +
+                seasText = " - <A HREF=\"" + TheTVDB.API.WebsiteSeasonUrl(s) + "\">" +
                            seasText + "</a>";
             }
             else
@@ -715,27 +706,18 @@ namespace TVRename
                 seasText = " - " + seasText;
             }
 
-            body += "<h1><A HREF=\"" + TheTVDB.Instance.WebsiteUrl(si.TvdbCode, -1, true) + "\">" + si.ShowName +
+            body += "<h1><A HREF=\"" + TheTVDB.API.WebsiteShowUrl(si) + "\">" + si.ShowName +
                     "</A>" + seasText + "</h1>";
 
             DirFilesCache dfc = new DirFilesCache();
             foreach (ProcessedEpisode ei in eis)
             {
-                string epl = ei.NumsAsString();
+                string epl = ei.EpNumsAsString();
 
-                string episodeUrl = TheTVDB.WebsiteUrl(ei.SeriesId, ei.SeasonId, ei.EpisodeId);
+                string episodeUrl = TheTVDB.API.WebsiteEpisodeUrl(ei);
 
                 body += "<A href=\"" + episodeUrl + "\" name=\"ep" + epl + "\">"; // anchor
-                if (si.DvdOrder && snum == 0)
-                {
-                    body += "<b>" + ei.Name + "</b>";
-                }
-                else
-                {
-                    body += "<b>" + HttpUtility.HtmlEncode(CustomEpisodeName.NameForNoExt(ei, CustomEpisodeName.OldNStyle(6))) +
-                            "</b>";
-                }
-
+                body += "<b>" + EpisodeName(si, snum, ei) + "</b>";
                 body += "</A>"; // anchor
                 if (si.UseSequentialMatch && ei.OverallNumber != -1)
                 {
@@ -773,7 +755,7 @@ namespace TVRename
                     // 300x168 / 300x225
                     if (!string.IsNullOrEmpty(ei.Filename))
                     {
-                        body += "<img src=" + TheTVDB.GetImageURL(ei.Filename) + ">";
+                        body += "<img src=" + TheTVDB.API.GetImageURL(ei.Filename) + ">";
                     }
 
                     body += "</td></tr></table>";
@@ -787,6 +769,16 @@ namespace TVRename
             } // for each episode in this season
 
             return body;
+        }
+
+        [NotNull]
+        private static string EpisodeName([NotNull] ShowItem si, int snum,  [NotNull] ProcessedEpisode ei)
+        {
+            if (si.Order == Season.SeasonType.dvd && snum == 0)
+            {
+                return ei.Name;
+            }
+            return HttpUtility.HtmlEncode(CustomEpisodeName.NameForNoExt(ei, CustomEpisodeName.OldNStyle(6)));
         }
 
         private static string GetOverview([NotNull] ProcessedEpisode ei)

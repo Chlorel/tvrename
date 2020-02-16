@@ -17,6 +17,7 @@ using JetBrains.Annotations;
 using SourceGrid;
 using SourceGrid.Cells.Controllers;
 using SourceGrid.Cells.Views;
+using TVRename.TheTVDB;
 using ColumnHeader = SourceGrid.Cells.ColumnHeader;
 using ContentAlignment = DevAge.Drawing.ContentAlignment;
 using Directory = System.IO.Directory;
@@ -190,9 +191,9 @@ namespace TVRename
         {
             SeriesInfo ser;
 
-            lock (TheTVDB.SERIES_LOCK)
+            lock (LocalCache.SERIES_LOCK)
             {
-                ser = TheTVDB.Instance.GetSeries(si.TvdbCode);
+                ser = LocalCache.Instance.GetSeries(si.TvdbCode);
             }
 
             ShowSummaryData showSummary = new ShowSummaryData
@@ -203,9 +204,9 @@ namespace TVRename
 
             if (ser != null)
             {
-                foreach (int snum in si.DvdOrder? ser.DvdSeasons.Keys: ser.AiredSeasons.Keys)
+                foreach (int snum in si.AppropriateSeasons().Keys)
                 {
-                    ShowSummaryData.ShowSummarySeasonData seasonData = getSeasonDetails(si, ser, snum);
+                    ShowSummaryData.ShowSummarySeasonData seasonData = getSeasonDetails(si, snum);
                     showSummary.AddSeason(seasonData);
                 }
             }
@@ -213,7 +214,7 @@ namespace TVRename
         }
 
         [NotNull]
-        private ShowSummaryData.ShowSummarySeasonData getSeasonDetails([NotNull] ShowItem si, [NotNull] SeriesInfo ser, int snum)
+        private ShowSummaryData.ShowSummarySeasonData getSeasonDetails([NotNull] ShowItem si, int snum)
         {
             int epCount = 0;
             int epGotCount = 0;
@@ -221,15 +222,13 @@ namespace TVRename
             DirFilesCache dfc = new DirFilesCache();
             Season season = null;
 
-            Dictionary<int, Season> seasons = si.DvdOrder ? ser.DvdSeasons : ser.AiredSeasons;
+            Dictionary<int, Season> seasons = si.AppropriateSeasons();
 
             if (snum >= 0 && seasons.ContainsKey(snum))
             {
                 season = seasons[snum];
 
-                List<ProcessedEpisode> eis = si.SeasonEpisodes.ContainsKey(snum)
-                    ? si.SeasonEpisodes[snum] // use processed episodes if they are available
-                    : ShowItem.ProcessedListFromEpisodes(season.Episodes.Values, si);
+                List<ProcessedEpisode> eis = si.SeasonEpisodes[snum];
 
                 foreach (ProcessedEpisode ei in eis)
                 {
@@ -312,7 +311,7 @@ namespace TVRename
                 return;
             }
 
-            Helpers.SysOpen(TheTVDB.Instance.WebsiteUrl(seas.TheSeries.TvdbCode, seas.SeasonId, false));
+            Helpers.SysOpen(API.WebsiteSeasonUrl(seas));
         }
 
         private void TVDBFor([CanBeNull] ShowItem si)
@@ -322,14 +321,14 @@ namespace TVRename
                 return;
             }
 
-            Helpers.SysOpen(TheTVDB.Instance.WebsiteUrl(si.TvdbCode, -1, false));
+            Helpers.SysOpen(API.WebsiteShowUrl(si));
         }
 
         private void ForceRefresh([CanBeNull] ShowItem si)
         {
             if (si != null)
             {
-                TheTVDB.Instance.ForgetShow(si.TvdbCode, true,si.UseCustomLanguage,si.CustomLanguageCode);
+                LocalCache.Instance.ForgetShow(si.TvdbCode, true,si.UseCustomLanguage,si.CustomLanguageCode);
             }
 
             mDoc.DoDownloadsFG(false,false);

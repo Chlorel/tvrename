@@ -14,6 +14,7 @@ using System.Windows.Forms;
 using Alphaleonis.Win32.Filesystem;
 using JetBrains.Annotations;
 using NodaTime;
+using TVRename.TheTVDB;
 using Path = System.IO.Path;
 
 namespace TVRename
@@ -67,7 +68,7 @@ namespace TVRename
             // look for a valid airdate in the filename
             // check for YMD, DMY, and MDY
             // only check against airdates we expect for the given show
-            SeriesInfo ser = TheTVDB.Instance.GetSeries(si.TvdbCode);
+            SeriesInfo ser = LocalCache.Instance.GetSeries(si.TvdbCode);
 
             if (ser is null)
             {
@@ -86,7 +87,7 @@ namespace TVRename
             filename = filename.Replace(",", "-");
             filename = filename.Replace(" ", "-");
 
-            Dictionary<int, Season> seasonsToUse = si.DvdOrder ? ser.DvdSeasons : ser.AiredSeasons;
+            Dictionary<int, Season> seasonsToUse = si.AppropriateSeasons();
             if (seasonsToUse is null)
             {
                 return false;
@@ -130,8 +131,8 @@ namespace TVRename
 
                             if (timeAgo < closestDate)
                             {
-                                seas = si.DvdOrder ? epi.DvdSeasonNumber : epi.AiredSeasonNumber;
-                                ep = si.DvdOrder ? epi.DvdEpNum : epi.AiredEpNum;
+                                seas = epi.GetSeasonNumber(si.Order);
+                                ep = epi.GetEpisodeNumber(si.Order);
                                 closestDate = timeAgo;
                             }
                         }
@@ -221,8 +222,8 @@ namespace TVRename
 
             List<FileInfo> ret = new List<FileInfo>();
 
-            int seasWanted = si.DvdOrder ? epi.TheDvdSeason.SeasonNumber : epi.TheAiredSeason.SeasonNumber;
-            int epWanted = si.DvdOrder ? epi.DvdEpNum : epi.AiredEpNum;
+            int seasWanted = epi.AppropriateSeasonNumber;
+            int epWanted = epi.AppropriateEpNum;
 
             int snum = seasWanted;
 
@@ -285,8 +286,7 @@ namespace TVRename
                     return true;
                 }
 
-                Episode ep = s.GetEpisode(seasF, epF, si.DvdOrder);
-                ProcessedEpisode pep = new ProcessedEpisode(ep, si);
+                ProcessedEpisode pep = si.GetEpisode(seasF, epF);
 
                 foreach (FileInfo testFileInfo in FindEpOnDisk(dfc, si, pep))
                 {
@@ -300,7 +300,7 @@ namespace TVRename
                     return false;
                 }
             }
-            catch (SeriesInfo.EpisodeNotFoundException)
+            catch (ShowItem.EpisodeNotFoundException)
             {
                 //Ignore exception, we may need the file
                 return true;

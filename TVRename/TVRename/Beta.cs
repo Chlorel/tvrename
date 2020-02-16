@@ -73,14 +73,8 @@ namespace TVRename
             DirFilesCache dfc = new DirFilesCache();
             foreach (ShowItem si in doc.Library.Values)
             {
-                foreach (KeyValuePair<int, List<ProcessedEpisode>> kvp in si.SeasonEpisodes)
+                foreach (KeyValuePair<int, List<ProcessedEpisode>> kvp in si.ActiveSeasons)
                 {
-                    //Ignore specials seasons
-                    if (kvp.Key == 0)
-                    {
-                        continue;
-                    }
-
                     //Ignore seasons that all aired on same date
                     DateTime? seasonMinAirDate = (from pep in kvp.Value select pep.FirstAired).Min();
                     DateTime? seasonMaxAirDate = (from pep in kvp.Value select pep.FirstAired).Max();
@@ -111,7 +105,7 @@ namespace TVRename
         {
             if (pep.Type == ProcessedEpisode.ProcessedEpisodeType.merged)
             {
-                output.AppendLine(si.ShowName + " - Season: " + seasonId + " - " + pep.NumsAsString() +
+                output.AppendLine(si.ShowName + " - Season: " + seasonId + " - " + pep.EpNumsAsString() +
                                   " - " + pep.Name + " is:");
 
                 foreach (Episode sourceEpisode in pep.SourceEpisodes)
