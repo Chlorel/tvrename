@@ -264,17 +264,17 @@ namespace TVRename.TheTVDB
 
             List<SeriesInfo> matchingShows = GetSeriesDictMatching(showName).Values.ToList();
 
-            if (matchingShows.Count == 0)
+            switch (matchingShows.Count)
             {
-                return null;
-            }
+                case 0:
+                    return null;
 
-            if (matchingShows.Count == 1)
-            {
-                return matchingShows.First();
-            }
+                case 1:
+                    return matchingShows.First();
 
-            return null;
+                default:
+                    return null;
+            }
         }
 
         [NotNull]
@@ -685,16 +685,15 @@ namespace TVRename.TheTVDB
             }
             catch (WebException ex)
             {
-                if (ex.IsUnimportant())
-                {
-                    Logger.Warn(
-                        $"Error obtaining lastupdated query since (local) {requestedTime.ToLocalTime()}: Message is {ex.LoggableDetails()}");
-                }
-                else
-                {
-                    Logger.Error(
-                        $"Error obtaining lastupdated query since (local) {requestedTime.ToLocalTime()}: Message is {ex.LoggableDetails()}");
-                }
+                Logger.LogWebException($"Error obtaining lastupdated query since (local) {requestedTime.ToLocalTime()}: Message is",ex);
+                
+                Say("");
+                LastErrorMessage = ex.Message;
+                return null;
+            }
+            catch (AggregateException aex) when (aex.InnerException is WebException ex)
+            {
+                Logger.LogWebException($"Error obtaining lastupdated query since (local) {requestedTime.ToLocalTime()}: Message is", ex);
 
                 Say("");
                 LastErrorMessage = ex.Message;
@@ -993,7 +992,7 @@ namespace TVRename.TheTVDB
                         int numberOfResponses = ((JArray) jsonEpisodeResponse["data"]).Count;
                         bool moreResponses;
 
-                        if (TVSettings.Instance.TVDBPagingMethod == PagingMethod.proper)
+                        if (TVSettings.TVDBPagingMethod == PagingMethod.proper)
                         {
                             JToken x = jsonEpisodeResponse["links"]["next"];
                             moreResponses = !string.IsNullOrWhiteSpace(x.ToString());
@@ -1030,7 +1029,7 @@ namespace TVRename.TheTVDB
                         ex.Response is HttpWebResponse resp &&
                         resp.StatusCode == HttpStatusCode.NotFound)
                     {
-                        if (pageNumber > 1 && TVSettings.Instance.TVDBPagingMethod == PagingMethod.brute)
+                        if (pageNumber > 1 && TVSettings.TVDBPagingMethod == PagingMethod.brute)
                         {
                             Logger.Info(
                                 $"Have got to the end of episodes for this show: Episodes were not found for {id} from TVDB (got a 404). Error obtaining page {pageNumber} in lang {lang} using url {ex.Response.ResponseUri.AbsoluteUri}");
@@ -1141,7 +1140,7 @@ namespace TVRename.TheTVDB
             if (languageFromCode is null)
             {
                 throw new ArgumentException(
-                    $"Requested language ({requestedLanguageCode}) not found in Language Cache, cache has ({string.Join(",", LanguageList.Select(language => language.Abbreviation))})",
+                    $"Requested language ({requestedLanguageCode}) not found in Language Cache, cache has ({LanguageList.Select(language => language.Abbreviation).ToCsv()})",
                     requestedLanguageCode);
             }
 
@@ -1239,7 +1238,7 @@ namespace TVRename.TheTVDB
                 if (languageFromCode is null)
                 {
                     throw new ArgumentException(
-                        $"Requested language ({requestedLanguageCode}) not found in Language Cache, cache has ({string.Join(",", LanguageList.Select(language => language.Abbreviation))})",
+                        $"Requested language ({requestedLanguageCode}) not found in Language Cache, cache has ({LanguageList.Select(language => language.Abbreviation).ToCsv()})",
                         requestedLanguageCode);
                 }
 
@@ -1319,7 +1318,7 @@ namespace TVRename.TheTVDB
             return jsonResponse;
         }
 
-        private bool CanFindEpisodesFor(int code, string requestedLanguageCode)
+        private static bool CanFindEpisodesFor(int code, string requestedLanguageCode)
         {
             try
             {
@@ -1401,50 +1400,28 @@ namespace TVRename.TheTVDB
 
             List<int> latestBannerIds = new List<int>();
 
+            ProcessBannerResponses(code, si, GetLanguageId(), requestedLanguageCode, bannerResponses, latestBannerIds);
+            ProcessBannerResponses(code, si, GetDefaultLanguageId(), DefaultLanguageCode, bannerDefaultLangResponses, latestBannerIds);
+
+            si.UpdateBanners(latestBannerIds);
+
+            si.BannersLoaded = true;
+        }
+
+        private static void ProcessBannerResponses(int code, SeriesInfo si, int languageId, string languageCode, [NotNull] List<JObject> bannerResponses,
+            ICollection<int> latestBannerIds)
+        {
             foreach (JObject response in bannerResponses)
             {
                 try
                 {
                     foreach (Banner b in response["data"]
                         .Cast<JObject>()
-                        .Select(bannerData => new Banner(si.TvdbCode, bannerData, GetLanguageId())))
-                    {
-                        //   if (!series.ContainsKey(b.SeriesId))
-                        //       throw new TVDBException("Can't find the series to add the banner to (TheTVDB).");
-                        //   SeriesInfo ser = series[b.SeriesId];
-                        //   ser.AddOrUpdateBanner(b);
-                        si.AddOrUpdateBanner(b);
-                        latestBannerIds.Add(b.BannerId);
-                    }
-                }
-                catch (InvalidCastException ex)
-                {
-                    Logger.Error(ex,
-                        $"Did not receive the expected format of json from when downloading banners for series {code} in {requestedLanguageCode}");
-
-                    Logger.Error(response["data"].ToString());
-                }
-            }
-
-            foreach (JObject response in bannerDefaultLangResponses)
-            {
-                try
-                {
-                    foreach (Banner b in response["data"]
-                        .Cast<JObject>()
-                        .Select(bannerData => new Banner(si.TvdbCode, bannerData, GetDefaultLanguageId())))
+                        .Select(bannerData => new Banner(si.TvdbCode, bannerData, languageId)))
                     {
                         lock (SERIES_LOCK)
                         {
-                            if (!series.ContainsKey(b.SeriesId))
-                            {
-                                throw new TVDBException(
-                                    $"Can't find the series to add the banner to (TheTVDB). Bannner.SeriesId = {b.SeriesId}, series = {si.Name} ({si.SeriesId}), code = {code}");
-                            }
-
-                            SeriesInfo ser = series[b.SeriesId];
-                            ser.AddOrUpdateBanner(b);
-
+                            si.AddOrUpdateBanner(b);
                             latestBannerIds.Add(b.BannerId);
                         }
                     }
@@ -1452,18 +1429,14 @@ namespace TVRename.TheTVDB
                 catch (InvalidCastException ex)
                 {
                     Logger.Error(ex,
-                        $"Did not receive the expected format of json from when downloading banners for series {code} in {DefaultLanguageCode}");
+                        $"Did not receive the expected format of json from when downloading banners for series {code} in {languageCode}");
 
                     Logger.Error(response["data"].ToString());
                 }
             }
-
-            si.UpdateBanners(latestBannerIds);
-
-            si.BannersLoaded = true;
         }
 
-        private (List<JObject> bannerDefaultLangResponses, List<JObject> bannerResponses) DownloadBanners(int code,
+        private static (List<JObject> bannerDefaultLangResponses, List<JObject> bannerResponses) DownloadBanners(int code,
             string requestedLanguageCode)
         {
             // get /series/id/images if the bannersToo is set - may need to make multiple calls to for each image type
