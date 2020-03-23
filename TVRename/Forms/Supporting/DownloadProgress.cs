@@ -6,7 +6,6 @@
 // Copyright (c) TV Rename. This code is released under GPLv3 https://github.com/TV-Rename/tvrename/blob/master/LICENSE.md
 // 
 using System.Windows.Forms;
-using TVRename.TheTVDB;
 
 namespace TVRename
 {
@@ -33,7 +32,7 @@ namespace TVRename
         private void bnCancel_Click(object sender, System.EventArgs e)
         {
             tmrUpdate.Stop();
-            mDoc.StopBgDownloadThread();
+            //mDoc.StopBgDownloadThread();
             DialogResult = DialogResult.Abort;
         }
 
@@ -56,7 +55,9 @@ namespace TVRename
 
         private void UpdateStuff()
         {
-            txtCurrent.Text = LocalCache.Instance.CurrentDLTask;
+            txtCurrent.Text =
+                TheTVDB.LocalCache.Instance.CurrentDLTask +
+                TVmaze.LocalCache.Instance.CurrentDLTask;
             pbProgressBar.Value = mDoc.DownloadPct;
         }
     }
