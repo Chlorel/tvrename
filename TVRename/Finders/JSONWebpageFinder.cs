@@ -6,9 +6,11 @@
 // Copyright (c) TV Rename. This code is released under GPLv3 https://github.com/TV-Rename/tvrename/blob/master/LICENSE.md
 // 
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -56,7 +58,22 @@ namespace TVRename
             }
             catch (WebException e)
             {
-                LOGGER.Warn( $"Failed to access: {TVSettings.Instance.SearchJSONURL} got the following message: {e.LoggableDetails()}");
+                LOGGER.LogWebException(
+                    $"Failed to access: {TVSettings.Instance.SearchJSONURL} got the following message:", e);
+            }
+            catch (AggregateException aex) when (aex.InnerException is WebException ex)
+            {
+                LOGGER.LogWebException(
+                    $"Failed to access: {TVSettings.Instance.SearchJSONURL} got the following message:", ex);
+            }
+            catch (HttpRequestException htec) when (htec.InnerException is WebException ex)
+            {
+                LOGGER.LogWebException(
+                    $"Failed to access: {TVSettings.Instance.SearchJSONURL} got the following message:", ex);
+            }
+            catch (HttpRequestException htec)
+            {
+                LOGGER.Warn($"Failed to access: {TVSettings.Instance.SearchJSONURL} got the following message: {htec.Message}");
             }
             catch (JsonReaderException ex)
             {

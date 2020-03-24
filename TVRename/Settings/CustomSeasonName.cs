@@ -46,7 +46,7 @@ namespace TVRename
         };
 
         [NotNull]
-        public static List<string> ExamplePresets(Season s)
+        public static List<string> ExamplePresets(ProcessedSeason s)
         {
             List<string> possibleExamples = new List<string>();
             foreach (string example in Presets)
@@ -58,10 +58,10 @@ namespace TVRename
         }
 
         [NotNull]
-        public static string NameFor(Season s, string styleString) => NameFor(s, styleString, false);
+        public static string NameFor(ProcessedSeason s, string styleString) => NameFor(s, styleString, false);
 
         [NotNull]
-        private static string NameFor([CanBeNull] Season s, string styleString, bool urlEncode)
+        private static string NameFor([CanBeNull] ProcessedSeason s, string styleString, bool urlEncode)
         {
             string name = styleString;
 
@@ -85,7 +85,7 @@ namespace TVRename
             name = name.ReplaceInsensitive("{EndYear}", s.MaxYear().ToString());
             name = name.ReplaceInsensitive("{ShowImdb}", s.Show.TheSeries()?.Imdb??string.Empty);
 
-            return name.Trim();
+            return TVSettings.Instance.DirectoryFriendly(name.Trim());
         }
 
         [NotNull]

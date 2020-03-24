@@ -39,14 +39,14 @@ namespace TVRename
             MDoc.SetDirty();
             MDoc.DoDownloadsFG(settings.Unattended,settings.Hidden);
 
-            List<ShowItem> addedShows = idsToAdd.Select(s => MDoc.Library.ShowItem(s)).ToList();
+            List<ShowItem> addedShows = idsToAdd.Select(s => MDoc.Library.GetShowItem(s)).ToList();
 
             //add each new show into the shows being scanned
             foreach (ShowItem si in addedShows)
             {
                 showList.Add(si);
             }
-            LOGGER.Info("Added new shows called: {0}", string.Join(", ", addedShows.Select(si => si?.ShowName)));
+            LOGGER.Info("Added new shows called: {0}", addedShows.Select(si => si?.ShowName).ToCsv());
 
             MDoc.DoWhenToWatch(true,settings.Unattended,settings.Hidden);
 

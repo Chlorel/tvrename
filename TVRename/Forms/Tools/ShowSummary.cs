@@ -17,7 +17,6 @@ using JetBrains.Annotations;
 using SourceGrid;
 using SourceGrid.Cells.Controllers;
 using SourceGrid.Cells.Views;
-using TVRename.TheTVDB;
 using ColumnHeader = SourceGrid.Cells.ColumnHeader;
 using ContentAlignment = DevAge.Drawing.ContentAlignment;
 using Directory = System.IO.Directory;
@@ -31,7 +30,7 @@ namespace TVRename
 
         private List<string> mFoldersToOpen;
         private List<FileInfo> mLastFileList;
-        private Season mLastSeasonClicked;
+        private ProcessedSeason mLastProcessedSeasonClicked;
         private ShowItem mLastShowClicked;
         private readonly List<ShowSummaryData> showList;
 
@@ -45,7 +44,7 @@ namespace TVRename
 
         public void GenerateData()
         {
-            foreach (ShowItem si in mDoc.Library.GetShowItems())
+            foreach (ShowItem si in mDoc.Library.GetSortedShowItems())
             {
                 showList.Add(AddShowDetails(si));
             }
@@ -98,7 +97,7 @@ namespace TVRename
             // Draw season
             for (int c = chkHideSpecials.Checked?1:0; c < maxSeason + 1; c++)
             {
-                h = new ColumnHeader(Season.UIFullSeasonWord(c))
+                h = new ColumnHeader(ProcessedSeason.UIFullSeasonWord(c))
                 {
                     AutomaticSortEnabled = false,
                     ResizeEnabled = false
@@ -174,7 +173,7 @@ namespace TVRename
                             Editor = {EditableMode = EditableMode.None}
                         };
 
-                    grid1[r + 1, seasonData.SeasonNumber + 1].AddController(new ShowClickEvent(this, show.ShowItem, seasonData.Season));
+                    grid1[r + 1, seasonData.SeasonNumber + 1].AddController(new ShowClickEvent(this, show.ShowItem, seasonData.ProcessedSeason));
                 }
                 r++;
             }
@@ -187,26 +186,19 @@ namespace TVRename
         }
 
         [NotNull]
-        private ShowSummaryData AddShowDetails([NotNull] ShowItem si)
+        private static ShowSummaryData AddShowDetails([NotNull] ShowItem si)
         {
-            SeriesInfo ser;
-
-            lock (LocalCache.SERIES_LOCK)
-            {
-                ser = LocalCache.Instance.GetSeries(si.TvdbCode);
-            }
-
             ShowSummaryData showSummary = new ShowSummaryData
                 {
                     ShowName = si.ShowName,
                     ShowItem = si
                 };
 
-            if (ser != null)
+            if (si.TheSeries() != null)
             {
                 foreach (int snum in si.AppropriateSeasons().Keys)
                 {
-                    ShowSummaryData.ShowSummarySeasonData seasonData = getSeasonDetails(si, snum);
+                    ShowSummaryData.ShowSummarySeasonData seasonData = GetSeasonDetails(si, snum);
                     showSummary.AddSeason(seasonData);
                 }
             }
@@ -214,19 +206,19 @@ namespace TVRename
         }
 
         [NotNull]
-        private ShowSummaryData.ShowSummarySeasonData getSeasonDetails([NotNull] ShowItem si, int snum)
+        private static ShowSummaryData.ShowSummarySeasonData GetSeasonDetails([NotNull] ShowItem si, int snum)
         {
             int epCount = 0;
             int epGotCount = 0;
             int epAiredCount = 0;
             DirFilesCache dfc = new DirFilesCache();
-            Season season = null;
+            ProcessedSeason processedSeason = null;
 
-            Dictionary<int, Season> seasons = si.AppropriateSeasons();
+            Dictionary<int, ProcessedSeason> seasons = si.AppropriateSeasons();
 
             if (snum >= 0 && seasons.ContainsKey(snum))
             {
-                season = seasons[snum];
+                processedSeason = seasons[snum];
 
                 List<ProcessedEpisode> eis = si.SeasonEpisodes[snum];
 
@@ -247,7 +239,7 @@ namespace TVRename
                     }
                 }
             }
-            return new ShowSummaryData.ShowSummarySeasonData(snum, epCount, epAiredCount, epGotCount, season,si.IgnoreSeasons.Contains(snum));
+            return new ShowSummaryData.ShowSummarySeasonData(snum, epCount, epAiredCount, epGotCount, processedSeason,si.IgnoreSeasons.Contains(snum));
         }
 
         private void showRightClickMenu_ItemClicked(object sender, [NotNull] ToolStripItemClickedEventArgs e)
@@ -258,13 +250,13 @@ namespace TVRename
             {
                 case RightClickCommands.kVisitTvdbSeason:
                     {
-                        TVDBFor(mLastSeasonClicked);
+                        TvdbFor(mLastProcessedSeasonClicked);
                         break;
                     }
 
                 case RightClickCommands.kVisitTvdbSeries:
                     {
-                        TVDBFor(mLastShowClicked);
+                        TvdbFor(mLastShowClicked);
                         break;
                     }
                 case RightClickCommands.kForceRefreshSeries:
@@ -304,34 +296,29 @@ namespace TVRename
             }
         }
 
-        private void TVDBFor([CanBeNull] Season seas)
+        private static void TvdbFor([CanBeNull] ProcessedSeason seas)
         {
             if (seas is null)
             {
                 return;
             }
 
-            Helpers.SysOpen(API.WebsiteSeasonUrl(seas));
+            Helpers.SysOpen(seas.WebsiteUrl);
         }
 
-        private void TVDBFor([CanBeNull] ShowItem si)
+        private static void TvdbFor([CanBeNull] ShowItem si)
         {
             if (si is null)
             {
                 return;
             }
 
-            Helpers.SysOpen(API.WebsiteShowUrl(si));
+            Helpers.SysOpen(si.WebsiteUrl);
         }
 
         private void ForceRefresh([CanBeNull] ShowItem si)
         {
-            if (si != null)
-            {
-                LocalCache.Instance.ForgetShow(si.TvdbCode, true,si.UseCustomLanguage,si.CustomLanguageCode);
-            }
-
-            mDoc.DoDownloadsFG(false,false);
+            mDoc.ForceRefresh(new List<ShowItem> {si},false,false );
         }
 
         #region Nested type: ShowClickEvent
@@ -339,7 +326,7 @@ namespace TVRename
         private class ShowClickEvent : ControllerBase
         {
             private readonly ShowSummary gridSummary;
-            private readonly Season season;
+            private readonly ProcessedSeason processedSeason;
             private readonly ShowItem show;
 
             public ShowClickEvent(ShowSummary gridSummary, ShowItem show)
@@ -348,10 +335,10 @@ namespace TVRename
                 this.gridSummary = gridSummary;
             }
 
-            public ShowClickEvent(ShowSummary gridSummary, ShowItem show, Season season)
+            public ShowClickEvent(ShowSummary gridSummary, ShowItem show, ProcessedSeason processedSeason)
             {
                 this.show = show;
-                this.season = season;
+                this.processedSeason = processedSeason;
                 this.gridSummary = gridSummary;
             }
 
@@ -364,13 +351,13 @@ namespace TVRename
 
                 gridSummary.showRightClickMenu.Items.Clear();
 
-                Season seas = season;
+                ProcessedSeason seas = processedSeason;
 
                 gridSummary.mLastFileList = new List<FileInfo>();
                 gridSummary.mFoldersToOpen = new List<string>();
 
                 gridSummary.mLastShowClicked = show;
-                gridSummary.mLastSeasonClicked = season;
+                gridSummary.mLastProcessedSeasonClicked = processedSeason;
 
                 if (show is null)
                 {
@@ -406,7 +393,7 @@ namespace TVRename
                 gridSummary.showRightClickMenu.Show(sender.Grid.PointToScreen(pt));
             }
 
-            private void GenerateOpenMenu([NotNull] Season seas, ICollection<string> added)
+            private void GenerateOpenMenu([NotNull] ProcessedSeason seas, ICollection<string> added)
             {
                 Dictionary<int, List<string>> afl = show.AllExistngFolderLocations();
 
@@ -465,7 +452,7 @@ namespace TVRename
                 }
             }
 
-            private void GenerateRightClickWatchMenu([NotNull] Season seas)
+            private void GenerateRightClickWatchMenu([NotNull] ProcessedSeason seas)
             {
                 // for each episode in season, find it on disk
                 bool first = true;
@@ -494,7 +481,7 @@ namespace TVRename
                 }
             }
 
-            private void GenerateMenu([NotNull] ContextMenuStrip showRightClickMenu, string menuName, RightClickCommands rightClickCommand)
+            private static void GenerateMenu([NotNull] ContextMenuStrip showRightClickMenu, string menuName, RightClickCommands rightClickCommand)
             {
                 GenerateMenu(showRightClickMenu, menuName, (int)rightClickCommand);
             }
@@ -541,17 +528,17 @@ namespace TVRename
                 private readonly int episodeAiredCount;
                 private readonly int episodeCount;
                 private readonly int episodeGotCount;
-                public readonly Season Season;
+                public readonly ProcessedSeason ProcessedSeason;
                 public readonly int SeasonNumber;
                 public readonly bool Ignored;
 
-                public ShowSummarySeasonData(int seasonNumber, int episodeCount, int episodeAiredCount, int episodeGotCount, Season season,bool ignored)
+                public ShowSummarySeasonData(int seasonNumber, int episodeCount, int episodeAiredCount, int episodeGotCount, ProcessedSeason processedSeason,bool ignored)
                 {
                     SeasonNumber = seasonNumber;
                     this.episodeCount = episodeCount;
                     this.episodeAiredCount = episodeAiredCount;
                     this.episodeGotCount = episodeGotCount;
-                    Season = season;
+                    ProcessedSeason = processedSeason;
                     Ignored = ignored;
                 }
 

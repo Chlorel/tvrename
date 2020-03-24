@@ -28,7 +28,6 @@ using TVRename.Forms;
 using TVRename.Forms.Tools;
 using TVRename.Forms.Utilities;
 using TVRename.Ipc;
-using TVRename.TheTVDB;
 using DataFormats = System.Windows.Forms.DataFormats;
 using Directory = Alphaleonis.Win32.Filesystem.Directory;
 using DragDropEffects = System.Windows.Forms.DragDropEffects;
@@ -108,8 +107,10 @@ namespace TVRename
 
         private ItemList mLastActionsClicked;
         private ProcessedEpisode mLastEpClicked;
+        private ProcessedEpisode mLastEpClickedWtw;
+        private ProcessedEpisode mLastEpClickedScan;
         private readonly string mLastFolderClicked;
-        private Season mLastSeasonClicked;
+        private ProcessedSeason mLastProcessedSeasonClicked;
         private List<ShowItem> mLastShowsClicked;
 
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
@@ -120,11 +121,6 @@ namespace TVRename
             mDoc = doc;
 
             busy = 0;
-            mLastEpClicked = null;
-            mLastFolderClicked = null;
-            mLastSeasonClicked = null;
-            mLastShowsClicked = null;
-            mLastActionsClicked = null;
 
             mInternalChange = 0;
             mFoldersToOpen = new List<string>();
@@ -268,12 +264,14 @@ namespace TVRename
 
             if (a.ForceUpdate)
             {
-                mDoc.ServerAccuracyCheck(UNATTENDED,WindowState==FormWindowState.Minimized);
+                txtDLStatusLabel.Text = "Background download: Accuracy Check running";
+                mDoc.TVDBServerAccuracyCheck(UNATTENDED,WindowState==FormWindowState.Minimized);
+                txtDLStatusLabel.Text = "Background download: Idle";
             }
 
             if (a.ForceRefresh)
             {
-                ForceRefresh(mDoc.Library.GetShowItems(), UNATTENDED);
+                ForceRefresh(mDoc.Library.GetSortedShowItems(), UNATTENDED);
             }
 
             if (a.Scan)
@@ -294,6 +292,12 @@ namespace TVRename
             if (a.DoAll)
             {
                 ActionAction(true, UNATTENDED);
+            }
+
+            if (a.Save)
+            {
+                mDoc.WriteXMLSettings();
+                SaveCaches();
             }
 
             if (a.Quit)
@@ -426,7 +430,7 @@ namespace TVRename
                 return;
             }
 
-            UpdateImages(mDoc.Library.GetShowItems());
+            UpdateImages(mDoc.Library.GetSortedShowItems());
             FillMyShows();
             FillEpGuideHtml();
         }
@@ -448,7 +452,8 @@ namespace TVRename
 
             if (res == DialogResult.Yes)
             {
-                LocalCache.Instance.ForgetEverything();
+                TheTVDB.LocalCache.Instance.ForgetEverything();
+                TVmaze.LocalCache.Instance.ForgetEverything();
                 FillMyShows();
                 FillEpGuideHtml();
                 FillWhenToWatchList();
@@ -703,7 +708,7 @@ namespace TVRename
                 if (!e.Cancel)
                 {
                     SaveLayoutXml();
-                    mDoc.TidyTvdb();
+                    mDoc.TidyCaches();
                     mDoc.Closing();
                     mAutoFolderMonitor.Dispose();
                     BGDownloadTimer.Dispose();
@@ -759,7 +764,7 @@ namespace TVRename
 
         private void FillMyShows()
         {
-            Season currentSeas = TreeNodeToSeason(MyShowTree.SelectedNode);
+            ProcessedSeason currentSeas = TreeNodeToSeason(MyShowTree.SelectedNode);
             ShowItem currentSi = TreeNodeToShowItem(MyShowTree.SelectedNode);
 
             List<ShowItem> expanded = new List<ShowItem>();
@@ -774,15 +779,13 @@ namespace TVRename
             MyShowTree.BeginUpdate();
 
             MyShowTree.Nodes.Clear();
-            List<ShowItem> sil = mDoc.Library.GetShowItems();
-            lock (LocalCache.SERIES_LOCK)
-            {
-                sil.Sort((a, b) => string.Compare(GenerateShowUIName(a), GenerateShowUIName(b), StringComparison.OrdinalIgnoreCase));
-            }
+            List<KeyValuePair<int, ShowItem>> sil = mDoc.Library.ToList();
+            sil.Sort((a, b) => string.Compare(GenerateShowUIName(a.Value), GenerateShowUIName(b.Value), StringComparison.OrdinalIgnoreCase));
 
             ShowFilter filter = TVSettings.Instance.Filter;
-            foreach (ShowItem si in sil)
+            foreach (KeyValuePair<int, ShowItem> s in sil)
             {
+                ShowItem si = s.Value;
                 if (filter.Filter(si)
                     & (string.IsNullOrEmpty(filterTextBox.Text) || si.NameMatchFilters(filterTextBox.Text)))
                 {
@@ -840,7 +843,7 @@ namespace TVRename
             }
         }
 
-        private ShowItem TreeNodeToShowItem([CanBeNull] TreeNode n)
+        private static ShowItem TreeNodeToShowItem([CanBeNull] TreeNode n)
         {
             if (n is null)
             {
@@ -855,10 +858,10 @@ namespace TVRename
                 case ProcessedEpisode pe:
                     return pe.Show;
 
-                case Season seas when seas.Episodes.Count == 0:
+                case ProcessedSeason seas when seas.Episodes.Count == 0:
                     return null;
 
-                case Season seas:
+                case ProcessedSeason seas:
                     return seas.Show;
 
                 default:
@@ -867,9 +870,9 @@ namespace TVRename
         }
 
         [CanBeNull]
-        private static Season TreeNodeToSeason([CanBeNull] TreeNode n)
+        private static ProcessedSeason TreeNodeToSeason([CanBeNull] TreeNode n)
         {
-            Season seas = n?.Tag as Season;
+            ProcessedSeason seas = n?.Tag as ProcessedSeason;
             return seas;
         }
 
@@ -887,7 +890,7 @@ namespace TVRename
                 return;
             }
 
-            Season seas = TreeNodeToSeason(n);
+            ProcessedSeason seas = TreeNodeToSeason(n);
             if (seas != null)
             {
                 // we have a TVDB season, but need to find the equivalent one in our local processed episode collection
@@ -917,13 +920,7 @@ namespace TVRename
                 return;
             }
 
-            SeriesInfo ser;
-            lock (LocalCache.SERIES_LOCK)
-            {
-                ser = LocalCache.Instance.GetSeries(si.TvdbCode);
-            }
-
-            if (ser is null)
+            if (si.TheSeries() is null)
             {
                 ClearInfoWindows("Not downloaded, or not available");
                 return;
@@ -933,7 +930,7 @@ namespace TVRename
             {
                 if (snum >= 0 && si.AppropriateSeasons().ContainsKey(snum))
                 {
-                    Season s = si.AppropriateSeasons()[snum];
+                    ProcessedSeason s = si.AppropriateSeasons()[snum];
                     SetHtmlBody(webInformation, ShowHtmlHelper.CreateOldPage(si.GetSeasonHtmlOverviewOffline(s)));
                     SetHtmlBody(webImages, ShowHtmlHelper.CreateOldPage(si.GetSeasonImagesHtmlOverview(s)));
                 }
@@ -949,7 +946,7 @@ namespace TVRename
 
             if (snum >= 0 && si.AppropriateSeasons().ContainsKey(snum))
             {
-                Season s = si.AppropriateSeasons()[snum];
+                ProcessedSeason s = si.AppropriateSeasons()[snum];
                 SetHtmlBody(webImages, ShowHtmlHelper.CreateOldPage(si.GetSeasonImagesHtmlOverview(s)));
 
                 SetHtmlBody(webInformation, si.GetSeasonHtmlOverview(s, true));
@@ -986,15 +983,15 @@ namespace TVRename
         {
             if (e != null)
             {
-                Helpers.SysOpen(API.WebsiteEpisodeUrl(e));
+                Helpers.SysOpen(e.WebsiteUrl);
             }
         }
 
-        private static void TvdbFor([CanBeNull] Season seas)
+        private static void TvdbFor([CanBeNull] ProcessedSeason seas)
         {
             if (seas != null)
             {
-                Helpers.SysOpen(API.WebsiteSeasonUrl(seas));
+                Helpers.SysOpen(seas.WebsiteUrl);
             }
         }
 
@@ -1002,7 +999,7 @@ namespace TVRename
         {
             if (si != null)
             {
-                Helpers.SysOpen(API.WebsiteShowUrl(si));
+                Helpers.SysOpen(si.WebsiteUrl);
             }
         }
 
@@ -1031,7 +1028,7 @@ namespace TVRename
                 selections.Add((ProcessedEpisode) lvi.Tag);
             }
 
-            Season currentSeas = TreeNodeToSeason(MyShowTree.SelectedNode);
+            ProcessedSeason currentSeas = TreeNodeToSeason(MyShowTree.SelectedNode);
             ShowItem currentShowItem = TreeNodeToShowItem(MyShowTree.SelectedNode);
 
             lvWhenToWatch.Items.Clear();
@@ -1127,12 +1124,15 @@ namespace TVRename
             if (lvWhenToWatch.SelectedIndices.Count == 0)
             {
                 txtWhenToWatchSynopsis.Text = "";
+                mLastEpClickedWtw = null;
                 return;
             }
 
             int n = lvWhenToWatch.SelectedIndices[0];
 
             ProcessedEpisode ei = (ProcessedEpisode) lvWhenToWatch.Items[n].Tag;
+            mLastEpClicked = ei;
+            mLastEpClickedWtw = ei;
 
             if (TVSettings.Instance.HideWtWSpoilers &&
                 (ei.HowLong() != "Aired" || lvWhenToWatch.Items[n].ImageIndex == 1))
@@ -1157,11 +1157,6 @@ namespace TVRename
             }
 
             mInternalChange--;
-
-            if (TVSettings.Instance.AutoSelectShowInMyShows)
-            {
-                GotoEpguideFor(ei, false);
-            }
         }
 
         private void lvWhenToWatch_DoubleClick(object sender, EventArgs e)
@@ -1328,10 +1323,7 @@ namespace TVRename
                 return;
             }
 
-            if (url.StartsWith("http://", StringComparison.Ordinal) ||
-                url.StartsWith("file://", StringComparison.Ordinal) ||
-                url.StartsWith("https://", StringComparison.Ordinal) 
-                )
+            if (url.IsHttpLink() || url.IsFileLink())
             {
                 e.Cancel = true;
                 Helpers.SysOpen(e.Url.AbsoluteUri);
@@ -1396,23 +1388,23 @@ namespace TVRename
                 tabControl1.SelectTab(tbMyShows);
             }
 
-            SelectSeason(ep.AppropriateSeason);
+            SelectSeason(ep.AppropriateProcessedSeason);
         }
 
         private void RightClickOnMyShows(ShowItem si, Point pt)
         {
             mLastShowsClicked = new List<ShowItem> {si};
             mLastEpClicked = null;
-            mLastSeasonClicked = null;
+            mLastProcessedSeasonClicked = null;
             mLastActionsClicked = null;
             BuildRightClickMenu(pt);
         }
 
-        private void RightClickOnMyShows([NotNull] Season seas, Point pt)
+        private void RightClickOnMyShows([NotNull] ProcessedSeason seas, Point pt)
         {
             mLastShowsClicked = new List<ShowItem> {seas.Show};
             mLastEpClicked = null;
-            mLastSeasonClicked = seas;
+            mLastProcessedSeasonClicked = seas;
             mLastActionsClicked = null;
             BuildRightClickMenu(pt);
         }
@@ -1433,8 +1425,10 @@ namespace TVRename
             }
 
             mLastEpClicked = ep;
+            mLastEpClickedWtw = ep;
+
             mLastShowsClicked = sis;
-            mLastSeasonClicked = ep?.AppropriateSeason;
+            mLastProcessedSeasonClicked = ep?.AppropriateProcessedSeason;
             mLastActionsClicked = null;
             BuildRightClickMenu(pt);
         }
@@ -1447,7 +1441,7 @@ namespace TVRename
             }
 
             ShowItem si = mLastShowsClicked[0];
-            Season seas = mLastSeasonClicked;
+            ProcessedSeason seas = mLastProcessedSeasonClicked;
             ProcessedEpisode ep = mLastEpClicked;
 
             if (addSep)
@@ -1488,7 +1482,7 @@ namespace TVRename
                 ? mLastShowsClicked[0]
                 : null;
 
-            Season seas = mLastSeasonClicked;
+            ProcessedSeason seas = mLastProcessedSeasonClicked;
             ProcessedEpisode ep = mLastEpClicked;
 
             if (si != null)
@@ -1512,17 +1506,17 @@ namespace TVRename
 
             if (seas != null && mLastShowsClicked != null && mLastShowsClicked.Count == 1)
             {
-                AddRcMenuItem("Edit " + Season.UIFullSeasonWord(seas.SeasonNumber), RightClickCommands.kEditSeason);
+                AddRcMenuItem("Edit " + ProcessedSeason.UIFullSeasonWord(seas.SeasonNumber), RightClickCommands.kEditSeason);
                 if (si != null)
                 {
                     if (si.IgnoreSeasons.Contains(seas.SeasonNumber))
                     {
-                        AddRcMenuItem("Include " + Season.UIFullSeasonWord(seas.SeasonNumber),
+                        AddRcMenuItem("Include " + ProcessedSeason.UIFullSeasonWord(seas.SeasonNumber),
                             RightClickCommands.kIncludeSeason);
                     }
                     else
                     {
-                        AddRcMenuItem("Ignore " + Season.UIFullSeasonWord(seas.SeasonNumber),
+                        AddRcMenuItem("Ignore " + ProcessedSeason.UIFullSeasonWord(seas.SeasonNumber),
                             RightClickCommands.kIgnoreSeason);
                     }
                 }
@@ -1602,7 +1596,7 @@ namespace TVRename
                 ? mLastShowsClicked[0]
                 : null;
 
-            Season seas = mLastSeasonClicked;
+            ProcessedSeason seas = mLastProcessedSeasonClicked;
             ProcessedEpisode ep = mLastEpClicked;
             List<string> added = new List<string>();
 
@@ -1744,7 +1738,7 @@ namespace TVRename
 
                 case RightClickCommands.kVisitTvdbSeason:
                     {
-                        TvdbFor(mLastSeasonClicked);
+                        TvdbFor(mLastProcessedSeasonClicked);
                         break;
                     }
 
@@ -1812,7 +1806,7 @@ namespace TVRename
                 case RightClickCommands.kEditSeason:
                     if (si != null)
                     {
-                        EditSeason(si, mLastSeasonClicked.SeasonNumber);
+                        EditSeason(si, mLastProcessedSeasonClicked.SeasonNumber);
                     }
 
                     break;
@@ -1861,14 +1855,14 @@ namespace TVRename
                 case RightClickCommands.kIgnoreSeason:
                     if (si != null)
                     {
-                        IgnoreSeason(si, mLastSeasonClicked.SeasonNumber);
+                        IgnoreSeason(si, mLastProcessedSeasonClicked.SeasonNumber);
                     }
                     break;
 
                 case RightClickCommands.kIncludeSeason:
                     if (si != null)
                     {
-                        IncludeSeason(si, mLastSeasonClicked.SeasonNumber);
+                        IncludeSeason(si, mLastProcessedSeasonClicked.SeasonNumber);
                     }
                     break;
 
@@ -2160,7 +2154,7 @@ namespace TVRename
             try
             {
                 mDoc.WriteXMLSettings();
-                LocalCache.Instance.SaveCache();
+                SaveCaches(); 
                 if (!SaveLayoutXml())
                 {
                     Logger.Error("Failed to Save Layout Configuration Files");
@@ -2224,7 +2218,7 @@ namespace TVRename
             txtDLStatusLabel.Visible = n != 0 || TVSettings.Instance.BGDownload;
             if (n != 0)
             {
-                txtDLStatusLabel.Text = "Background download: " + LocalCache.Instance.CurrentDLTask;
+                txtDLStatusLabel.Text = "Background download: " + TheTVDB.LocalCache.Instance.CurrentDLTask +TVmaze.LocalCache.Instance.CurrentDLTask;
                 backgroundDownloadNowToolStripMenuItem.Enabled = false;
             }
             else
@@ -2240,13 +2234,19 @@ namespace TVRename
             if (n == 0 && lastDlRemaining > 0)
             {
                 // we've just finished a bunch of background downloads
-                LocalCache.Instance.SaveCache();
+                SaveCaches();
                 RefreshWTW(false,true);
 
                 backgroundDownloadNowToolStripMenuItem.Enabled = true;
             }
 
             lastDlRemaining = n;
+        }
+
+        private void SaveCaches()
+        {
+            TheTVDB.LocalCache.Instance.SaveCache();
+            TVmaze.LocalCache.Instance.SaveCache();
         }
 
         private void backgroundDownloadToolStripMenuItem_Click(object sender, EventArgs e)
@@ -2351,7 +2351,19 @@ namespace TVRename
         {
             if (tabControl1.SelectedTab == tbMyShows)
             {
+                if (mLastEpClicked != null && TVSettings.Instance.AutoSelectShowInMyShows)
+                {
+                    GotoEpguideFor(mLastEpClicked, false);
+                }
                 FillEpGuideHtml();
+            }
+            else if (tabControl1.SelectedTab == tbWTW)
+            {
+                mLastEpClicked = mLastEpClickedWtw; 
+            }
+            else if (tabControl1.SelectedTab == tbAllInOne)
+            {
+                mLastEpClicked = mLastEpClickedScan;
             }
         }
 
@@ -2375,11 +2387,7 @@ namespace TVRename
         [NotNull]
         private TreeNode AddShowItemToTree([NotNull] ShowItem si)
         {
-            SeriesInfo ser;
-            lock (LocalCache.SERIES_LOCK)
-            {
-                ser = LocalCache.Instance.GetSeries(si.TvdbCode);
-            }
+            SeriesInfo ser = si.TheSeries();
 
             TreeNode n = new TreeNode(GenerateShowUIName(ser,si)) {Tag = si};
 
@@ -2410,7 +2418,7 @@ namespace TVRename
                 SeasonFilter sf = TVSettings.Instance.SeasonFilter;
                 foreach (int snum in theKeys)
                 {
-                    Season s = si.AppropriateSeasons()[snum];
+                    ProcessedSeason s = si.AppropriateSeasons()[snum];
 
                     //Ignore the season if it is filtered out
                     if (!sf.Filter(si, s))
@@ -2461,7 +2469,7 @@ namespace TVRename
         // ReSharper disable once InconsistentNaming
         private static string GenerateShowUIName([NotNull] ShowItem si)
         {
-            SeriesInfo s = LocalCache.Instance.GetSeries(si.TvdbCode);
+            SeriesInfo s = si.TheSeries();
             return GenerateShowUIName(s,si);
         }
 
@@ -2477,7 +2485,7 @@ namespace TVRename
         {
             if (TVSettings.Instance.PostpendThe && name.StartsWith("The ", StringComparison.Ordinal))
             {
-                return name.Substring(4) + ", The";
+                return name.RemoveFirst(4) + ", The";
             }
 
             return name;
@@ -2613,22 +2621,38 @@ namespace TVRename
             return null;
         }
 
-        private void SelectSeason(Season seas)
+        private void SelectSeason(ProcessedSeason seas)
         {
             foreach (TreeNode n in MyShowTree.Nodes)
             {
-                foreach (TreeNode n2 in n.Nodes)
+                if (NodeIsForShow(seas.Show, n))
                 {
-                    if (TreeNodeToSeason(n2) == seas)
+                    foreach (TreeNode n2 in n.Nodes)
                     {
-                        n2.EnsureVisible();
-                        MyShowTree.SelectedNode = n2;
-                        return;
+                        if (TreeNodeToSeason(n2)?.SeasonId == seas.SeasonId)
+                        {
+                            n2.EnsureVisible();
+                            MyShowTree.SelectedNode = n2;
+                            return;
+                        }
                     }
                 }
             }
 
             FillEpGuideHtml(null);
+        }
+
+        private static bool NodeIsForShow([NotNull] ShowItem si, TreeNode n)
+        {
+            switch (si.Provider)
+            {
+                case ShowItem.ProviderType.TVmaze:
+                    return TreeNodeToShowItem(n)?.TVmazeCode == si.TVmazeCode;
+                case ShowItem.ProviderType.TheTVDB:
+                    return TreeNodeToShowItem(n)?.TvdbCode == si.TvdbCode;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
         }
 
         private void SelectShow(ShowItem si)
@@ -2659,10 +2683,7 @@ namespace TVRename
             DialogResult dr = aes.ShowDialog();
             if (dr == DialogResult.OK)
             {
-                lock (LocalCache.SERIES_LOCK)
-                {
-                    mDoc.Library.Add(si);
-                }
+                mDoc.Library.Add(si);
 
                 ShowAddedOrEdited(false,false);
                 SelectShow(si);
@@ -2743,7 +2764,7 @@ namespace TVRename
                 return;
             }
 
-            Season seas = TreeNodeToSeason(n);
+            ProcessedSeason seas = TreeNodeToSeason(n);
             if (seas != null)
             {
                 ShowItem si = TreeNodeToShowItem(n);
@@ -2767,15 +2788,12 @@ namespace TVRename
             MoreBusy();
             mDoc.PreventAutoScan("Edit Season");
 
-            lock (LocalCache.SERIES_LOCK)
+            EditSeason er = new EditSeason(si, seasnum, TVSettings.Instance.NamingStyle);
+            DialogResult dr = er.ShowDialog();
+            if (dr == DialogResult.OK)
             {
-                EditSeason er = new EditSeason(si, seasnum, TVSettings.Instance.NamingStyle);
-                DialogResult dr = er.ShowDialog();
-                if (dr == DialogResult.OK)
-                {
-                    ShowAddedOrEdited(false, false);
-                    SelectSeason(si.AppropriateSeasons()[seasnum]);
-                }
+                ShowAddedOrEdited(false, false);
+                SelectSeason(si.AppropriateSeasons()[seasnum]);
             }
 
             mDoc.AllowAutoScan();
@@ -2871,7 +2889,7 @@ namespace TVRename
             }
 
             ShowItem si = TreeNodeToShowItem(n);
-            Season seas = TreeNodeToSeason(n);
+            ProcessedSeason seas = TreeNodeToSeason(n);
 
             if (seas != null)
             {
@@ -2885,9 +2903,9 @@ namespace TVRename
 
         private void quickstartGuideToolStripMenuItem_Click(object sender, EventArgs e) => ShowQuickStartGuide();
 
-        private Season CurrentlySelectedSeason()
+        private ProcessedSeason CurrentlySelectedSeason()
         {
-            Season currentSeas = TreeNodeToSeason(MyShowTree.SelectedNode);
+            ProcessedSeason currentSeas = TreeNodeToSeason(MyShowTree.SelectedNode);
             if (currentSeas != null)
             {
                 return currentSeas;
@@ -2896,16 +2914,16 @@ namespace TVRename
             ShowItem currentShow = TreeNodeToShowItem(MyShowTree.SelectedNode);
             if (currentShow != null)
             {
-                foreach (KeyValuePair<int, Season> s in currentShow.AppropriateSeasons())
+                foreach (KeyValuePair<int, ProcessedSeason> s in currentShow.AppropriateSeasons())
                 {
                     //Find first season we can
                     return s.Value;
                 }
             }
 
-            foreach (ShowItem si in mDoc.Library.GetShowItems())
+            foreach (ShowItem si in mDoc.Library.GetSortedShowItems())
             {
-                foreach (KeyValuePair<int, Season> s in si.AppropriateSeasons())
+                foreach (KeyValuePair<int, ProcessedSeason> s in si.AppropriateSeasons())
                 {
                     //Find first season we can
                     return s.Value;
@@ -2917,7 +2935,7 @@ namespace TVRename
         [CanBeNull]
         private List<ProcessedEpisode> CurrentlySelectedPel()
         {
-            Season currentSeas = TreeNodeToSeason(MyShowTree.SelectedNode);
+            ProcessedSeason currentSeas = TreeNodeToSeason(MyShowTree.SelectedNode);
             ShowItem currentShow = TreeNodeToShowItem(MyShowTree.SelectedNode);
 
             int snum = currentSeas?.SeasonNumber ?? 1;
@@ -2932,7 +2950,7 @@ namespace TVRename
             }
             else
             {
-                foreach (ShowItem si in mDoc.Library.GetShowItems())
+                foreach (ShowItem si in mDoc.Library.GetSortedShowItems())
                 {
                     foreach (KeyValuePair<int, List<ProcessedEpisode>> kvp in si.SeasonEpisodes)
                     {
@@ -2987,7 +3005,7 @@ namespace TVRename
                 theFolder = TVSettings.Instance.DownloadFolders.First();
             }
 
-            AddEditSeasEpFinders d = new AddEditSeasEpFinders(TVSettings.Instance.FNPRegexs, mDoc.Library.GetShowItems(), currentShow, theFolder);
+            AddEditSeasEpFinders d = new AddEditSeasEpFinders(TVSettings.Instance.FNPRegexs, mDoc.Library.GetSortedShowItems(), currentShow, theFolder);
 
             DialogResult dr = d.ShowDialog();
             if (dr == DialogResult.OK)
@@ -3125,7 +3143,7 @@ namespace TVRename
                 {
                     foreach (int seriesId in mDoc.ShowProblems)
                     {
-                        ShowItem problemShow = mDoc.Library.ShowItem(seriesId);
+                        ShowItem problemShow = mDoc.Library.GetShowItem(seriesId);
                         if (problemShow != null)
                         {
                             EditShow(problemShow);
@@ -3355,12 +3373,19 @@ namespace TVRename
         private void ActionAction(bool checkedNotSelected, bool unattended)
         {
             mDoc.PreventAutoScan("Action Selected Items");
-            LvResults lvr = new LvResults(lvAction, checkedNotSelected);
-            mDoc.DoActions(lvr.FlatList);
+            ItemList lvr = new LvResults(lvAction, checkedNotSelected).FlatList;
+            foreach (Item i in lvr)
+            {
+                if (i is Action a)
+                {
+                    a.ResetOutcome();
+                }
+            }
+            mDoc.DoActions(lvr);
             // remove items from master list, unless it had an error
             foreach (Item i2 in new LvResults(lvAction, checkedNotSelected).FlatList)
             {
-                if (i2 != null && !lvr.FlatList.Contains(i2))
+                if (i2 != null && !lvr.Contains(i2))
                 {
                     mDoc.TheActionList.Remove(i2);
                 }
@@ -3533,7 +3558,7 @@ namespace TVRename
 
             mLastShowsClicked = null;
             mLastEpClicked = null;
-            mLastSeasonClicked = null;
+            mLastProcessedSeasonClicked = null;
             mLastActionsClicked = null;
 
             showRightClickMenu.Items.Clear();
@@ -3558,20 +3583,17 @@ namespace TVRename
             }
 
             mLastEpClicked = action.Episode;
+            mLastEpClickedScan = mLastEpClicked;
+
             if (action.Episode != null)
             {
-                mLastSeasonClicked = action.Episode.AppropriateSeason;
+                mLastProcessedSeasonClicked = action.Episode.AppropriateProcessedSeason;
                 mLastShowsClicked = new List<ShowItem> {action.Episode.Show};
             }
             else
             {
-                mLastSeasonClicked = null;
+                mLastProcessedSeasonClicked = null;
                 mLastShowsClicked = null;
-            }
-
-            if (mLastEpClicked != null && TVSettings.Instance.AutoSelectShowInMyShows)
-            {
-                GotoEpguideFor(mLastEpClicked, false);
             }
         }
 
@@ -4082,7 +4104,7 @@ namespace TVRename
 
             Task.Run(() => {
                 TimeZoneTracker results = new TimeZoneTracker();
-                foreach (ShowItem si in mDoc.Library.GetShowItems())
+                foreach (ShowItem si in mDoc.Library.GetSortedShowItems())
                 {
                     SeriesInfo ser = si.TheSeries();
                     if (ser != null)
@@ -4129,7 +4151,7 @@ namespace TVRename
                 {
                     foreach (KeyValuePair<string, List<string>> kvp2 in kvp.Value)
                     {
-                        sb.AppendLine($"{kvp.Key,-30}{kvp2.Key,-30}{string.Join(",", kvp2.Value)}");
+                        sb.AppendLine($"{kvp.Key,-30}{kvp2.Key,-30}{kvp2.Value.ToCsv()}");
                     }
                 }
 
@@ -4203,7 +4225,11 @@ namespace TVRename
             logToolStripMenuItem_Click(sender, e);
 
             Cursor.Current = Cursors.WaitCursor;
-            mDoc.ServerAccuracyCheck(false,false);
+            txtDLStatusLabel.Text = "Background download: Accuracy Check running";
+
+            mDoc.TVDBServerAccuracyCheck(false, false);
+
+            txtDLStatusLabel.Text = "Background download: Idle";
             Cursor.Current = Cursors.Default;
         }
     }

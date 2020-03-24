@@ -14,7 +14,6 @@ using System.Windows.Forms;
 using Alphaleonis.Win32.Filesystem;
 using JetBrains.Annotations;
 using NodaTime;
-using TVRename.TheTVDB;
 using Path = System.IO.Path;
 
 namespace TVRename
@@ -30,6 +29,18 @@ namespace TVRename
                 TVSettings.Instance.LookForDateInFilename, out re);
         }
 
+        public static bool FindSeasEp(string itemName, out int seas, out int ep, out int maxEp, ShowItem si, IEnumerable<TVSettings.FilenameProcessorRE> rexps, bool doDateCheck, [CanBeNull] out TVSettings.FilenameProcessorRE re)
+        {
+            re = null;
+
+            if (doDateCheck && FindSeasEpDateCheck(itemName, out seas, out ep, out maxEp, si))
+            {
+                return true;
+            }
+
+            return FindSeasEp(string.Empty, itemName, out seas, out ep, out maxEp, si, rexps, out re);
+        }
+
         public static bool FindSeasEp([CanBeNull] FileInfo fi, out int seas, out int ep, out int maxEp, ShowItem si,
             IEnumerable<TVSettings.FilenameProcessorRE> rexps, bool doDateCheck, [CanBeNull] out TVSettings.FilenameProcessorRE re)
         {
@@ -42,25 +53,23 @@ namespace TVRename
                 return false;
             }
 
-            if (doDateCheck && FindSeasEpDateCheck(fi, out seas, out ep, out maxEp, si))
+            if (doDateCheck && FindSeasEpDateCheck(fi.Name, out seas, out ep, out maxEp, si))
             {
                 return true;
             }
 
-            string filename = fi.Name;
-            int l = filename.Length;
             int le = fi.Extension.Length;
-            filename = filename.Substring(0, l - le);
+            string filename = fi.Name.RemoveLast(le);
             return FindSeasEp(fi.Directory.FullName, filename, out seas, out ep, out maxEp, si, rexps, out re);
         }
 
-        private static bool FindSeasEpDateCheck([CanBeNull] FileInfo fi, out int seas, out int ep, out int maxEp, [CanBeNull] ShowItem si)
+        private static bool FindSeasEpDateCheck([CanBeNull] string filename, out int seas, out int ep, out int maxEp, [CanBeNull] ShowItem si)
         {
             ep = -1;
             seas = -1;
             maxEp = -1;
 
-            if (fi is null || si is null)
+            if (filename is null || si is null)
             {
                 return false;
             }
@@ -68,7 +77,7 @@ namespace TVRename
             // look for a valid airdate in the filename
             // check for YMD, DMY, and MDY
             // only check against airdates we expect for the given show
-            SeriesInfo ser = LocalCache.Instance.GetSeries(si.TvdbCode);
+            SeriesInfo ser = si.TheSeries();
 
             if (ser is null)
             {
@@ -76,24 +85,20 @@ namespace TVRename
             }
 
             string[] dateFormats = { "yyyy-MM-dd", "dd-MM-yyyy", "MM-dd-yyyy", "yy-MM-dd", "dd-MM-yy", "MM-dd-yy" };
-            string filename = fi.Name;
-            if (filename is null)
-            {
-                return false;
-            }
+
             // force possible date separators to a dash
             filename = filename.Replace("/", "-");
             filename = filename.Replace(".", "-");
             filename = filename.Replace(",", "-");
             filename = filename.Replace(" ", "-");
 
-            Dictionary<int, Season> seasonsToUse = si.AppropriateSeasons();
+            Dictionary<int, ProcessedSeason> seasonsToUse = si.AppropriateSeasons();
             if (seasonsToUse is null)
             {
                 return false;
             }
 
-            foreach (KeyValuePair<int, Season> kvp in seasonsToUse)
+            foreach (KeyValuePair<int, ProcessedSeason> kvp in seasonsToUse)
             {
                 if (kvp.Value?.Episodes?.Values is null)
                 {
@@ -456,12 +461,6 @@ namespace TVRename
             return hint2;
         }
 
-        [NotNull]
-        public static IEnumerable<ShowItem> FindMatchingShows(FileInfo fi, [NotNull] IEnumerable<ShowItem> sil)
-        {
-            return sil.Where(item => item.NameMatch(fi, false));
-        }
-
         public static bool BetterShowsMatch(FileInfo matchedFile, ShowItem currentlyMatchedShow, bool useFullPath, [NotNull] TVDoc doc)
         {
             return doc.Library.Shows
@@ -610,12 +609,14 @@ namespace TVRename
             return addedShows;
         }
 
-        public static ShowItem FindBestMatchingShow(FileInfo fi, [NotNull] IEnumerable<ShowItem> shows)
+        public static ShowItem FindBestMatchingShow([NotNull] FileInfo fi, [NotNull] IEnumerable<ShowItem> shows) => FindBestMatchingShow(fi.Name, shows);
+
+        public static ShowItem FindBestMatchingShow(string filename, [NotNull] IEnumerable<ShowItem> shows)
         {
             IEnumerable<ShowItem> showItems = shows as ShowItem[] ?? shows.ToArray();
 
             IEnumerable<ShowItem> showsMatchAtStart = showItems
-                .Where(item => FileHelper.SimplifyAndCheckFilenameAtStart(fi.Name, item.ShowName));
+                .Where(item => FileHelper.SimplifyAndCheckFilenameAtStart(filename, item.ShowName));
 
             IEnumerable<ShowItem> matchAtStart = showsMatchAtStart as ShowItem[] ?? showsMatchAtStart.ToArray();
 
@@ -624,8 +625,20 @@ namespace TVRename
                 return matchAtStart.OrderByDescending(s => s.ShowName.Length).First();
             }
 
-            IEnumerable<ShowItem> otherMatchingShows = FindMatchingShows(fi, showItems);
+            IEnumerable<ShowItem> otherMatchingShows = FindMatchingShows(filename, showItems);
             return otherMatchingShows.OrderByDescending(s => s.ShowName.Length).FirstOrDefault();
+        }
+
+        [NotNull]
+        public static IEnumerable<ShowItem> FindMatchingShows([NotNull] FileInfo fi, [NotNull] IEnumerable<ShowItem> sil)
+        {
+            return FindMatchingShows(fi.Name,sil);
+        }
+
+        [NotNull]
+        public static IEnumerable<ShowItem> FindMatchingShows(string filename, [NotNull] IEnumerable<ShowItem> sil)
+        {
+            return sil.Where(item => item.NameMatch(filename));
         }
     }
 }
