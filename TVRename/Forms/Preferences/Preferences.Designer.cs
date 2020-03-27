@@ -330,6 +330,12 @@ namespace TVRename
             this.cbMissing = new System.Windows.Forms.CheckBox();
             this.label60 = new System.Windows.Forms.Label();
             this.pbGeneral = new System.Windows.Forms.PictureBox();
+/*
+            this.cbShowCollections = new System.Windows.Forms.CheckBox();
+            this.label37 = new System.Windows.Forms.Label();
+            this.label38 = new System.Windows.Forms.Label();
+            this.tbPercentDirty = new System.Windows.Forms.TextBox();
+*/
             this.txtWTWDays = new System.Windows.Forms.TextBox();
             this.cbMode = new System.Windows.Forms.ComboBox();
             this.label34 = new System.Windows.Forms.Label();
@@ -3510,6 +3516,12 @@ namespace TVRename
             this.tbGeneral.Controls.Add(this.groupBox17);
             this.tbGeneral.Controls.Add(this.label60);
             this.tbGeneral.Controls.Add(this.pbGeneral);
+/*
+            this.tbGeneral.Controls.Add(this.cbShowCollections);
+            this.tbGeneral.Controls.Add(this.label37);
+            this.tbGeneral.Controls.Add(this.label38);
+            this.tbGeneral.Controls.Add(this.tbPercentDirty);
+*/
             this.tbGeneral.Controls.Add(this.txtWTWDays);
             this.tbGeneral.Controls.Add(this.cbMode);
             this.tbGeneral.Controls.Add(this.label34);
@@ -3701,7 +3713,45 @@ namespace TVRename
             this.pbGeneral.TabIndex = 23;
             this.pbGeneral.TabStop = false;
             this.pbGeneral.Click += new System.EventHandler(this.pbGeneral_Click);
+/*
+            //
+            // cbShowCollections
             // 
+            this.cbShowCollections.AutoSize = true;
+            this.cbShowCollections.Location = new System.Drawing.Point(266, 222);
+            this.cbShowCollections.Name = "cbShowCollections";
+            this.cbShowCollections.Size = new System.Drawing.Size(145, 17);
+            this.cbShowCollections.TabIndex = 24;
+            this.cbShowCollections.Text = "Multiple Show collections";
+            this.cbShowCollections.UseVisualStyleBackColor = true;
+            // 
+            // label37
+            // 
+            this.label37.AutoSize = true;
+            this.label37.Location = new System.Drawing.Point(11, 80);
+            this.label37.Name = "label37";
+            this.label37.Size = new System.Drawing.Size(114, 13);
+            this.label37.TabIndex = 20;
+            this.label37.Text = "Refresh entire series  if";
+            // 
+            // label38
+            // 
+            this.label38.AutoSize = true;
+            this.label38.Location = new System.Drawing.Point(163, 80);
+            this.label38.Name = "label38";
+            this.label38.Size = new System.Drawing.Size(132, 13);
+            this.label38.TabIndex = 22;
+            this.label38.Text = "% of episodes are updated";
+            // 
+            // tbPercentDirty
+            // 
+            this.tbPercentDirty.Location = new System.Drawing.Point(128, 77);
+            this.tbPercentDirty.Name = "tbPercentDirty";
+            this.tbPercentDirty.Size = new System.Drawing.Size(28, 20);
+            this.tbPercentDirty.TabIndex = 21;
+            this.tbPercentDirty.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.TxtNumberOnlyKeyPress);
+            // 
+*/
             // txtWTWDays
             // 
             this.txtWTWDays.Location = new System.Drawing.Point(13, 51);
@@ -4689,5 +4739,8 @@ namespace TVRename
         private System.Windows.Forms.Label label37;
         private System.Windows.Forms.Label label38;
         private System.Windows.Forms.TextBox tbPercentDirty;
+/*
+        private System.Windows.Forms.CheckBox cbShowCollections;
+*/
     }
 }
