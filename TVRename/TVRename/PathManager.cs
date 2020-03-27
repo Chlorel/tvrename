@@ -26,30 +26,14 @@ namespace TVRename
         private const string SHOWS_COLLECTION_FILE_NAME = "TVRenameColls.xml";
         private const string SHOWS_DEFAULT_COLLECTION = "2.1";
 
+        private static string SHOWS_COLLECTION = "";
         private static string UserDefinedBasePath;
 
 
         public static FileInfo[] GetPossibleSettingsHistory() => new DirectoryInfo(System.IO.Path.GetDirectoryName(TVDocSettingsFile.FullName)).GetFiles(SETTINGS_FILE_NAME + "*");
-
-        public static FileInfo[] GetPossibleTvdbHistory() => new DirectoryInfo(System.IO.Path.GetDirectoryName(TVDocSettingsFile.FullName)).GetFiles(TVDB_FILE_NAME + "*");
-        public static FileInfo[] GetPossibleTvMazeHistory() => new DirectoryInfo(System.IO.Path.GetDirectoryName(TVDocSettingsFile.FullName)).GetFiles(TVMAZE_FILE_NAME + "*");
-/*
-        // =========================================================================================================================================
-        private static string SHOWS_COLLECTION = "";
-
-        public static FileInfo[] GetPossibleShowsHistory()
-        {
-            return new DirectoryInfo(System.IO.Path.GetDirectoryName(TVDocShowsFile.FullName)).GetFiles(SHOWS_FILE_NAME + "*");
-        }
-        public static FileInfo[] GetPossibleSettingsHistory()
-        {
-            return new DirectoryInfo(System.IO.Path.GetDirectoryName(TVDocSettingsFile.FullName)).GetFiles(SETTINGS_FILE_NAME + "*");
-        }
-        public static FileInfo[] GetPossibleTvdbHistory()
-        {
-            return new DirectoryInfo(System.IO.Path.GetDirectoryName(TVDocSettingsFile.FullName)).GetFiles(TVDB_FILE_NAME + "*");
-        }
-*/
+        public static FileInfo[] GetPossibleShowsHistory()    => new DirectoryInfo(System.IO.Path.GetDirectoryName(TVDocShowsFile.FullName)).GetFiles(SHOWS_FILE_NAME + "*");
+        public static FileInfo[] GetPossibleTvdbHistory()     => new DirectoryInfo(System.IO.Path.GetDirectoryName(TVDocSettingsFile.FullName)).GetFiles(TVDB_FILE_NAME + "*");
+        public static FileInfo[] GetPossibleTvMazeHistory()   => new DirectoryInfo(System.IO.Path.GetDirectoryName(TVDocSettingsFile.FullName)).GetFiles(TVMAZE_FILE_NAME + "*");
 
         public static void SetUserDefinedBasePath(string path)
         {
@@ -75,18 +59,26 @@ namespace TVRename
         {
             string path = UserDefinedBasePath.HasValue()
                 ? UserDefinedBasePath
-                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TVRename",
-                    "TVRename", "2.1");
+                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TVRename", "TVRename", (!string.IsNullOrEmpty(SHOWS_COLLECTION) ? SHOWS_COLLECTION : SHOWS_DEFAULT_COLLECTION));
             Directory.CreateDirectory(path);
             return new FileInfo(System.IO.Path.Combine(path, file));
         }
 
+        [NotNull]
+        private static FileInfo GetRootFileInfo([NotNull] string file)
+        {
+            string path = UserDefinedBasePath.HasValue()
+                ? UserDefinedBasePath
+                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TVRename", "TVRename", (!string.IsNullOrEmpty(SHOWS_COLLECTION) ? "" : SHOWS_DEFAULT_COLLECTION));
+            Directory.CreateDirectory(path);
+            return new FileInfo(System.IO.Path.Combine(path, file));
+        }
 
         [NotNull]
         public static FileInfo StatisticsFile => GetFileInfo(STATISTICS_FILE_NAME);
         // ReSharper disable once InconsistentNaming
         [NotNull]
-        public static FileInfo UILayoutFile => GetFileInfo(UI_LAYOUT_FILE_NAME);
+        public static FileInfo UILayoutFile => GetRootFileInfo(UI_LAYOUT_FILE_NAME);
         // ReSharper disable once InconsistentNaming
         [NotNull]
         public static FileInfo TVDBFile => GetFileInfo(TVDB_FILE_NAME);
@@ -95,10 +87,12 @@ namespace TVRename
         public static FileInfo TVmazeFile=> GetFileInfo(TVMAZE_FILE_NAME);
         // ReSharper disable once InconsistentNaming
         [NotNull]
-        public static FileInfo TVDocSettingsFile => GetFileInfo(SETTINGS_FILE_NAME);
+        public static FileInfo TVDocSettingsFile => GetRootFileInfo(SETTINGS_FILE_NAME);
         [NotNull]
-        public static FileInfo LanguagesFile => GetFileInfo(LANGUAGES_FILE_NAME);
-/*
+        public static FileInfo TVDocShowsFile => GetFileInfo(SHOWS_FILE_NAME);
+        [NotNull]
+        public static FileInfo LanguagesFile => GetRootFileInfo(LANGUAGES_FILE_NAME);
+
         // =========================================================================================================================================
         public static string ShowCollection
         {
@@ -119,100 +113,7 @@ namespace TVRename
             }
         }
 
-        public static FileInfo ShowCollectionFile
-        {
-            get
-            {
-                if (!string.IsNullOrEmpty(UserDefinedBasePath))
-                {
-                    return GetFileInfo(UserDefinedBasePath, SHOWS_COLLECTION_FILE_NAME);
-                }
-                else
-                {
-                    return GetFileInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TVRename", "TVRename"), SHOWS_COLLECTION_FILE_NAME);
-                }
-            }
-        }
-
-        public static FileInfo StatisticsFile
-        {
-            get
-            {
-                if (!string.IsNullOrEmpty(UserDefinedBasePath))
-                {
-                    return GetFileInfo(UserDefinedBasePath, STATISTICS_FILE_NAME);
-                }
-                return GetFileInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TVRename", "TVRename", (!string.IsNullOrEmpty(SHOWS_COLLECTION) ? SHOWS_COLLECTION : SHOWS_DEFAULT_COLLECTION)), STATISTICS_FILE_NAME);
-            }
-        }
-
-        // ReSharper disable once InconsistentNaming
         [NotNull]
-        public static FileInfo UILayoutFile
-        {
-            get
-            {
-                if (!string.IsNullOrEmpty(UserDefinedBasePath))
-                {
-                    return GetFileInfo(UserDefinedBasePath, UI_LAYOUT_FILE_NAME);
-                }
-                return GetFileInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TVRename", "TVRename", (!string.IsNullOrEmpty(SHOWS_COLLECTION) ? "" : SHOWS_DEFAULT_COLLECTION)), UI_LAYOUT_FILE_NAME);
-            }
-        }
-
-        // ReSharper disable once InconsistentNaming
-        [NotNull]
-        public static FileInfo TVDBFile
-        {
-            get
-            {
-                if (!string.IsNullOrEmpty(UserDefinedBasePath))
-                {
-                    return GetFileInfo(UserDefinedBasePath, TVDB_FILE_NAME);
-                }
-                return GetFileInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TVRename", "TVRename", (!string.IsNullOrEmpty(SHOWS_COLLECTION) ? SHOWS_COLLECTION : SHOWS_DEFAULT_COLLECTION)), TVDB_FILE_NAME);
-            }
-        }
-
-        // ReSharper disable once InconsistentNaming
-        [NotNull]
-        public static FileInfo TVDocSettingsFile
-        {
-            get
-            {
-                if (!string.IsNullOrEmpty(UserDefinedBasePath))
-                {
-                    return GetFileInfo(UserDefinedBasePath, SETTINGS_FILE_NAME);
-                }
-                return GetFileInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TVRename", "TVRename", (!string.IsNullOrEmpty(SHOWS_COLLECTION) ? "" : SHOWS_DEFAULT_COLLECTION)), SETTINGS_FILE_NAME);
-            }
-        }
-
-        [NotNull]
-        public static FileInfo LanguagesFile
-        {
-            get
-            {
-                if (!string.IsNullOrEmpty(UserDefinedBasePath))
-                {
-                    return GetFileInfo(UserDefinedBasePath, LANGUAGES_FILE_NAME);
-                }
-                return GetFileInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TVRename", "TVRename", (!string.IsNullOrEmpty(SHOWS_COLLECTION) ? "" : SHOWS_DEFAULT_COLLECTION)), LANGUAGES_FILE_NAME);
-            }
-        }
-
-        // =========================================================================================================================================
-        public static FileInfo TVDocShowsFile
-        {
-            get
-            {
-                if (!string.IsNullOrEmpty(UserDefinedBasePath))
-                {
-                    return GetFileInfo(UserDefinedBasePath, SHOWS_FILE_NAME);
-                }
-                return GetFileInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TVRename", "TVRename", (!string.IsNullOrEmpty(SHOWS_COLLECTION) ? SHOWS_COLLECTION : SHOWS_DEFAULT_COLLECTION)), (!string.IsNullOrEmpty(SHOWS_COLLECTION) ? SHOWS_FILE_NAME : SETTINGS_FILE_NAME));
-            }
-        }
-*/
+        public static FileInfo ShowCollectionFile =>  GetRootFileInfo(SHOWS_COLLECTION_FILE_NAME);
     }
 }
