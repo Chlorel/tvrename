@@ -78,7 +78,7 @@ namespace TVRename
         public static FileInfo StatisticsFile => GetFileInfo(STATISTICS_FILE_NAME);
         // ReSharper disable once InconsistentNaming
         [NotNull]
-        public static FileInfo UILayoutFile => GetRootFileInfo(UI_LAYOUT_FILE_NAME);
+        public static FileInfo UILayoutFile => GetFileInfo(UI_LAYOUT_FILE_NAME);
         // ReSharper disable once InconsistentNaming
         [NotNull]
         public static FileInfo TVDBFile => GetFileInfo(TVDB_FILE_NAME);
@@ -87,11 +87,11 @@ namespace TVRename
         public static FileInfo TVmazeFile=> GetFileInfo(TVMAZE_FILE_NAME);
         // ReSharper disable once InconsistentNaming
         [NotNull]
-        public static FileInfo TVDocSettingsFile => GetRootFileInfo(SETTINGS_FILE_NAME);
+        public static FileInfo TVDocSettingsFile => GetFileInfo(SETTINGS_FILE_NAME);
         [NotNull]
         public static FileInfo TVDocShowsFile => GetFileInfo(SHOWS_FILE_NAME);
         [NotNull]
-        public static FileInfo LanguagesFile => GetRootFileInfo(LANGUAGES_FILE_NAME);
+        public static FileInfo LanguagesFile => GetFileInfo(LANGUAGES_FILE_NAME);
 
         // =========================================================================================================================================
         public static string ShowCollection
@@ -114,6 +114,6 @@ namespace TVRename
         }
 
         [NotNull]
-        public static FileInfo ShowCollectionFile =>  GetRootFileInfo(SHOWS_COLLECTION_FILE_NAME);
+        public static FileInfo ShowCollectionFile =>  GetFileInfo(SHOWS_COLLECTION_FILE_NAME);
     }
 }
