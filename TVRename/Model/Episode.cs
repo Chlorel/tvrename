@@ -45,7 +45,7 @@ namespace TVRename
         public string Filename;
 
         protected int ReadAiredSeasonNum; // only use after loading to attach to the correct season!
-        protected int ReadDvdSeasonNum; // only use after loading to attach to the correct season!
+        public int ReadDvdSeasonNum; // only use after loading to attach to the correct season!
         public int SeasonId;
         public int SeriesId;
         public long SrvLastUpdated;
@@ -94,7 +94,7 @@ namespace TVRename
 
         protected Episode([NotNull] SeriesInfo ser,ShowItem.ProviderType type)
         {
-            SetDefaults(ser,(type==ShowItem.ProviderType.TVmaze)?ser.TvMazeCode:ser.TvdbCode);
+            SetDefaults(ser,type==ShowItem.ProviderType.TVmaze?ser.TvMazeCode:ser.TvdbCode);
         }
 
         [CanBeNull]
@@ -163,7 +163,7 @@ namespace TVRename
             AirsAfterSeason = r.ExtractInt("AirsAfterSeason");
             SiteRatingCount = r.ExtractInt("SiteRatingCount") ?? r.ExtractInt("siteRatingCount");
             AbsoluteNumber = r.ExtractInt("AbsoluteNumber");
-            FirstAired = ParseAired(r.ExtractString("FirstAired"));
+            FirstAired = JsonHelper.ParseFirstAired(r.ExtractString("FirstAired"));
         }
 
         private static int ExtractAndParse([NotNull] XElement r, string key)
@@ -171,22 +171,6 @@ namespace TVRename
             string value = r.ExtractString(key);
             int.TryParse(value, out int intValue);
             return intValue;
-        }
-
-        private static DateTime? ParseAired([CanBeNull] string contents)
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(contents))
-                {
-                    return null;
-                }
-                return DateTime.ParseExact(contents, "yyyy-MM-dd",new System.Globalization.CultureInfo(""));
-            }
-            catch
-            {
-                return null;
-            }
         }
 
         public Episode(int seriesId, [NotNull] JObject json, JObject jsonInDefaultLang)
@@ -288,31 +272,11 @@ namespace TVRename
                 EpisodeDirector = r["directors"].Flatten("|");
                 Writer = r["writers"].Flatten("|");
 
-                FirstAired = GetFirstAired(r);
+                FirstAired = JsonHelper.ParseFirstAired((string)r["firstAired"]);
             }
             catch (Exception e)
             {
                 Logger.Error(e, $"Failed to parse : {r}");
-            }
-        }
-
-        private static DateTime? GetFirstAired(JObject r)
-        {
-            try
-            {
-                string contents = (string) r["firstAired"];
-                if (string.IsNullOrEmpty(contents))
-                {
-                    return null;
-                }
-
-                return DateTime.ParseExact(contents, "yyyy-MM-dd",
-                    new System.Globalization.CultureInfo(""));
-            }
-            catch (Exception e)
-            {
-                Logger.Debug(e, "Failed to parse firstAired");
-                return null;
             }
         }
 
