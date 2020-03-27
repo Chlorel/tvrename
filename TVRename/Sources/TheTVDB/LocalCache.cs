@@ -110,7 +110,7 @@ namespace TVRename.TheTVDB
             System.Diagnostics.Debug.Assert(cache != null);
             cacheFile = cache;
 
-            LastErrorMessage = "";
+            LastErrorMessage = string.Empty;
             IsConnected = false;
             extraEpisodes = new ConcurrentDictionary<int, ExtraEp>();
             removeEpisodeIds = new ConcurrentDictionary<int, ExtraEp>();
@@ -286,7 +286,7 @@ namespace TVRename.TheTVDB
                     }
                 }
             }
-            catch (SourceConnectivityException ex)
+            catch (SourceConnectivityException)
             {
                 issues.Add($"Failed to compare {si.Name} as we could not download the series details.");
             }
@@ -462,7 +462,7 @@ namespace TVRename.TheTVDB
                     }
                 }
 
-                LastErrorMessage = "";
+                LastErrorMessage = string.Empty;
 
                 return false;
             }
@@ -713,14 +713,12 @@ namespace TVRename.TheTVDB
                 {
                     kvp.Value.Dirty = true;
                     kvp.Value.ClearEpisodes();
-                    Logger.Info("Planning to download all of {0} as {1}% of the episodes need to be updated",
-                        kvp.Value.Name, percentDirty);
+                    Logger.Info($"Planning to download all of {kvp.Value.Name} as {percentDirty}% of the episodes need to be updated");
                 }
                 else
                 {
                     Logger.Trace(
-                        "Not planning to download all of {0} as {1}% of the episodes need to be updated and that's less than the 10% limit to upgrade.",
-                        kvp.Value.Name, percentDirty);
+                        $"Not planning to download all of {kvp.Value.Name} as {percentDirty}% of the episodes need to be updated and that's less than the 10% limit to upgrade.");
                 }
             }
         }
@@ -1281,7 +1279,8 @@ namespace TVRename.TheTVDB
                     if (API.TvdbIsUp() && !CanFindEpisodesFor(code, requestedLanguageCode))
                     {
                         LastErrorMessage = ex.Message;
-                        throw new ShowNotFoundException(code);
+                        string msg = $"Show with TVDB Id {code} is no longer found on TVDB. Please Update";
+                        throw new ShowNotFoundException(code,msg,ShowItem.ProviderType.TheTVDB,ShowItem.ProviderType.TheTVDB);
                     }
                 }
 
@@ -1386,7 +1385,7 @@ namespace TVRename.TheTVDB
             si.BannersLoaded = true;
         }
 
-        private static void ProcessBannerResponses(int code, SeriesInfo si, int languageId, string languageCode, [NotNull] List<JObject> bannerResponses,
+        private static void ProcessBannerResponses(int code, SeriesInfo si, int languageId, string languageCode, [NotNull] IEnumerable<JObject> bannerResponses,
             ICollection<int> latestBannerIds)
         {
             foreach (JObject response in bannerResponses)
@@ -1687,9 +1686,11 @@ namespace TVRename.TheTVDB
 
         public bool EnsureUpdated([NotNull] SeriesSpecifier seriesd, bool bannersToo)
         {
-            if (seriesd.Provider == ShowItem.ProviderType.TVmaze) return true; //todo remove this
+            if (seriesd.Provider == ShowItem.ProviderType.TVmaze) {
+                throw new SourceConsistencyException($"Asked to update {seriesd.Name} from TV Maze, but the Id is not for TV maze.", ShowItem.ProviderType.TVmaze);
+            }
 
-            int code = seriesd.TvdbSeriesId; //todo check if this is correct??
+            int code = seriesd.TvdbSeriesId; 
             
             if (DoWeForceReloadFor(code) || series[code].Episodes.Count == 0) 
             {

@@ -135,7 +135,7 @@ namespace TVRename
                     }
                     if(showConfiguration.TVmazeCode != show.TvMazeCode)
                     {
-                        Logger.Error($"Issue with copy back of ids");
+                        Logger.Error($"Issue with copy back of ids {show.Name} {show.TvdbCode} {showConfiguration.TVmazeCode} {show.TvMazeCode} ");
                     }
                 }
             }
@@ -422,7 +422,7 @@ namespace TVRename
             ExportShowInfo(); //Save shows list to disk
         }
 
-        public ConcurrentBag<int> ShowProblems => cacheManager.Problems;
+        public ConcurrentBag<ShowNotFoundException> ShowProblems => cacheManager.Problems;
 
         public void Scan([CanBeNull] IEnumerable<ShowItem> passedShows, bool unattended, TVSettings.ScanType st, bool hidden)
         {

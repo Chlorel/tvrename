@@ -57,7 +57,7 @@ namespace TVRename
             {
                 return new ActionOutcome(ex);
             }
-            catch (XmlException xex)
+            catch (XmlException)
             {
                 //Assume that the file needs to be recreated
                 CreateBlankFile();
@@ -356,7 +356,7 @@ namespace TVRename
             }
         }
 
-        private void UpdateId([NotNull] XElement root, [NotNull] string idType, [NotNull] string defaultState, int idValue)
+        private static void UpdateId([NotNull] XElement root, [NotNull] string idType, [NotNull] string defaultState, int idValue)
         {
             UpdateId(root,idType,defaultState,idValue.ToString());
         }
