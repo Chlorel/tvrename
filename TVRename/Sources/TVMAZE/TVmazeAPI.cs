@@ -13,19 +13,29 @@ namespace TVRename.TVmaze
     internal static class API
     {
         // ReSharper disable once ConvertToConstant.Local
-        private static readonly string WebsiteRoot = "https://tvmaze.com";
-        // ReSharper disable once ConvertToConstant.Local
         // ReSharper disable once InconsistentNaming
         private static readonly string APIRoot = "http://api.tvmaze.com";
 
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         [NotNull]
-        public static IEnumerable<KeyValuePair<string,long>> GetShowUpdates()
+        public static IEnumerable<KeyValuePair<string,long>> GetUpdates()
         {
-            JObject updatesJson = HttpHelper.HttpGetRequestWithRetry(APIRoot + "/updates/shows", 3, 2);
+            try
+            {
+                JObject updatesJson = HttpHelper.HttpGetRequestWithRetry(APIRoot + "/updates/shows", 3, 2);
 
-            return updatesJson.Children<JProperty>().Select(t => new KeyValuePair<string, long>(t.Name, (long) t.Value));
+                return updatesJson.Children<JProperty>()
+                    .Select(t => new KeyValuePair<string, long>(t.Name, (long) t.Value));
+            }
+            catch (WebException ex)
+            {
+                if (!ex.IsUnimportant())
+                {
+                    Logger.Error($"Could not get updates from TV Maze due to {ex.LoggableDetails()}");
+                }
+                throw new SourceConnectivityException(ex.Message);
+            }
         }
 
         private static int GetSeriesIdFromOtherCodes(int siTvdbCode,string imdb)
@@ -43,21 +53,21 @@ namespace TVRename.TVmaze
                     string tvdBimbd = TheTVDB.LocalCache.Instance.GetSeries(siTvdbCode)?.Imdb;
                     if (!imdb.HasValue() && !tvdBimbd.HasValue())
                     {
-                        throw new SourceConsistencyException($"Please add show {siTvdbCode} to tvMaze", ShowItem.ProviderType.TVmaze);
+                        throw new ShowNotFoundException(siTvdbCode, $"Cant find a show with TVDB Id {siTvdbCode} on TV Maze, either add the show to TV Maze, find the show and update The TVDB Id or use TVDB for that show.", ShowItem.ProviderType.TheTVDB, ShowItem.ProviderType.TVmaze);
                     }
                     string imdbCode = imdb ?? tvdBimbd;
                     try
                     {
                         JObject r = HttpHelper.HttpGetRequestWithRetry(APIRoot + "/lookup/shows?imdb=" + imdbCode, 3, 2);
                         int tvMazeId = (int)r["id"];
-                        Logger.Fatal($"TVMaze Data issue: {tvMazeId} has the wrong TVDB Id based on {imdbCode}.");
+                        Logger.Error($"TVMaze Data issue: {tvMazeId} has the wrong TVDB Id based on {imdbCode}.");
                         return tvMazeId;
                     }
                     catch (WebException wex2)
                     {
-                        if (wex2.Is404())
+                        if (wex2.Is404() && TvMazeIsUp())
                         {
-                            throw new SourceConsistencyException($"Please add show with imdb={imdbCode} and tvdb={siTvdbCode} to tvMaze", ShowItem.ProviderType.TVmaze);
+                            throw new ShowNotFoundException(siTvdbCode,$"Please add show with imdb={imdbCode} and tvdb={siTvdbCode} to tvMaze, or use TVDB as the source for that show.", ShowItem.ProviderType.TheTVDB, ShowItem.ProviderType.TVmaze);
                         }
                         throw new SourceConnectivityException($"Can't find TVmaze series for IMDB={imdbCode} and tvdb={siTvdbCode} {wex.Message}");
                     }
@@ -70,15 +80,31 @@ namespace TVRename.TVmaze
         {
             try
             {
-                return HttpHelper.HttpGetRequestWithRetry($"{APIRoot}/shows/{tvMazeId}?specials=1&embed[]=cast&embed[]=episodes&embed[]=crew&embed[]=akas&embed[]=seasons&embed[]=images", 3,2);
+                return HttpHelper.HttpGetRequestWithRetry($"{APIRoot}/shows/{tvMazeId}?specials=1&embed[]=cast&embed[]=episodes&embed[]=crew&embed[]=akas&embed[]=seasons&embed[]=images", 5,2);
             }
             catch (WebException wex)
             {
-                if (wex.Is404())
+                if (wex.Is404() && TvMazeIsUp())
                 {
-                    throw new SourceConsistencyException($"Please add show maze id {tvMazeId} to tvMaze", ShowItem.ProviderType.TVmaze);
+                    throw new ShowNotFoundException(tvMazeId,$"Please add show maze id {tvMazeId} to tvMaze", ShowItem.ProviderType.TVmaze, ShowItem.ProviderType.TVmaze);
+                }
+                if (!wex.IsUnimportant())
+                {
+                    Logger.Error($"Could not get show with id {tvMazeId} from TV Maze due to {wex.LoggableDetails()}");
                 }
                 throw new SourceConnectivityException($"Can't find TVmaze series for {tvMazeId} {wex.Message}");
+            }
+        }
+
+        private static bool TvMazeIsUp()
+        {
+            try
+            {
+                return HttpHelper.HttpGetRequestWithRetry(APIRoot + "/singlesearch/shows?q=girls", 5, 1).HasValues;
+            }
+            catch (WebException)
+            {
+                return false;
             }
         }
 
@@ -88,6 +114,7 @@ namespace TVRename.TVmaze
             JObject results =  ss.TvMazeSeriesId > 0
                 ? GetSeriesDetails(ss.TvMazeSeriesId)
                 : GetSeriesDetails(GetSeriesIdFromOtherCodes(ss.TvdbSeriesId,ss.ImdbCode));
+
 
             SeriesInfo downloadedSi = GenerateSeriesInfo(results);
             foreach (JToken akaJson in results["_embedded"]["akas"])
@@ -109,7 +136,7 @@ namespace TVRename.TVmaze
                 JToken imageNode = jsonSeason["image"];
                 if (jsonSeason["image"].HasValues)
                 {
-                    downloadedSi.AddOrUpdateBanner(GenerateBanner(ss.TvMazeSeriesId,(int)jsonSeason["id"], (int)jsonSeason["number"], (string)imageNode["original"]));
+                    downloadedSi.AddOrUpdateBanner(GenerateBanner(ss.TvMazeSeriesId, (int)jsonSeason["number"], (string)imageNode["original"]));
                 }
             }
 
@@ -159,7 +186,7 @@ namespace TVRename.TVmaze
         }
 
         [NotNull]
-        private static Banner GenerateBanner(int seriesId,int seasonId, int seasonNumber,[NotNull] string url)
+        private static Banner GenerateBanner(int seriesId, int seasonNumber,[NotNull] string url)
         {
             Banner newBanner = new Banner(seriesId)
             {
@@ -198,22 +225,6 @@ namespace TVRename.TVmaze
             return new Season(id,number,name,description,url,imageUrl,seriesId);
         }
 
-        private static DateTime? ParseFirstAired([CanBeNull] string theDate)
-        {
-            try
-            {
-                if (!string.IsNullOrEmpty(theDate))
-                {
-                    return DateTime.ParseExact(theDate, "yyyy-MM-dd", new CultureInfo(""));
-                }
-
-                return null;
-            }
-            catch
-            {
-                return null;
-            }
-        }
 
         [NotNull]
         private static SeriesInfo GenerateSeriesInfo([NotNull] JObject r)
@@ -221,15 +232,16 @@ namespace TVRename.TVmaze
             string nw = GetKeySubKey(r,"network", "name"); 
             string wc = GetKeySubKey(r,"webChannel", "name");
             string days =  r["schedule"]["days"]?.Select(x => x.Value<string>()).ToCsv();
-            int tvdb = (int) (r["externals"]["thetvdb"] ?? 0);
-            int rage = r["externals"]["tvrage"].HasValues?(int) r["externals"]["tvrage"] : 0;
+            int tvdb = r["externals"]["thetvdb"].Type == JTokenType.Null ? -1 : (int)r["externals"]["thetvdb"]; 
+            int rage = r["externals"]["tvrage"].Type == JTokenType.Null ? -1 : (int)r["externals"]["tvrage"];
+
 
             SeriesInfo returnValue = new SeriesInfo
             {
                 IsStub = false,
                 AirsDay = days,
                 AirsTime = JsonHelper.ParseAirTime((string)r["schedule"]["time"]),
-                FirstAired = ParseFirstAired((string)r["premiered"]),
+                FirstAired = JsonHelper.ParseFirstAired((string)r["premiered"]),
                 TvdbCode = tvdb,
                 TvMazeCode = (int)(r["id"]??0),
                 TvRageCode = rage,
@@ -247,6 +259,7 @@ namespace TVRename.TVmaze
                     long.TryParse((string)r["updated"], out long updateTime)
                         ? updateTime
                         : 0,
+                Dirty = false,
             };
 
             if (r.ContainsKey("genres"))
@@ -342,7 +355,9 @@ namespace TVRename.TVmaze
                 AiredEpNum = (int)r["number"],
                 SeasonId = (int)r["season"],
                 AiredSeasonNumber = (int)r["season"],
-                Filename = GetUrl(r, "medium")
+                Filename = GetUrl(r, "medium"),
+                ReadDvdSeasonNum = 0,
+                DvdEpNum = 0
             };
 
             newEp.SetWriters(writers);
