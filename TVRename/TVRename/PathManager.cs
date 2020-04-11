@@ -21,12 +21,19 @@ namespace TVRename
         private const string STATISTICS_FILE_NAME = "Statistics.xml";
         private const string LANGUAGES_FILE_NAME = "Languages.xml";
 
+        // =========================================================================================================================================
+        private const string SHOWS_FILE_NAME = "TVRenameShows.xml";
+        private const string SHOWS_COLLECTION_FILE_NAME = "TVRenameColls.xml";
+        private const string SHOWS_DEFAULT_COLLECTION = "2.1";
+
+        private static string SHOWS_COLLECTION = "";
         private static string UserDefinedBasePath;
 
-        public static FileInfo[] GetPossibleSettingsHistory() => new DirectoryInfo(System.IO.Path.GetDirectoryName(TVDocSettingsFile.FullName)).GetFiles(SETTINGS_FILE_NAME + "*");
 
-        public static FileInfo[] GetPossibleTvdbHistory() => new DirectoryInfo(System.IO.Path.GetDirectoryName(TVDocSettingsFile.FullName)).GetFiles(TVDB_FILE_NAME + "*");
-        public static FileInfo[] GetPossibleTvMazeHistory() => new DirectoryInfo(System.IO.Path.GetDirectoryName(TVDocSettingsFile.FullName)).GetFiles(TVMAZE_FILE_NAME + "*");
+        public static FileInfo[] GetPossibleSettingsHistory() => new DirectoryInfo(System.IO.Path.GetDirectoryName(TVDocSettingsFile.FullName)).GetFiles(SETTINGS_FILE_NAME + "*");
+        public static FileInfo[] GetPossibleShowsHistory()    => new DirectoryInfo(System.IO.Path.GetDirectoryName(TVDocShowsFile.FullName)).GetFiles(SHOWS_FILE_NAME + "*");
+        public static FileInfo[] GetPossibleTvdbHistory()     => new DirectoryInfo(System.IO.Path.GetDirectoryName(TVDocSettingsFile.FullName)).GetFiles(TVDB_FILE_NAME + "*");
+        public static FileInfo[] GetPossibleTvMazeHistory()   => new DirectoryInfo(System.IO.Path.GetDirectoryName(TVDocSettingsFile.FullName)).GetFiles(TVMAZE_FILE_NAME + "*");
 
         public static void SetUserDefinedBasePath(string path)
         {
@@ -52,8 +59,17 @@ namespace TVRename
         {
             string path = UserDefinedBasePath.HasValue()
                 ? UserDefinedBasePath
-                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TVRename",
-                    "TVRename", "2.1");
+                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TVRename", "TVRename", (!string.IsNullOrEmpty(SHOWS_COLLECTION) ? SHOWS_COLLECTION : SHOWS_DEFAULT_COLLECTION));
+            Directory.CreateDirectory(path);
+            return new FileInfo(System.IO.Path.Combine(path, file));
+        }
+
+        [NotNull]
+        private static FileInfo GetRootFileInfo([NotNull] string file)
+        {
+            string path = UserDefinedBasePath.HasValue()
+                ? UserDefinedBasePath
+                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TVRename", "TVRename", (!string.IsNullOrEmpty(SHOWS_COLLECTION) ? "" : SHOWS_DEFAULT_COLLECTION));
             Directory.CreateDirectory(path);
             return new FileInfo(System.IO.Path.Combine(path, file));
         }
@@ -73,6 +89,31 @@ namespace TVRename
         [NotNull]
         public static FileInfo TVDocSettingsFile => GetFileInfo(SETTINGS_FILE_NAME);
         [NotNull]
+        public static FileInfo TVDocShowsFile => GetFileInfo(SHOWS_FILE_NAME);
+        [NotNull]
         public static FileInfo LanguagesFile => GetFileInfo(LANGUAGES_FILE_NAME);
+
+        // =========================================================================================================================================
+        public static string ShowCollection
+        {
+            get
+            {
+                return SHOWS_COLLECTION;
+            }
+            set
+            {
+                if (value != SHOWS_DEFAULT_COLLECTION)
+                {
+                    SHOWS_COLLECTION = value;
+                }
+                else
+                {
+                    SHOWS_COLLECTION = "";
+                }
+            }
+        }
+
+        [NotNull]
+        public static FileInfo ShowCollectionFile =>  GetFileInfo(SHOWS_COLLECTION_FILE_NAME);
     }
 }

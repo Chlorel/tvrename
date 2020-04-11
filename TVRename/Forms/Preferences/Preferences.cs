@@ -360,6 +360,8 @@ namespace TVRename
 
             s.mode = cbMode.Text == "Beta" ? TVSettings.BetaMode.BetaToo : TVSettings.BetaMode.ProductionOnly;
 
+            s.ShowCollections = cbShowCollections.Checked;
+
             s.keepTogetherMode = KeepTogetherMode();
 
             s.PreferredLanguageCode =
@@ -886,6 +888,8 @@ namespace TVRename
             rbDefShowUseSubFolders.Checked= s.DefShowUseSubFolders;
 
             tbPriorityOverrideTerms.Text = s.PriorityReplaceTerms;
+
+            cbShowCollections.Checked = s.ShowCollections;
 
             PopulateFromEnums(s);
 
