@@ -174,9 +174,19 @@ namespace TVRename
         public int DownloadsRemaining() =>
             cacheManager.DownloadDone ? 0 : cacheManager.DownloadsRemaining;
 
-        public void SetSearcher(int n)
+        public void SetSearcher(SearchEngine s)
         {
-            TVSettings.Instance.TheSearchers.SetToNumber(n);
+            TVSettings.Instance.TheSearchers.SetSearchEngine(s);
+            SetDirty();
+        }
+
+        public void SetDefaultScanType(TVSettings.ScanType s)
+        {
+            if (s == TVSettings.Instance.UIScanType)
+            {
+                return;
+            }
+            TVSettings.Instance.UIScanType = s;
             SetDirty();
         }
 

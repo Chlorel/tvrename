@@ -6,8 +6,8 @@
 // Copyright (c) TV Rename. This code is released under GPLv3 https://github.com/TV-Rename/tvrename/blob/master/LICENSE.md
 // 
 
-using System;
 using System.Windows.Forms;
+using TVRename.Utility;
 
 // Starting from:
 // http://social.msdn.microsoft.com/Forums/ja-JP/csharpexpressja/thread/67475927-015c-4206-b5e7-d67504edb3a1
@@ -95,21 +95,14 @@ namespace TVRename
             }
         }
 
-        // The 'TopItem' function doesn't work in a ListView if groups are enabled. This is meant to be a workaround.
-        // Problem is, it just doesn't work and I don't know why!
-        // ReSharper disable once UnusedMember.Local
-        private const int SB_HORZ = 0;
-        private const int SB_VERT = 1;
-        private const int LVM_FIRST = 0x1000;
-        private const int LVM_SCROLL = LVM_FIRST + 20;
-
-        public int GetScrollVerticalPos() => NativeMethods.GetScrollPos(Handle, SB_VERT);
-
         public void SetScrollVerticalPos(int position)
         {
-            int currentPos = NativeMethods.GetScrollPos(Handle, SB_VERT);
-            int delta = -(currentPos - position);
-            NativeMethods.SendMessage(Handle, LVM_SCROLL, IntPtr.Zero, (IntPtr)delta); // First param is horizontal scroll amount, second is vertical scroll amount
+            ListViewNativeMethods.SetScrollVerticalPos(this,position);
+        }
+
+        public int GetScrollVerticalPos()
+        {
+            return ListViewNativeMethods.GetScrollVerticalPos(this);
         }
     }
 }
