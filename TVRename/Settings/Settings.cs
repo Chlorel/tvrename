@@ -193,6 +193,7 @@ namespace TVRename
 
         public bool BulkAddIgnoreRecycleBin = false;
         public bool BulkAddCompareNoVideoFolders = false;
+        public ScanType UIScanType = ScanType.Full;
 
         public string AutoAddMovieTerms = "dvdrip;camrip;screener;dvdscr;r5;bluray";
         [NotNull]
@@ -311,6 +312,7 @@ namespace TVRename
         public readonly TidySettings Tidyup = new TidySettings();
         public bool runPeriodicCheck = false;
         public int periodCheckHours = 1;
+        public int periodUpdateCacheHours = 1;
         public bool runStartupCheck = false;
         public bool DoBulkAddInScan = false;
         public PreviouslySeenEpisodes PreviouslySeenEpisodes;
@@ -424,6 +426,7 @@ namespace TVRename
             writer.WriteElement("ExportRSSDaysPast", ExportRSSDaysPast);
             writer.WriteElement("KeepTogether", KeepTogether);
             writer.WriteElement("KeepTogetherType", (int) keepTogetherMode);
+            writer.WriteElement("UIScanType", (int) UIScanType  );
             writer.WriteElement("KeepTogetherExtensions", keepTogetherExtensionsString);
             writer.WriteElement("LeadingZeroOnSeason", LeadingZeroOnSeason);
             writer.WriteElement("ShowInTaskbar", ShowInTaskbar);
@@ -478,6 +481,7 @@ namespace TVRename
             writer.WriteElement("StartupScan", runStartupCheck);
             writer.WriteElement("PeriodicScan", runPeriodicCheck);
             writer.WriteElement("PeriodicScanHours", periodCheckHours);
+            writer.WriteElement("PeriodicUpdateCacheHours", periodUpdateCacheHours);
             writer.WriteElement("RemoveDownloadDirectoriesFiles", RemoveDownloadDirectoriesFiles);
             writer.WriteElement("DoBulkAddInScan", DoBulkAddInScan);
             writer.WriteElement("DeleteShowFromDisk", DeleteShowFromDisk);
@@ -638,6 +642,7 @@ namespace TVRename
 
         public bool RunPeriodicCheck() => runPeriodicCheck;
         public int PeriodicCheckPeriod() => (int)periodCheckHours.Hours().TotalMilliseconds;
+        public int PeriodicUpdateCachePeriod() => (int)periodUpdateCacheHours.Hours().TotalMilliseconds;
         public bool RunOnStartUp() => runStartupCheck;
 
         public string GetSeasonSearchTermsString() => searchSeasonWordsString;
@@ -864,7 +869,7 @@ namespace TVRename
 
             string url = epi.Show.UseCustomSearchUrl && !string.IsNullOrWhiteSpace(epi.Show.CustomSearchUrl)
                 ? epi.Show.CustomSearchUrl
-                : TheSearchers.CurrentSearchUrl();
+                : TheSearchers.CurrentSearch.Url;
 
             return CustomEpisodeName.NameForNoExt(epi, url, true);
         }
@@ -1273,6 +1278,7 @@ namespace TVRename
             runStartupCheck = xmlSettings.ExtractBool("StartupScan",false);
             runPeriodicCheck = xmlSettings.ExtractBool("PeriodicScan",false);
             periodCheckHours = xmlSettings.ExtractInt("PeriodicScanHours",1);
+            periodUpdateCacheHours = xmlSettings.ExtractInt("PeriodicUpdateCacheHours", 1);
             RemoveDownloadDirectoriesFiles = xmlSettings.ExtractBool("RemoveDownloadDirectoriesFiles",false);
             DoBulkAddInScan = xmlSettings.ExtractBool("DoBulkAddInScan",false);
             DeleteShowFromDisk = xmlSettings.ExtractBool("DeleteShowFromDisk",true);
@@ -1293,6 +1299,7 @@ namespace TVRename
             searchSeasonWordsString = xmlSettings.ExtractString("SearchSeasonNames", "Season;Series;Saison;Temporada;Seizoen");
             preferredRSSSearchTermsString = xmlSettings.ExtractString("PreferredRSSSearchTerms", "720p;1080p");
             keepTogetherMode = xmlSettings.ExtractEnum("KeepTogetherType", KeepTogetherModes.All);
+            UIScanType = xmlSettings.ExtractEnum("UIScanType", ScanType.Full);
             keepTogetherExtensionsString = xmlSettings.ExtractString("KeepTogetherExtensions", keepTogetherExtensionsStringDEFAULT);
             ExportWTWRSS = xmlSettings.ExtractBool("ExportWTWRSS",false);
             CopyFutureDatedEpsFromSearchFolders = xmlSettings.ExtractBool("CopyFutureDatedEpsFromSearchFolders",false);

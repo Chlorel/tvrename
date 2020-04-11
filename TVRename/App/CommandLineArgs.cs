@@ -34,6 +34,8 @@ namespace TVRename
         public bool ForceRefresh { get; }
         public bool ForceUpdate { get; }
         public bool Unattended { get; }
+        public bool QuickUpdate { get; }
+      
         public string UserFilePath { get; }
 
         private MissingFolderBehavior previousMissingFolderBehavior;
@@ -55,6 +57,8 @@ namespace TVRename
             Unattended = args.Contains("/unattended", StringComparer.OrdinalIgnoreCase);
             ForceRefresh = args.Contains("/forcerefresh", StringComparer.OrdinalIgnoreCase);
             ForceUpdate = args.Contains("/forceupdate", StringComparer.OrdinalIgnoreCase);
+            QuickUpdate = args.Contains("/quickupdate", StringComparer.OrdinalIgnoreCase);
+                
             Save = args.Contains("/save", StringComparer.OrdinalIgnoreCase);
 
             UserFilePath = args.Where(a => a.StartsWith("/userfilepath:", StringComparison.OrdinalIgnoreCase)).Select(a => a.Substring(a.IndexOf(":", StringComparison.Ordinal) + 1)).FirstOrDefault();
@@ -80,13 +84,15 @@ namespace TVRename
         {
             StringBuilder output = new StringBuilder();
             output.AppendLine();
-            output.AppendLine("/forcerefresh will refresh all TVDB information");
+            output.AppendLine("/forcerefresh will refresh all TVDB and TV Maze information");
             output.AppendLine("/forceupdate will verify TVDB information is up to date");
-            output.AppendLine("/scan will Tell TV Rename to run a scan");
+            output.AppendLine("/quickupdate will do a quick update from TVDB and TV Maze");
+            output.AppendLine("/scan will Tell TV Rename to run a full scan");
             output.AppendLine("/quickscan will scan shows most likely to need an update: http://www.tvrename.com/userguide#scan");
             output.AppendLine("/recentscan will scan recent shows: http://www.tvrename.com/userguide#scan");
             output.AppendLine("/doall Tell TV Rename execute all the actions it can.");
             output.AppendLine("/quit Tell a running TV Rename session to exit.");
+            output.AppendLine("/save Tell a running TV Rename session to save its caches.");
             output.AppendLine("");
             output.AppendLine("/hide will hide the UI for all UI elements");
             output.AppendLine("/unattended will hide the UI for all blocking UI elements");
@@ -97,7 +103,7 @@ namespace TVRename
             output.AppendLine("/ignoremissing will Ignore missing folders.");
             output.AppendLine("/norenamecheck requests an existing TV Rename session to scan without renaming.");
             output.AppendLine("");
-            output.AppendLine("Further information is available at http://www.tvrename.com/cmd-line");
+            output.AppendLine("Further information is available at https://www.tvrename.com/manual/cmd-line/");
 
             return output.ToString();
         }
