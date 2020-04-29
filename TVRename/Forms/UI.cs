@@ -10,6 +10,7 @@ using NLog;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
@@ -303,6 +304,11 @@ namespace TVRename
                 SaveCaches();
             }
 
+            if (a.Export)
+            {
+                mDoc.RunExporters();
+            }
+
             if (a.Quit)
             {
                 Close();
@@ -315,7 +321,7 @@ namespace TVRename
             MoreBusy();
             Task.Run(
                 () => mDoc.TVDBServerAccuracyCheck(unattended, WindowState == FormWindowState.Minimized)
-            );
+            ).Wait();
             LessBusy();
         }
 
@@ -931,14 +937,36 @@ namespace TVRename
                 ProcessedSeason s = si.AppropriateSeasons()[snum];
                 SetHtmlBody(webImages, ShowHtmlHelper.CreateOldPage(si.GetSeasonImagesHtmlOverview(s)));
 
-                SetHtmlBody(webInformation, si.GetSeasonHtmlOverview(s, true));
+                SetHtmlBody(webInformation, si.GetSeasonHtmlOverview(s, false));
+
+                if (bwSeasonHTMLGenerator.WorkerSupportsCancellation)
+                {
+                    // Cancel the asynchronous operation.
+                    bwSeasonHTMLGenerator.CancelAsync();
+                }
+
+                if (!bwSeasonHTMLGenerator.IsBusy)
+                {
+                    bwSeasonHTMLGenerator.RunWorkerAsync(s);
+                }
             }
             else
             {
                 // no epnum specified, just show an overview
                 SetHtmlBody(webImages, ShowHtmlHelper.CreateOldPage(si.GetShowImagesHtmlOverview()));
 
-                SetHtmlBody(webInformation, si.GetShowHtmlOverview(true));
+                SetHtmlBody(webInformation, si.GetShowHtmlOverview(false));
+
+                if (bwShowHTMLGenerator.WorkerSupportsCancellation)
+                {
+                    // Cancel the asynchronous operation.
+                    bwShowHTMLGenerator.CancelAsync();
+                }
+
+                if (!bwShowHTMLGenerator.IsBusy)
+                {
+                    bwShowHTMLGenerator.RunWorkerAsync(si);
+                }
             }
         }
 
@@ -995,77 +1023,69 @@ namespace TVRename
 
         private void FillWhenToWatchList()
         {
-            mInternalChange++;
-            lvWhenToWatch.BeginUpdate();
-
-            int dd = TVSettings.Instance.WTWRecentDays;
-
-            lvWhenToWatch.Groups["justPassed"].Header =
-                "Aired in the last " + dd + " day" + (dd == 1 ? "" : "s");
-
-            // try to maintain selections if we can
-            List<ProcessedEpisode> selections = new List<ProcessedEpisode>();
-            foreach (ListViewItem lvi in lvWhenToWatch.SelectedItems)
+            if (bwUpdateSchedule.WorkerSupportsCancellation)
             {
-                selections.Add((ProcessedEpisode) lvi.Tag);
+                // Cancel the asynchronous operation.
+                bwUpdateSchedule.CancelAsync();
             }
 
-            ProcessedSeason currentSeas = TreeNodeToSeason(MyShowTree.SelectedNode);
-            ShowItem currentShowItem = TreeNodeToShowItem(MyShowTree.SelectedNode);
+            if (!bwUpdateSchedule.IsBusy)
+            {
+                bwUpdateSchedule.RunWorkerAsync();
+            }
+        }
 
-            lvWhenToWatch.Items.Clear();
-
-            List<DateTime> bolded = new List<DateTime>();
+        [NotNull]
+        private List<ListViewItem> GenerateNewScheduleItems()
+        {
+            int dd = TVSettings.Instance.WTWRecentDays;
             DirFilesCache dfc = new DirFilesCache();
 
             IEnumerable<ProcessedEpisode> recentEps = mDoc.Library.GetRecentAndFutureEps(dd);
+            return recentEps.Select(ei => GenerateLvi(dfc, ei)).ToList();
+        }
 
-            foreach (ProcessedEpisode ei in recentEps)
+        [NotNull]
+        private ListViewItem GenerateLvi(DirFilesCache dfc, [NotNull] ProcessedEpisode pe)
+        {
+            ListViewItem lvi = new ListViewItem
             {
-                DateTime? dt = ei.GetAirDateDt(true);
-                if (dt != null)
-                {
-                    bolded.Add(dt.Value);
-                }
+                Text = GenerateShowUIName(pe),
+                Tag = pe
+            };
 
-                ListViewItem lvi = new ListViewItem {Text = ""};
-                for (int i = 0; i < 8; i++)
-                {
-                    lvi.SubItems.Add("");
-                }
+            DateTime? airdt = pe.GetAirDateDt(true);
+            if (airdt is null)
+            {
+                return lvi;
+            }
+            DateTime dt = airdt.Value;
 
-                UpdateWtw(dfc, ei, lvi);
+            lvi.Group = lvWhenToWatch.Groups[CalculateWtwlviGroup(pe, dt)];
 
-                lvWhenToWatch.Items.Add(lvi);
+            lvi.SubItems.Add(pe.SeasonNumberAsText);
+            lvi.SubItems.Add(GetEpisodeNumber(pe));
+            lvi.SubItems.Add(dt.ToShortDateString());
+            lvi.SubItems.Add(dt.ToString("t"));
+            lvi.SubItems.Add(dt.ToString("ddd"));
+            lvi.SubItems.Add(pe.HowLong());
+            lvi.SubItems.Add(pe.TheSeries.Network);
+            lvi.SubItems.Add(pe.Name);
 
-                foreach (ProcessedEpisode pe in selections)
-                {
-                    if (!pe.SameAs(ei))
-                    {
-                        continue;
-                    }
-
-                    lvi.Selected = true;
-                    break;
-                }
+            // icon..
+            int? iconNumbers = ChooseWtwIcon(dfc, pe, dt);
+            if (iconNumbers != null)
+            {
+                lvi.ImageIndex = iconNumbers.Value;
             }
 
-            lvWhenToWatch.Sort();
-
-            lvWhenToWatch.EndUpdate();
-            calCalendar.BoldedDates = bolded.ToArray();
-
-            if (currentSeas != null)
+            if (TVSettings.Instance.UseColoursOnWtw)
             {
-                SelectSeason(currentSeas);
+                (Color back, Color fore) = GetWtwColour(pe, dt);
+                lvi.BackColor = back;
+                lvi.ForeColor = fore;
             }
-            else if (currentShowItem != null)
-            {
-                SelectShow(currentShowItem);
-            }
-
-            UpdateToolstripWTW();
-            mInternalChange--;
+            return lvi;
         }
 
         private void lvWhenToWatch_ColumnClick(object sender, [NotNull] ColumnClickEventArgs e)
@@ -1105,7 +1125,7 @@ namespace TVRename
 
             if (lvWhenToWatch.SelectedIndices.Count == 0)
             {
-                txtWhenToWatchSynopsis.Text = "";
+                txtWhenToWatchSynopsis.Text = string.Empty;
                 mLastEpClickedWtw = null;
                 return;
             }
@@ -1490,7 +1510,7 @@ namespace TVRename
 
                 if (mLastShowsClicked != null && mLastShowsClicked.Count == 1)
                 {
-                    AddRcMenuItem("When to Watch", RightClickCommands.kWhenToWatchSeries);
+                    AddRcMenuItem("Schedule", RightClickCommands.kWhenToWatchSeries);
                     AddRcMenuItem("Edit Show", RightClickCommands.kEditShow);
                     AddRcMenuItem("Delete Show", RightClickCommands.kDeleteShow);
                 }
@@ -1755,7 +1775,7 @@ namespace TVRename
                         break;
                     }
 
-                case RightClickCommands.kWhenToWatchSeries: // when to watch
+                case RightClickCommands.kWhenToWatchSeries: // when to watch /Schedule
                     {
                         int code = -1;
                         if (mLastEpClicked != null)
@@ -2374,19 +2394,9 @@ namespace TVRename
             {
                 if (TVSettings.Instance.ShowStatusColors != null)
                 {
-                    if (TVSettings.Instance.ShowStatusColors.IsShowStatusDefined(si.ShowStatus))
+                    if (TVSettings.Instance.ShowStatusColors.AppliesTo(si))
                     {
-                        n.ForeColor = TVSettings.Instance.ShowStatusColors.GetEntry(false, true, si.ShowStatus);
-                    }
-                    else
-                    {
-                        Color nodeColor =
-                            TVSettings.Instance.ShowStatusColors.GetEntry(true, true, si.SeasonsAirStatus.ToString());
-
-                        if (!nodeColor.IsEmpty)
-                        {
-                            n.ForeColor = nodeColor;
-                        }
+                        n.ForeColor = TVSettings.Instance.ShowStatusColors.GetColour(si);
                     }
                 }
 
@@ -2421,13 +2431,9 @@ namespace TVRename
                     {
                         if (TVSettings.Instance.ShowStatusColors != null)
                         {
-                            Color nodeColor =
-                                TVSettings.Instance.ShowStatusColors.GetEntry(true, false,
-                                    s.Status(si.GetTimeZone()).ToString());
-
-                            if (!nodeColor.IsEmpty)
+                            if (TVSettings.Instance.ShowStatusColors.AppliesTo(s))
                             {
-                                n2.ForeColor = nodeColor;
+                                n2.ForeColor = TVSettings.Instance.ShowStatusColors.GetColour(s);
                             }
                         }
                     }
@@ -2485,44 +2491,6 @@ namespace TVRename
             }
 
             return "-- Unknown : " + si?.TvdbCode + " --";
-        }
-
-        private void UpdateWtw(DirFilesCache dfc, [NotNull] ProcessedEpisode pe, [NotNull] ListViewItem lvi)
-        {
-            DateTime? airdt = pe.GetAirDateDt(true);
-            if (airdt is null)
-            {
-                return;
-            }
-            DateTime dt = airdt.Value;
-
-            lvi.Group = lvWhenToWatch.Groups[CalculateWtwlviGroup(pe, dt)];
-            lvi.Tag = pe;
-            lvi.Text = GenerateShowUIName(pe);
-
-            int n = 0;
-            lvi.SubItems[++n].Text = pe.SeasonNumberAsText;
-            lvi.SubItems[++n].Text = GetEpisodeNumber(pe);
-            lvi.SubItems[++n].Text = dt.ToShortDateString();
-            lvi.SubItems[++n].Text = dt.ToString("t");
-            lvi.SubItems[++n].Text = dt.ToString("ddd");
-            lvi.SubItems[++n].Text = pe.HowLong();
-            lvi.SubItems[++n].Text = pe.TheSeries.Network;
-            lvi.SubItems[++n].Text = pe.Name;
-
-            // icon..
-            int? iconNumbers = ChooseWtwIcon(dfc, pe, dt);
-            if (iconNumbers != null)
-            {
-                lvi.ImageIndex = iconNumbers.Value;
-            }
-
-            if (TVSettings.Instance.UseColoursOnWtw)
-            {
-                (Color back,Color fore) = GetWtwColour(pe,dt);
-                lvi.BackColor = back;
-                lvi.ForeColor = fore;
-            }
         }
 
         private static (Color, Color) GetWtwColour([NotNull] ProcessedEpisode ep, DateTime dt)
@@ -4143,6 +4111,178 @@ namespace TVRename
         private void McbModifyMetadata_Click(object sender, EventArgs e)
         {
             UpdateCheckboxGroup(mcbModifyMetadata, i => i is ActionFileMetaData);
+        }
+
+        private void ThanksToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            ThanksForm form = new ThanksForm();
+            form.ShowDialog();
+        }
+
+        private void TabControl1_DrawItem(object sender, [NotNull] DrawItemEventArgs e)
+        {
+            //Follow this advice https://docs.microsoft.com/en-us/dotnet/framework/winforms/controls/how-to-display-side-aligned-tabs-with-tabcontrol
+
+            Graphics g = e.Graphics;
+            TabControl tabCtrl = (TabControl)sender;
+
+            g.FillRectangle(e.State == DrawItemState.Selected ? Brushes.White : new SolidBrush(BackColor),e.Bounds);
+
+            // Get the item from the collection.
+            TabPage tabPage = tabCtrl.TabPages[e.Index];
+
+            // Get the real bounds for the tab rectangle.
+            Rectangle tabBounds = tabCtrl.GetTabRect(e.Index);
+
+            // Draw string. Center the text.
+            StringFormat stringFlags = new StringFormat
+            {
+                Alignment = StringAlignment.Center,
+                LineAlignment = StringAlignment.Center
+            };
+            const int INDENT = 15;
+
+            //GetIcon
+            Image icon = tabCtrl.ImageList.Images[tabPage.ImageKey];
+            if (icon is null)
+            {
+                return;
+            }
+
+            float x = tabBounds.X + (tabBounds.Width - icon.Width) / 2.0f; 
+            float y = tabBounds.Y + INDENT;
+            e.Graphics.DrawImage(icon, x, y);
+            Font labelFont = new Font("Segoe UI Semibold", 11F, FontStyle.Regular, GraphicsUnit.Point, 0);
+
+            Rectangle textarea = new Rectangle(tabBounds.X, tabBounds.Y + INDENT + icon.Height,tabBounds.Width,tabBounds.Height-(INDENT + icon.Height));
+            g.DrawString(tabPage.Text, labelFont, Brushes.Black,textarea,stringFlags );
+        }
+
+        private void BwSeasonHTMLGenerator_DoWork(object sender, [NotNull] DoWorkEventArgs e)
+        {
+            ProcessedSeason s = e.Argument as ProcessedSeason;
+            ShowItem si = s?.Show;
+            string html = si?.GetSeasonHtmlOverview(s, true);
+            e.Result = html??string.Empty;
+        }
+
+        private void UpdateWebInformation(object sender, [NotNull] RunWorkerCompletedEventArgs e)
+        {
+            string html = e.Result as string;
+            if (html.HasValue())
+            {
+                SetHtmlBody(webInformation, html);
+            }
+        }
+
+        private void BwShowHTMLGenerator_DoWork(object sender, [NotNull] DoWorkEventArgs e)
+        {
+            ShowItem si = e.Argument as ShowItem;
+            string html = si?.GetShowHtmlOverview(true);
+            e.Result = html ?? string.Empty;
+        }
+
+        private void BwUpdateSchedule_DoWork(object sender, [NotNull] DoWorkEventArgs e)
+        {
+            e.Result = GenerateNewScheduleItems();
+        }
+
+        private void BwUpdateSchedule_RunWorkerCompleted(object sender, [NotNull] RunWorkerCompletedEventArgs e)
+        {
+            if(!(e.Result is List<ListViewItem> newContents))
+            {
+                return;
+            }
+
+            mInternalChange++;
+            lvWhenToWatch.BeginUpdate();
+
+            int dd = TVSettings.Instance.WTWRecentDays;
+
+            lvWhenToWatch.Groups["justPassed"].Header =
+                "Aired in the last " + dd + " day" + (dd == 1 ? "" : "s");
+
+            // try to maintain selections if we can
+            List<ProcessedEpisode> selections = new List<ProcessedEpisode>();
+            foreach (ListViewItem lvi in lvWhenToWatch.SelectedItems)
+            {
+                selections.Add((ProcessedEpisode)lvi.Tag);
+            }
+
+            ProcessedSeason currentSeas = TreeNodeToSeason(MyShowTree.SelectedNode);
+            ShowItem currentShowItem = TreeNodeToShowItem(MyShowTree.SelectedNode);
+
+            lvWhenToWatch.Items.Clear();
+
+            List<DateTime> bolded = new List<DateTime>();
+
+            foreach (ListViewItem lvi in newContents)
+            {
+                if (!(lvi.Tag is ProcessedEpisode ei))
+                {
+                    continue;
+                }
+
+                DateTime? dt = ei.GetAirDateDt(true);
+                if (dt != null)
+                {
+                    bolded.Add(dt.Value);
+                }
+
+                lvWhenToWatch.Items.Add(lvi);
+
+                foreach (ProcessedEpisode pe in selections)
+                {
+                    if (!pe.SameAs(ei))
+                    {
+                        continue;
+                    }
+
+                    lvi.Selected = true;
+                    break;
+                }
+            }
+
+            lvWhenToWatch.Sort();
+
+            lvWhenToWatch.EndUpdate();
+            calCalendar.BoldedDates = bolded.ToArray();
+
+            if (currentSeas != null)
+            {
+                SelectSeason(currentSeas);
+            }
+            else if (currentShowItem != null)
+            {
+                SelectShow(currentShowItem);
+            }
+
+            UpdateToolstripWTW();
+            mInternalChange--;
+        }
+
+        private void TbFullScan_Click(object sender, EventArgs e)
+        {
+            UiScan(null, false, TVSettings.ScanType.Full);
+        }
+
+        private void TpRecentScan_Click(object sender, EventArgs e)
+        {
+            UiScan(null, false, TVSettings.ScanType.Recent);
+        }
+
+        private void TbQuickScan_Click(object sender, EventArgs e)
+        {
+            UiScan(null, false, TVSettings.ScanType.Quick);
+        }
+
+        private void UI_Resize(object sender, EventArgs e)
+        {
+            bool isWide = (Width > 1100);
+            tpRecentScan.Visible = isWide;
+            tbQuickScan.Visible = isWide;
+            tbFullScan.Visible = isWide;
+            btnScan.Visible = !isWide;
         }
     }
 }

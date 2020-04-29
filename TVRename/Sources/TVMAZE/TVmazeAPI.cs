@@ -36,6 +36,11 @@ namespace TVRename.TVmaze
                 }
                 throw new SourceConnectivityException(ex.Message);
             }
+            catch (System.IO.IOException iex)
+            {
+                Logger.Error($"Could not get updates from TV Maze due to {iex.Message}");
+                throw new SourceConnectivityException(iex.Message);
+            }
         }
 
         private static int GetSeriesIdFromOtherCodes(int siTvdbCode,string imdb)
@@ -115,7 +120,6 @@ namespace TVRename.TVmaze
             JObject results =  ss.TvMazeSeriesId > 0
                 ? GetSeriesDetails(ss.TvMazeSeriesId)
                 : GetSeriesDetails(GetSeriesIdFromOtherCodes(ss.TvdbSeriesId,ss.ImdbCode));
-
 
             SeriesInfo downloadedSi = GenerateSeriesInfo(results);
             foreach (JToken akaJson in results["_embedded"]["akas"])
@@ -226,7 +230,6 @@ namespace TVRename.TVmaze
             return new Season(id,number,name,description,url,imageUrl,seriesId);
         }
 
-
         [NotNull]
         private static SeriesInfo GenerateSeriesInfo([NotNull] JObject r)
         {
@@ -236,10 +239,9 @@ namespace TVRename.TVmaze
             int tvdb = r["externals"]["thetvdb"].Type == JTokenType.Null ? -1 : (int)r["externals"]["thetvdb"]; 
             int rage = r["externals"]["tvrage"].Type == JTokenType.Null ? -1 : (int)r["externals"]["tvrage"];
 
-
             SeriesInfo returnValue = new SeriesInfo
             {
-                IsStub = false,
+                IsSearchResultOnly = false,
                 AirsDay = days,
                 AirsTime = JsonHelper.ParseAirTime((string)r["schedule"]["time"]),
                 FirstAired = JsonHelper.ParseFirstAired((string)r["premiered"]),

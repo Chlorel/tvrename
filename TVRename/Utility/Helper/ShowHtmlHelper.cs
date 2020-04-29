@@ -250,7 +250,7 @@ namespace TVRename
             sb.AppendSeason(s,si,col,includeDirectoryLinks);
             foreach (ProcessedEpisode ep in si.SeasonEpisodes[s.SeasonNumber])
             {
-                List<FileInfo> fl = dfc.FindEpOnDisk(ep);
+                List<FileInfo> fl = includeDirectoryLinks ? dfc.FindEpOnDisk(ep) : null;
                 sb.AppendEpisode(ep,fl,col);
             }
             sb.AppendLine(HTMLFooter());
@@ -266,11 +266,19 @@ namespace TVRename
 
             string seasonLink = TheTVDB.API.WebsiteSeasonUrl(s);
             string showLink = TheTVDB.API.WebsiteShowUrl(si);
-            string urlFilename = Uri.EscapeDataString(si.GetBestFolderLocationToOpen(s));
 
-            string explorerButton = includeDirectoryLinks
-                ? CreateButton($"{UI.EXPLORE_PROXY}{urlFilename}", "<i class=\"far fa-folder-open\"></i>", "Open Containing Folder")
-                : string.Empty;
+            string explorerButton;
+            if (includeDirectoryLinks)
+            {
+                string urlFilename = Uri.EscapeDataString(si.GetBestFolderLocationToOpen(s));
+                explorerButton = CreateButton($"{UI.EXPLORE_PROXY}{urlFilename}",
+                    "<i class=\"far fa-folder-open\"></i>", "Open Containing Folder");
+            }
+            else
+            {
+                explorerButton = string.Empty;
+            }
+            
             string tvdbButton = CreateButton(seasonLink, "TVDB.com", "View on TVDB");
             string episodeText = s.Episodes.Count >0 ? $"<br/><small class=\"text-muted\">{s.Episodes.Count} Episodes</small>" :string.Empty;
 
@@ -494,7 +502,7 @@ namespace TVRename
         public static string GetSeasonImagesHtmlOverview([NotNull] this ShowItem si, [NotNull] ProcessedSeason s)
         {
             int snum = s.SeasonNumber;
-            string body = "";
+            string body = string.Empty;
 
             List<ProcessedEpisode> eis =si.SeasonEpisodes[snum];
 
@@ -563,7 +571,9 @@ namespace TVRename
         [NotNull]
         private static string ActorLinkHtml([NotNull] Actor actor)
         {
-            string asText = string.IsNullOrWhiteSpace(actor.ActorRole) ? string.Empty : " as " + actor.ActorRole;
+            string asText = actor.AsSelf()?string.Empty
+                : string.IsNullOrWhiteSpace(actor.ActorRole) ? string.Empty
+                : " as " + actor.ActorRole;
             string tryText =
                 $@"<a href=""http://www.imdb.com/find?s=nm&q={actor.ActorName}"">{actor.ActorName}</a>{asText}";
             return tryText;
@@ -718,7 +728,7 @@ namespace TVRename
         {
             SeriesInfo ser = si.TheSeries();
             int snum = s.SeasonNumber;
-            string body = "";
+            string body = string.Empty;
 
             if (!string.IsNullOrEmpty(ser?.GetSeriesWideBannerPath()) &&
                 !string.IsNullOrEmpty(TheTVDB.API.GetImageURL(ser.GetSeriesWideBannerPath())))

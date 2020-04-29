@@ -822,7 +822,7 @@ namespace TVRename
             this.cbUseColoursOnWtw.Name = "cbUseColoursOnWtw";
             this.cbUseColoursOnWtw.Size = new System.Drawing.Size(181, 17);
             this.cbUseColoursOnWtw.TabIndex = 44;
-            this.cbUseColoursOnWtw.Text = "Use Colours on When To Watch";
+            this.cbUseColoursOnWtw.Text = "Use Colours on Schedule";
             this.cbUseColoursOnWtw.UseVisualStyleBackColor = true;
             // 
             // chkBasicShowDetails
@@ -1029,7 +1029,7 @@ namespace TVRename
             this.chkHideWtWSpoilers.Name = "chkHideWtWSpoilers";
             this.chkHideWtWSpoilers.Size = new System.Drawing.Size(182, 17);
             this.chkHideWtWSpoilers.TabIndex = 35;
-            this.chkHideWtWSpoilers.Text = "Hide Spoilers in When To Watch";
+            this.chkHideWtWSpoilers.Text = "Hide Spoilers in Schedule";
             this.chkHideWtWSpoilers.UseVisualStyleBackColor = true;
             // 
             // chkHideMyShowsSpoilers
@@ -1071,7 +1071,7 @@ namespace TVRename
             this.cbStartupTab.Items.AddRange(new object[] {
             "My Shows",
             "Scan",
-            "When to Watch"});
+            "Schedule"});
             this.cbStartupTab.Location = new System.Drawing.Point(75, 120);
             this.cbStartupTab.Name = "cbStartupTab";
             this.cbStartupTab.Size = new System.Drawing.Size(135, 21);
@@ -1104,7 +1104,7 @@ namespace TVRename
             this.label11.Name = "label11";
             this.label11.Size = new System.Drawing.Size(185, 13);
             this.label11.TabIndex = 25;
-            this.label11.Text = "Double-click in When to Watch does:";
+            this.label11.Text = "Double-click in Schedule does:";
             // 
             // label6
             // 
@@ -1419,7 +1419,7 @@ namespace TVRename
             this.RSSGrid.Size = new System.Drawing.Size(395, 77);
             this.RSSGrid.TabIndex = 26;
             this.RSSGrid.TabStop = true;
-            this.RSSGrid.ToolTipText = "";
+            this.RSSGrid.ToolTipText = string.Empty;
             // 
             // label25
             // 
@@ -3100,7 +3100,7 @@ namespace TVRename
             this.groupBox2.Size = new System.Drawing.Size(405, 135);
             this.groupBox2.TabIndex = 0;
             this.groupBox2.TabStop = false;
-            this.groupBox2.Text = "When to Watch";
+            this.groupBox2.Text = "Schedule";
             // 
             // bnBrowseWTWICAL
             // 
@@ -3476,7 +3476,7 @@ namespace TVRename
             this.ReplacementsGrid.Size = new System.Drawing.Size(402, 114);
             this.ReplacementsGrid.TabIndex = 1;
             this.ReplacementsGrid.TabStop = true;
-            this.ReplacementsGrid.ToolTipText = "";
+            this.ReplacementsGrid.ToolTipText = string.Empty;
             // 
             // label19
             // 
@@ -3977,7 +3977,7 @@ namespace TVRename
             this.cbLanguages.Items.AddRange(new object[] {
             "My Shows",
             "Scan",
-            "When to Watch"});
+            "Schedule"});
             this.cbLanguages.Location = new System.Drawing.Point(117, 19);
             this.cbLanguages.Name = "cbLanguages";
             this.cbLanguages.Size = new System.Drawing.Size(146, 21);
@@ -4256,7 +4256,7 @@ namespace TVRename
             this.cbDefShowNextAirdate.Name = "cbDefShowNextAirdate";
             this.cbDefShowNextAirdate.Size = new System.Drawing.Size(201, 17);
             this.cbDefShowNextAirdate.TabIndex = 49;
-            this.cbDefShowNextAirdate.Text = "Show &next airdate in When to Watch";
+            this.cbDefShowNextAirdate.Text = "Show &next airdate in 'Schedule'";
             this.cbDefShowNextAirdate.UseVisualStyleBackColor = true;
             // 
             // groupBox6

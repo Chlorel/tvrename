@@ -277,7 +277,7 @@ namespace TVRename
             }
             catch (UriFormatException e)
             {
-                Logger.Error(e,$"Could not compare {directoryPath1} and {directoryPath2}, assuming they are not the same location");
+                Logger.Warn(e,$"Could not compare {directoryPath1} and {directoryPath2}, assuming they are not the same location");
                 return false;
             }
         }
@@ -422,6 +422,10 @@ namespace TVRename
         [NotNull]
         public static string EnsureEndsWithSeparator([NotNull] this string source)
         {
+            if (!source.HasValue())
+            {
+                return Path.DirectorySeparatorChar.ToString();
+            }
             if (source.Trim().EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal))
             {
                 return source.Trim();
@@ -460,7 +464,7 @@ namespace TVRename
         {
             if (string.IsNullOrWhiteSpace(input))
             {
-                return "";
+                return string.Empty;
             }
 
             string directoryName = input;
@@ -498,6 +502,16 @@ namespace TVRename
         internal static bool FileExistsCaseSensitive([NotNull] IEnumerable<FileInfo> files, FileInfo newFile)
         {
             return files.Any(testFile => string.Equals(testFile.Name, newFile.Name, StringComparison.CurrentCulture));
+        }
+
+        public static bool IsValidDirectory(this string directoryName)
+        {
+            if (directoryName.ContainsAnyCharctersFrom(Path.GetInvalidPathChars()))
+            {
+                return false;
+            }
+
+            return true;
         }
     }
 }

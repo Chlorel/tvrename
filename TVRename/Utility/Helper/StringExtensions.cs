@@ -60,6 +60,11 @@ namespace TVRename
         [NotNull]
         public static string ReplaceInsensitive([NotNull] this string source, [NotNull] string search, [NotNull] string replacement)
         {
+            if (!source.HasValue())
+            {
+                return string.Empty;
+            }
+
             return Regex.Replace(
                 source,
                 Regex.Escape(search),
@@ -83,6 +88,10 @@ namespace TVRename
         {
             return instr.Substring(0, instr.Length - 1);
         }
+
+        [NotNull]
+        public static string Initial([NotNull] this string str) => str.HasValue() ? str.Substring(0, 1): string.Empty;
+
         [NotNull]
         public static string RemoveLast([NotNull] this string instr, int number)
         {

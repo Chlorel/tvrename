@@ -33,6 +33,9 @@ namespace TVRename
         }
 
         [NotNull]
+        public IEnumerable<string> ShowStatuses =>Shows.Select(item => item.ShowStatus).Distinct().OrderBy(s => s);
+
+        [NotNull]
         public IEnumerable<string> SeasonWords()
         {
             //See https://github.com/TV-Rename/tvrename/issues/241 for background
@@ -558,7 +561,6 @@ namespace TVRename
             {
                 ProcessedEpisode t = eis[index];
                 ProcessedEpisode n = new ProcessedEpisode(t, si, txt, t.AiredEpNum + 1, t.DvdEpNum + 1, t.EpNum2 + 1);
-
                 eis.Insert(index, n);
             }
             else if (index == ec)
@@ -810,7 +812,7 @@ namespace TVRename
                     if (ser != null && si.CustomShowName == ser.Name)
                     {
                         // then, turn it off
-                        si.CustomShowName = "";
+                        si.CustomShowName = string.Empty;
                         si.UseCustomShowName = false;
                     }
                 }

@@ -294,6 +294,12 @@
     <Compile Include="Finders\RSSItemList.cs" />
     <Compile Include="Finders\SearchFolderFileFinder.cs" />
     <Compile Include="Finders\DownloadingFinder.cs" />
+    <Compile Include="Forms\Utilities\ThanksForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\Utilities\ThanksForm.Designer.cs">
+      <DependentUpon>ThanksForm.cs</DependentUpon>
+    </Compile>
     <Compile Include="ItemsAndActions\ActionOutcome.cs" />
     <Compile Include="Model\Season.cs" />
     <Compile Include="Sources\SourceConsistencyException.cs" />
@@ -641,6 +647,20 @@
     <Compile Include="Utility\UpdateVersion.cs" />
     <Compile Include="Utility\VersionUpdater.cs" />
     <Compile Include="Utility\Helper\XMLHelper.cs" />
+    <None Include="Resources\2738302-32.png" />
+    <None Include="Resources\5172493-32.png" />
+    <None Include="Resources\1587498-32.png" />
+    <None Include="Resources\616650-32.png" />
+    <None Include="Resources\4781834-32.png" />
+    <None Include="Resources\353430-32.png" />
+    <None Include="Resources\322497-321.png" />
+    <None Include="Resources\314251-32.png" />
+    <None Include="Resources\226562-32.png" />
+    <None Include="Resources\134221-32.png" />
+    <None Include="Resources\322497-32.png" />
+    <None Include="Resources\tvdblogo2.png" />
+    <None Include="Resources\tvdblogo1.png" />
+    <None Include="Resources\tvm-header-logo.png" />
     <None Include="Resources\2738302-48.png" />
     <None Include="Resources\226562-48.png" />
     <None Include="Resources\353430-48.png" />
@@ -789,6 +809,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\Utilities\CannotConnectForm.resx">
       <DependentUpon>CannotConnectForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\Utilities\ThanksForm.resx">
+      <DependentUpon>ThanksForm.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\Utilities\LicenceInfo.resx">
       <DependentUpon>LicenceInfo.cs</DependentUpon>

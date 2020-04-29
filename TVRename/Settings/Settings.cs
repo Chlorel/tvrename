@@ -126,34 +126,34 @@ namespace TVRename
         public bool FanArtJpg = false;
         public bool Mede8erXML = false;
         public bool ExportFOXML = false;
-        public string ExportFOXMLTo = "";
+        public string ExportFOXMLTo = string.Empty;
         public bool ExportMissingCSV = false;
-        public string ExportMissingCSVTo = "";
+        public string ExportMissingCSVTo = string.Empty;
         public bool ExportMissingXML = false;
-        public string ExportMissingXMLTo = "";
+        public string ExportMissingXMLTo = string.Empty;
         public bool ExportShowsTXT = false;
-        public string ExportShowsTXTTo = "";
+        public string ExportShowsTXTTo = string.Empty;
         public bool ExportShowsHTML = false;
-        public string ExportShowsHTMLTo = "";
+        public string ExportShowsHTMLTo = string.Empty;
         public int ExportRSSMaxDays = 7;
         public int ExportRSSMaxShows = 10;
         public int ExportRSSDaysPast = 0;
         public bool ExportRenamingXML = false;
-        public string ExportRenamingXMLTo = "";
+        public string ExportRenamingXMLTo = string.Empty;
         public bool ExportWTWRSS = false;
-        public string ExportWTWRSSTo = "";
+        public string ExportWTWRSSTo = string.Empty;
         public bool ExportWTWXML = false;
-        public string ExportWTWXMLTo = "";
+        public string ExportWTWXMLTo = string.Empty;
         public bool ExportWTWICAL = false;
-        public string ExportWTWICALTo = "";
+        public string ExportWTWICALTo = string.Empty;
         public bool ExportRecentXSPF = false;
-        public string ExportRecentXSPFTo = "";
+        public string ExportRecentXSPFTo = string.Empty;
         public bool ExportRecentM3U = false;
-        public string ExportRecentM3UTo = "";
+        public string ExportRecentM3UTo = string.Empty;
         public bool ExportRecentASX = false;
-        public string ExportRecentASXTo = "";
+        public string ExportRecentASXTo = string.Empty;
         public bool ExportRecentWPL = false;
-        public string ExportRecentWPLTo = "";
+        public string ExportRecentWPLTo = string.Empty;
         public bool UseColoursOnWtw = false;
         public List<FilenameProcessorRE> FNPRegexs = DefaultFNPList();
         public bool FolderJpg = false;
@@ -214,11 +214,11 @@ namespace TVRename
         [NotNull]
         public IEnumerable<string> AutoAddIgnoreSuffixesArray => Convert(AutoAddIgnoreSuffixes);
 
-        public string keepTogetherExtensionsString = "";
+        public string keepTogetherExtensionsString = string.Empty;
         [NotNull]
         public IEnumerable<string> keepTogetherExtensionsArray => Convert(keepTogetherExtensionsString);
 
-        public string subtitleExtensionsString = "";
+        public string subtitleExtensionsString = string.Empty;
         [NotNull]
         public IEnumerable<string> subtitleExtensionsArray => Convert(subtitleExtensionsString);
 
@@ -230,7 +230,7 @@ namespace TVRename
         [NotNull]
         public string[] PreferredRSSSearchTerms() => Convert(preferredRSSSearchTermsString);
 
-        public string OtherExtensionsString = "";
+        public string OtherExtensionsString = string.Empty;
         [NotNull]
         private IEnumerable<string> OtherExtensionsArray => Convert(OtherExtensionsString);
 
@@ -304,8 +304,8 @@ namespace TVRename
         public bool DeleteShowFromDisk = true;
 
         public ShowStatusColoringTypeList ShowStatusColors = new ShowStatusColoringTypeList();
-        public string SABHostPort = "";
-        public string SABAPIKey = "";
+        public string SABHostPort = string.Empty;
+        public string SABAPIKey = string.Empty;
         public bool CheckSABnzbd = false;
         public string PreferredLanguageCode = "en";
         public WTWDoubleClickAction WTWDoubleClick = WTWDoubleClickAction.Scan;
@@ -360,7 +360,7 @@ namespace TVRename
             guesses[1] = "c:\\Program Files\\uTorrent\\uTorrent.exe";
             guesses[2] = "c:\\Program Files (x86)\\uTorrent\\uTorrent.exe";
 
-            uTorrentPath = "";
+            uTorrentPath = string.Empty;
             foreach (FileInfo f in guesses.Select(g => new FileInfo(g)).Where(f => f.Exists))
             {
                 uTorrentPath = f.FullName;
@@ -599,6 +599,10 @@ namespace TVRename
                 writer.WriteInfo("ShowNetworkFilter", "ShowNetwork", Filter.ShowNetwork);
                 writer.WriteInfo("ShowRatingFilter", "ShowRating", Filter.ShowRating);
 
+                writer.WriteInfo("ShowStatusFilter", "ShowStatusInclude", Filter.ShowStatusInclude);
+                writer.WriteInfo("ShowNetworkFilter", "ShowNetworkInclude", Filter.ShowNetworkInclude);
+                writer.WriteInfo("ShowRatingFilter", "ShowRatingInclude", Filter.ShowRatingInclude);
+
                 foreach (string genre in Filter.Genres)
                 {
                     writer.WriteInfo("GenreFilter", "Genre", genre);
@@ -620,14 +624,28 @@ namespace TVRename
             if (ShowStatusColors != null)
             {
                 writer.WriteStartElement("ShowStatusTVWColors");
-                foreach (KeyValuePair<ShowStatusColoringType, System.Drawing.Color> e in ShowStatusColors)
+                foreach (KeyValuePair<ColouringRule, System.Drawing.Color> e in ShowStatusColors)
                 {
                     writer.WriteStartElement("ShowStatusTVWColor");
-                    // TODO ... Write Meta Flags
-                    writer.WriteAttributeToXml("IsMeta", e.Key.IsMetaType);
-                    writer.WriteAttributeToXml("IsShowLevel", e.Key.IsShowLevel);
-                    writer.WriteAttributeToXml("ShowStatus", e.Key.Status);
+
+                    switch (e.Key)
+                    {
+                        case ShowStatusColouringRule sscr:
+                            writer.WriteAttributeToXml("Type", "ShowStatusColouringRule");
+                            writer.WriteAttributeToXml("ShowStatus", sscr.status);
+                            break;
+                        case ShowAirStatusColouringRule sascr:
+                            writer.WriteAttributeToXml("Type", "ShowAirStatusColouringRule");
+                            writer.WriteAttributeToXml("ShowStatus", (int)sascr.status);
+                            break;
+                        case SeasonStatusColouringRule ssascr:
+                            writer.WriteAttributeToXml("Type", "SeasonStatusColouringRule");
+                            writer.WriteAttributeToXml("ShowStatus", (int)ssascr.status);
+                            break;
+                    }
+
                     writer.WriteAttributeToXml("Color", Helpers.TranslateColorToHtml(e.Value));
+
                     writer.WriteEndElement(); //ShowStatusTVWColor
                 }
 
@@ -682,12 +700,7 @@ namespace TVRename
                 return false;
             }
 
-            if (s.ContainsAnyCharctersFrom(Path.GetInvalidPathChars()))
-            {
-                return false;
-            }
-
-            return true;
+            return s.IsValidDirectory();
         }
 
         public static bool OKPath([NotNull] string s,bool EmptyOK)
@@ -702,12 +715,7 @@ namespace TVRename
                 return false;
             }
 
-            if (s.ContainsAnyCharctersFrom(Path.GetInvalidPathChars()))
-            {
-                return false;
-            }
-
-            return true;
+            return s.IsValidDirectory();
         }
 
         [NotNull]
@@ -867,14 +875,14 @@ namespace TVRename
             SeriesInfo s = epi?.TheSeries;
             if (s is null)
             {
-                return "";
+                return string.Empty;
             }
 
-            string url = epi.Show.UseCustomSearchUrl && !string.IsNullOrWhiteSpace(epi.Show.CustomSearchUrl)
+            string url = epi.Show.UseCustomSearchUrl && epi.Show.CustomSearchUrl.HasValue()
                 ? epi.Show.CustomSearchUrl
                 : TheSearchers.CurrentSearch.Url;
 
-            return CustomEpisodeName.NameForNoExt(epi, url, true);
+            return !url.HasValue() ? string.Empty : CustomEpisodeName.NameForNoExt(epi, url, true);
         }
 
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
@@ -994,7 +1002,7 @@ namespace TVRename
             {
                 if (b is null)
                 {
-                    b = "";
+                    b = string.Empty;
                 }
 
                 This = a;
@@ -1028,7 +1036,7 @@ namespace TVRename
         }
 
         [Serializable]
-        public class ShowStatusColoringTypeList : Dictionary<ShowStatusColoringType, System.Drawing.Color>
+        public class ShowStatusColoringTypeList : Dictionary<ColouringRule, System.Drawing.Color>
         {
             public ShowStatusColoringTypeList()
             {
@@ -1038,26 +1046,13 @@ namespace TVRename
             {
             }
 
-            public bool IsShowStatusDefined(string showStatus)
-            {
-                foreach (KeyValuePair<ShowStatusColoringType, System.Drawing.Color> e in this)
-                {
-                    if (!e.Key.IsMetaType && e.Key.IsShowLevel &&
-                        e.Key.Status.Equals(showStatus, StringComparison.CurrentCultureIgnoreCase))
-                    {
-                        return true;
-                    }
-                }
+            public bool AppliesTo(ShowItem show) => Keys.Any(rule => rule.appliesTo(show));
 
-                return false;
-            }
-
-            public System.Drawing.Color GetEntry(bool meta, bool showLevel, string status)
+            public System.Drawing.Color GetColour(ShowItem show)
             {
-                foreach (KeyValuePair<ShowStatusColoringType, System.Drawing.Color> e in this)
+                foreach (KeyValuePair<ColouringRule, System.Drawing.Color> e in this)
                 {
-                    if (e.Key.IsMetaType == meta && e.Key.IsShowLevel == showLevel &&
-                        e.Key.Status.Equals(status, StringComparison.CurrentCultureIgnoreCase))
+                    if (e.Key.appliesTo(show))
                     {
                         return e.Value;
                     }
@@ -1065,102 +1060,117 @@ namespace TVRename
 
                 return System.Drawing.Color.Empty;
             }
+            public System.Drawing.Color GetColour(ProcessedSeason s)
+            {
+                foreach (KeyValuePair<ColouringRule, System.Drawing.Color> e in this)
+                {
+                    if (e.Key.appliesTo(s))
+                    {
+                        return e.Value;
+                    }
+                }
+
+                return System.Drawing.Color.Empty;
+            }
+
+            public bool AppliesTo(ProcessedSeason s) => Keys.Any(rule => rule.appliesTo(s));
         }
 
-        public class ShowStatusColoringType
+        public abstract class ColouringRule
         {
-            public ShowStatusColoringType(bool isMetaType, bool isShowLevel, string status)
+            // Text is a read-only property - only a get accessor is needed:
+            public abstract string Text
             {
-                IsMetaType = isMetaType;
-                IsShowLevel = isShowLevel;
-                Status = status;
+                get;
+            }
+            public abstract bool appliesTo(ProcessedSeason s);
+            public abstract bool appliesTo(ShowItem s);
+        }
+
+        public class ShowStatusColouringRule : ColouringRule
+        {
+            public ShowStatusColouringRule(string status)
+            {
+                this.status = status;
             }
 
-            public readonly bool IsMetaType;
-            public readonly bool IsShowLevel;
-            public readonly string Status;
-
+            public readonly string status;
             [NotNull]
-            public string Text
-            {
-                get
-                {
-                    if (IsMetaType)
-                    {
-                        return IsShowLevel ? "Show Seasons" : "Season" +$" Status: { StatusTextForDisplay}";
-                    }
+            public override string Text => "Show Status: "+status;
 
-                    return IsShowLevel ? $"Show Status: {StatusTextForDisplay}" : string.Empty;
-                }
+            public override bool appliesTo(ProcessedSeason s) => false;
+
+            public override bool appliesTo([NotNull] ShowItem s) => status==s.ShowStatus;
+        }
+
+        public class ShowAirStatusColouringRule : ColouringRule
+        {
+            public ShowAirStatusColouringRule(ShowItem.ShowAirStatus status)
+            {
+                this.status = status;
             }
 
-            private string StatusTextForDisplay
+            public readonly ShowItem.ShowAirStatus status;
+            public override string ToString()
             {
-                get
-                {
-                    if (!IsMetaType)
-                    {
-                        return Status;
-                    }
-                    string value = ConvertFromOldStyle();
-
-                    return IsShowLevel ? ShowLevelStatusText(value) : SeasonLevelStatusText(value);
-                }
-            }
-
-            [NotNull]
-            private string ConvertFromOldStyle()
-            {
-                string value = Status.Equals("PartiallyAired") ? "partiallyAired"
-                    : Status.Equals("NoneAired") ? "noneAired"
-                    : Status.Equals("Aired") ? "aired"
-                    : Status.Equals("NoEpisodesOrSeasons") ? "noEpisodesOrSeasons"
-                    : Status.Equals("NoEpisodes") ? "noEpisodes"
-                    : Status;
-
-                return value;
-            }
-
-            private string SeasonLevelStatusText([NotNull] string value)
-            {
-                ProcessedSeason.SeasonStatus status =
-                    (ProcessedSeason.SeasonStatus) Enum.Parse(typeof(ProcessedSeason.SeasonStatus), value);
-
-                switch (status)
-                {
-                    case ProcessedSeason.SeasonStatus.aired:
-                        return "All aired";
-                    case ProcessedSeason.SeasonStatus.noEpisodes:
-                        return "No Episodes";
-                    case ProcessedSeason.SeasonStatus.noneAired:
-                        return "None aired";
-                    case ProcessedSeason.SeasonStatus.partiallyAired:
-                        return "Partially aired";
-                    default:
-                        return Status;
-                }
-            }
-
-            private string ShowLevelStatusText([NotNull] string value)
-            {
-                //Convert from old style values if needed
-                ShowItem.ShowAirStatus status =
-                    (ShowItem.ShowAirStatus) Enum.Parse(typeof(ShowItem.ShowAirStatus), value, true);
-
                 switch (status)
                 {
                     case ShowItem.ShowAirStatus.aired:
-                        return "All aired";
+                        return "Show Season Status: All aired";
                     case ShowItem.ShowAirStatus.noEpisodesOrSeasons:
-                        return "No Seasons or Episodes in Seasons";
+                        return "Show Season Status: No Seasons or Episodes in Seasons";
                     case ShowItem.ShowAirStatus.noneAired:
-                        return "None aired";
+                        return "Show Season Status: None aired";
                     case ShowItem.ShowAirStatus.partiallyAired:
-                        return "Partially aired";
+                        return "Show Season Status: Partially aired";
                     default:
-                        return Status;
+                        throw new ArgumentOutOfRangeException();
                 }
             }
+
+            [NotNull]
+            public override string Text => ToString();
+
+            public override bool appliesTo(ProcessedSeason s) => false;
+
+            public override bool appliesTo([NotNull] ShowItem s) => status ==s.SeasonsAirStatus;
+        }
+
+        public class SeasonStatusColouringRule : ColouringRule
+        {
+            public SeasonStatusColouringRule(ProcessedSeason.SeasonStatus status)
+            {
+                this.status = status;
+            }
+
+            public readonly ProcessedSeason.SeasonStatus status;
+
+            [NotNull]
+            public override string Text => ToString();
+            public override string ToString()
+            {
+                switch (status)
+                {
+                    case ProcessedSeason.SeasonStatus.aired:
+                        return "Season Status: All aired";
+
+                    case ProcessedSeason.SeasonStatus.noEpisodes:
+                        return "Season Status: No Episodes";
+
+                    case ProcessedSeason.SeasonStatus.noneAired:
+                        return "Season Status: None aired";
+
+                    case ProcessedSeason.SeasonStatus.partiallyAired:
+                        return "Season Status: Partially aired";
+
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
+
+            public override bool appliesTo([NotNull] ProcessedSeason s) => status == s.Status(s.Show.GetTimeZone());
+
+            public override bool appliesTo(ShowItem s) => false;
         }
 
         // ReSharper disable once FunctionComplexityOverflow
@@ -1353,12 +1363,20 @@ namespace TVRename
             {
                 ShowName = xmlSettings.Descendants("ShowFilters").Descendants("ShowNameFilter").Attributes("ShowName")
                     .FirstOrDefault()?.Value,
+
                 ShowStatus = xmlSettings.Descendants("ShowFilters").Descendants("ShowStatusFilter").Attributes("ShowStatus")
                     .FirstOrDefault()?.Value,
                 ShowRating = xmlSettings.Descendants("ShowFilters").Descendants("ShowRatingFilter").Attributes("ShowRating")
                     .FirstOrDefault()?.Value,
                 ShowNetwork = xmlSettings.Descendants("ShowFilters").Descendants("ShowNetworkFilter").Attributes("ShowNetwork")
-                    .FirstOrDefault()?.Value
+                    .FirstOrDefault()?.Value,
+
+                ShowStatusInclude = ((bool?) xmlSettings.Descendants("ShowFilters").Descendants("ShowStatusFilter").Attributes("ShowStatusInclude")
+                    .FirstOrDefault()) ?? true,
+                ShowRatingInclude = ((bool?)xmlSettings.Descendants("ShowFilters").Descendants("ShowRatingFilter").Attributes("ShowRatingInclude")
+                    .FirstOrDefault()) ?? true,
+                ShowNetworkInclude = ((bool?)xmlSettings.Descendants("ShowFilters").Descendants("ShowNetworkFilter").Attributes("ShowNetworkInclude")
+                    .FirstOrDefault()) ?? true
             };
 
             foreach (XAttribute rep in xmlSettings.Descendants("ShowFilters").Descendants("GenreFilter").Attributes("Genre"))
@@ -1379,10 +1397,11 @@ namespace TVRename
             foreach (XElement rep in xmlSettings.Descendants("ShowStatusTVWColors").FirstOrDefault()
                                          ?.Descendants("ShowStatusTVWColor") ?? new List<XElement>())
             {
-                string showStatus = rep.Attribute("ShowStatus")?.Value;
-                bool isMeta = bool.Parse(rep.Attribute("IsMeta")?.Value ?? "false");
-                bool isShowLevel = bool.Parse(rep.Attribute("IsShowLevel")?.Value ?? "true");
-                ShowStatusColoringType type = new ShowStatusColoringType(isMeta, isShowLevel, showStatus);
+                ColouringRule newRule = ExtractColouringRule(rep);
+                if (newRule is null)
+                {
+                    continue;
+                }
                 string color = rep.Attribute("Color")?.Value;
                 if (string.IsNullOrEmpty(color))
                 {
@@ -1390,8 +1409,125 @@ namespace TVRename
                 }
 
                 System.Drawing.Color c = System.Drawing.ColorTranslator.FromHtml(color);
-                ShowStatusColors.Add(type, c);
+                ShowStatusColors.Add(newRule, c);
             }
+        }
+
+        [CanBeNull]
+        private ColouringRule ExtractColouringRule([NotNull] XElement rep)
+        {
+            string showStatus = rep.Attribute("ShowStatus")?.Value;
+            if (showStatus is null)
+            {
+                return null;
+            }
+
+            string type = rep.Attribute("Type")?.Value;
+            if (type is null)
+            {
+                //Old Style Rule; lets convert
+                string isMetaString = rep.Attribute("IsMeta")?.Value;
+                string isShowLevelString = rep.Attribute("IsShowLevel")?.Value;
+                bool isMeta = bool.Parse(isMetaString ?? "false");
+                bool isShowLevel = bool.Parse(isShowLevelString ?? "true");
+
+                if (!isShowLevel)
+                {
+                    return new SeasonStatusColouringRule(ConvertToSeasonStatus(showStatus));
+                }
+
+                if (isMeta)
+                {
+                    return new ShowAirStatusColouringRule(ConvertToShowAirStatus(showStatus));
+                }
+
+                return new ShowStatusColouringRule(showStatus);
+            }
+
+            switch (type)
+            {
+                case "SeasonStatusColouringRule":
+                    return new SeasonStatusColouringRule(ExtractEnum<ProcessedSeason.SeasonStatus>(showStatus));
+                case "ShowStatusColouringRule":
+                    return new ShowStatusColouringRule(showStatus);
+                case "ShowAirStatusColouringRule":
+                    return new ShowAirStatusColouringRule(ExtractEnum<ShowItem.ShowAirStatus>(showStatus));
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+        }
+
+        [NotNull]
+        // ReSharper disable once AnnotateNotNullParameter
+        private static T ExtractEnum<T>(string value)
+        {
+            if (!typeof(T).IsEnum)
+            {
+                throw new ArgumentException("T must be an enumerated type");
+            }
+
+            if (value is null)
+            {
+                throw new ArgumentException();
+            }
+
+            int val = int.Parse(value);
+
+            if (typeof(T).IsEnumDefined(val))
+            {
+                return (T)Enum.Parse(typeof(T), value, true);
+            }
+
+            throw new ArgumentException();
+        }
+
+        private ShowItem.ShowAirStatus ConvertToShowAirStatus([NotNull] string value)
+        {
+            switch (value)
+            {
+                case "All aired":
+                case "Aired":
+                case "aired":
+                    return ShowItem.ShowAirStatus.aired;
+                case "No Seasons or Episodes in Seasons":
+                case "NoEpisodesOrSeasons":
+                case "noEpisodesOrSeasons":
+                    return ShowItem.ShowAirStatus.noEpisodesOrSeasons;
+                case "None aired":
+                case "NoneAired":
+                case "noneAired":
+                    return ShowItem.ShowAirStatus.noneAired;
+                case "Partially aired":
+                case "PartiallyAired":
+                case "partiallyAired":
+                    return ShowItem.ShowAirStatus.partiallyAired;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+        }
+
+        private ProcessedSeason.SeasonStatus ConvertToSeasonStatus([NotNull] string value)
+        {
+            switch (value)
+            {
+                case "All aired":
+                case "Aired":
+                case "aired":
+                    return ProcessedSeason.SeasonStatus.aired;
+                case "No Episodes":
+                case "NoEpisodes":
+                case "noEpisodes":
+                    return ProcessedSeason.SeasonStatus.noEpisodes;
+                case "None aired":
+                case "NoneAired":
+                case "noneAired":
+                    return ProcessedSeason.SeasonStatus.noneAired;
+                case "Partially aired":
+                case "PartiallyAired":
+                case "partiallyAired":
+                    return ProcessedSeason.SeasonStatus.partiallyAired;
+            }
+            throw new ArgumentOutOfRangeException();
         }
 
         private void UpdateRegExs([NotNull] XElement xmlSettings)
