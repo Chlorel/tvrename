@@ -232,18 +232,26 @@ namespace TVRename
                     return;
                 }
 
-                if (!TVmaze.LocalCache.Instance.GetUpdates(showErrorMsgBox, cts,downloadIds.Where(specifier => specifier.Provider==ShowItem.ProviderType.TVmaze)))
+                if (downloadIds.Any(s => s.Provider == ShowItem.ProviderType.TVmaze))
                 {
-                    DownloadDone = true;
-                    downloadOk = false;
-                    return;
+                    if (!TVmaze.LocalCache.Instance.GetUpdates(showErrorMsgBox, cts,
+                        downloadIds.Where(specifier => specifier.Provider == ShowItem.ProviderType.TVmaze)))
+                    {
+                        DownloadDone = true;
+                        downloadOk = false;
+                        return;
+                    }
                 }
 
-                if (!TheTVDB.LocalCache.Instance.GetUpdates(showErrorMsgBox,cts, downloadIds.Where(specifier => specifier.Provider == ShowItem.ProviderType.TheTVDB)))
+                if (downloadIds.Any(s => s.Provider == ShowItem.ProviderType.TheTVDB))
                 {
-                    DownloadDone = true;
-                    downloadOk = false;
-                    return;
+                    if (!TheTVDB.LocalCache.Instance.GetUpdates(showErrorMsgBox, cts,
+                        downloadIds.Where(specifier => specifier.Provider == ShowItem.ProviderType.TheTVDB)))
+                    {
+                        DownloadDone = true;
+                        downloadOk = false;
+                        return;
+                    }
                 }
 
                 // for each of the ShowItems, make sure we've got downloaded data for it
@@ -252,7 +260,7 @@ namespace TVRename
                 int n = 0;
 
                 int numWorkers = TVSettings.Instance.ParallelDownloads;
-                Logger.Info("Setting up {0} threads to download information from TheTVDB.com and MVMaze.com", numWorkers);
+                Logger.Info("Setting up {0} threads to download information from TheTVDB.com and TVMaze.com", numWorkers);
                 Logger.Info($"Working on {downloadIds.Count(s => s.Provider == ShowItem.ProviderType.TheTVDB)} TVDB and {downloadIds.Count(s => s.Provider == ShowItem.ProviderType.TVmaze)} TV Maze shows.");
                 Logger.Info($"Identified that {downloadIds.Count(s => s.Provider==ShowItem.ProviderType.TheTVDB && (TheTVDB.LocalCache.Instance.GetSeries(s.TvdbSeriesId)?.Dirty??true))} TVDB and {downloadIds.Count(s => s.Provider == ShowItem.ProviderType.TVmaze && (TVmaze.LocalCache.Instance.GetSeries(s.TvMazeSeriesId)?.Dirty ?? true))} TV Maze shows need to be updated");
                 workers = new List<Thread>();

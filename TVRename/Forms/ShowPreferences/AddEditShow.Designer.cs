@@ -202,7 +202,7 @@ namespace TVRename
             this.chkShowNextAirdate.Name = "chkShowNextAirdate";
             this.chkShowNextAirdate.Size = new System.Drawing.Size(201, 17);
             this.chkShowNextAirdate.TabIndex = 1;
-            this.chkShowNextAirdate.Text = "Show &next airdate in When to Watch";
+            this.chkShowNextAirdate.Text = "Show &next airdate in 'Schedule'";
             this.chkShowNextAirdate.UseVisualStyleBackColor = true;
             // 
             // pnlCF
@@ -930,7 +930,7 @@ namespace TVRename
             this.lbTags.Name = "lbTags";
             this.lbTags.Size = new System.Drawing.Size(80, 13);
             this.lbTags.TabIndex = 1;
-            this.lbTags.Tag = "";
+            this.lbTags.Tag = string.Empty;
             this.lbTags.Text = "Available Tags:";
             // 
             // lbSearchURL
