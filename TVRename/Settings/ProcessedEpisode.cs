@@ -40,6 +40,7 @@ namespace TVRename
             Type = o.Type;
             TheAiredProcessedSeason = o.TheAiredProcessedSeason;
             TheDvdProcessedSeason = o.TheDvdProcessedSeason;
+            SourceEpisodes=new List<Episode>();
         }
 
         public ProcessedEpisode([NotNull] Episode e, [NotNull] ShowItem si)
@@ -53,6 +54,7 @@ namespace TVRename
             Type = ProcessedEpisodeType.single;
             TheAiredProcessedSeason=si.GetOrAddAiredSeason(e.AiredSeasonNumber,e.SeasonId);
             TheDvdProcessedSeason = si.GetOrAddDvdSeason(e.DvdSeasonNumber, e.SeasonId);
+            SourceEpisodes = new List<Episode>();
         }
 
         public ProcessedEpisode([NotNull] ProcessedEpisode e, [NotNull] ShowItem si, ProcessedEpisodeType t)
@@ -66,6 +68,7 @@ namespace TVRename
             Type = t;
             TheAiredProcessedSeason = e.TheAiredProcessedSeason;
             TheDvdProcessedSeason = e.TheDvdProcessedSeason;
+            SourceEpisodes = new List<Episode>();
         }
 
         public ProcessedEpisode([NotNull] ProcessedEpisode e, [NotNull] ShowItem si, List<Episode> episodes)
@@ -85,6 +88,31 @@ namespace TVRename
         public ProcessedEpisode([NotNull] ProcessedEpisode pe, ShowItem si, [NotNull] string name, int airedEpNum, int dvdEpNum, int epNum2)
             : base(pe)
         {
+            //This is used when a new episode is inserted
+
+            EpisodeId = -1;
+            SrvLastUpdated = 0;
+            Overview = string.Empty;
+            Runtime = null;
+            LinkUrl = null;
+            EpisodeRating = null;
+            EpisodeGuestStars = null;
+            EpisodeDirector = null;
+            Writer = null;
+            Dirty = false;
+            DvdChapter = null;
+            DvdDiscId = null;
+            AirsBeforeEpisode = null;
+            AirsBeforeSeason = null;
+            AirsAfterSeason = null;
+            SiteRatingCount = null;
+            AbsoluteNumber = null;
+            ProductionCode = null;
+            ImdbCode = null;
+            Filename = null;
+            AirStamp = null;
+            AirTime = null;
+
             NextToAir = false;
             OverallNumber = -1;
             Ignore = false;
@@ -96,6 +124,7 @@ namespace TVRename
             Type = ProcessedEpisodeType.single;
             TheAiredProcessedSeason = pe.TheAiredProcessedSeason;
             TheDvdProcessedSeason = pe.TheDvdProcessedSeason;
+            SourceEpisodes = new List<Episode>();
         }
 
         public int AppropriateSeasonNumber => Show.Order==ProcessedSeason.SeasonType.dvd ? DvdSeasonNumber : AiredSeasonNumber;
@@ -106,10 +135,9 @@ namespace TVRename
         public bool PreviouslySeen => TVSettings.Instance.PreviouslySeenEpisodes.Contains(EpisodeId);
 
         [NotNull]
-        public string SeasonNumberAsText => AppropriateSeasonNumber != 0 ? AppropriateSeasonNumber.ToString() : "Special";
+        public string SeasonNumberAsText => AppropriateSeasonNumber != 0 ? AppropriateSeasonNumber.ToString() : TVSettings.SpecialsListViewName;
 
-        [NotNull]
-        public string WebsiteUrl
+        public string? WebsiteUrl
         {
             get
             {

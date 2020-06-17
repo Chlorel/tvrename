@@ -24,9 +24,9 @@ namespace TVRename
         private bool downloadOk;
         private bool downloadStopOnError;
         private bool showErrorMsgBox;
-        private Semaphore workerSemaphore;
+        private Semaphore? workerSemaphore;
         private List<Thread> workers;
-        private Thread mDownloaderThread;
+        private Thread? mDownloaderThread;
         private ICollection<SeriesSpecifier> downloadIds;
         public ConcurrentBag<ShowNotFoundException> Problems { get; }
         
@@ -38,6 +38,8 @@ namespace TVRename
             DownloadDone = true;
             downloadOk = true;
             Problems = new ConcurrentBag<ShowNotFoundException>();
+            workers = new List<Thread>();
+            downloadIds = new List<SeriesSpecifier>();
         }
 
         public void StartBgDownloadThread(bool stopOnError, ICollection<SeriesSpecifier> shows, bool showMsgBox,
@@ -62,10 +64,11 @@ namespace TVRename
             mDownloaderThread.Start(ctsToken);
         }
 
-        public bool DoDownloadsFg(bool showProgress, bool showMsgBox, ICollection<SeriesSpecifier> shows)
+        public bool DoDownloadsFg(bool showProgress, bool showMsgBox, ICollection<SeriesSpecifier> shows, IDialogParent owner)
         {
             if (TVSettings.Instance.OfflineMode)
             {
+                Logger.Info("Cancelling downloads... We're in offline mode");
                 return true; // don't do internet in offline mode!
             }
 
@@ -84,7 +87,9 @@ namespace TVRename
             if (!DownloadDone && showProgress) // downloading still going on, so time to show the dialog if we're not in /hide mode
             {
                 DownloadProgress dp = new DownloadProgress(this);
-                DialogResult result = dp.ShowDialog();
+                owner.ShowChildDialog(dp);
+                DialogResult result = dp.DialogResult;
+                dp.Dispose();
 
                 if (result == DialogResult.Abort)
                 {
@@ -94,22 +99,28 @@ namespace TVRename
 
             WaitForBgDownloadDone();
 
-            if (!downloadOk)
+            if (downloadOk)
             {
-                Logger.Warn(TheTVDB.LocalCache.Instance.LastErrorMessage +" "+ TVmaze.LocalCache.Instance.LastErrorMessage);
-                if (showErrorMsgBox)
-                {
-                    CannotConnectForm ccform = new CannotConnectForm("Error while downloading", TheTVDB.LocalCache.Instance.LastErrorMessage + " " + TVmaze.LocalCache.Instance.LastErrorMessage);
-                    DialogResult ccresult = ccform.ShowDialog();
-                    if (ccresult == DialogResult.Abort)
-                    {
-                        TVSettings.Instance.OfflineMode = true;
-                    }
-                }
-
-                TheTVDB.LocalCache.Instance.LastErrorMessage = string.Empty;
-                TVmaze.LocalCache.Instance.LastErrorMessage = string.Empty;
+                return true;
             }
+
+            Logger.Warn(TheTVDB.LocalCache.Instance.LastErrorMessage +" "+ TVmaze.LocalCache.Instance.LastErrorMessage);
+            if (showErrorMsgBox)
+            {
+                CannotConnectForm ccform = new CannotConnectForm("Error while downloading", TheTVDB.LocalCache.Instance.LastErrorMessage + " " + TVmaze.LocalCache.Instance.LastErrorMessage);
+
+                owner.ShowChildDialog(ccform);
+                DialogResult ccresult = ccform.DialogResult;
+                ccform.Dispose();
+                    
+                if (ccresult == DialogResult.Abort)
+                {
+                    TVSettings.Instance.OfflineMode = true;
+                }
+            }
+
+            TheTVDB.LocalCache.Instance.LastErrorMessage = string.Empty;
+            TVmaze.LocalCache.Instance.LastErrorMessage = string.Empty;
 
             return downloadOk;
         }
@@ -139,7 +150,7 @@ namespace TVRename
                     break;
 
                 default:
-                    throw new Exception("GetThread started with invalid parameter");
+                    throw new ArgumentException("GetThread started with invalid parameter");
             }
 
             try
@@ -201,18 +212,15 @@ namespace TVRename
 
         private void WaitForAllThreadsAndTidyUp()
         {
-            if (workers != null)
+            foreach (Thread t in workers)
             {
-                foreach (Thread t in workers)
+                if (t.IsAlive)
                 {
-                    if (t.IsAlive)
-                    {
-                        t.Join();
-                    }
+                    t.Join();
                 }
             }
 
-            workers = null;
+            workers.Clear();
             workerSemaphore = null;
         }
 
@@ -265,7 +273,8 @@ namespace TVRename
                 Logger.Info($"Identified that {downloadIds.Count(s => s.Provider==ShowItem.ProviderType.TheTVDB && (TheTVDB.LocalCache.Instance.GetSeries(s.TvdbSeriesId)?.Dirty??true))} TVDB and {downloadIds.Count(s => s.Provider == ShowItem.ProviderType.TVmaze && (TVmaze.LocalCache.Instance.GetSeries(s.TvMazeSeriesId)?.Dirty ?? true))} TV Maze shows need to be updated");
                 workers = new List<Thread>();
 
-                workerSemaphore = new Semaphore(numWorkers, numWorkers); // allow up to numWorkers working at once
+                Semaphore newSemaphore = new Semaphore(numWorkers, numWorkers); // allow up to numWorkers working at once
+                workerSemaphore = newSemaphore;
 
                 foreach (SeriesSpecifier code in downloadIds)
                 {
@@ -277,13 +286,12 @@ namespace TVRename
                     DownloadsRemaining = totalItems - n;
                     n++;
 
-                    workerSemaphore.WaitOne(); // blocks until there is an available slot
+                    newSemaphore.WaitOne(); // blocks until there is an available slot
                     Thread t = new Thread(GetThread);
                     workers.Add(t);
                     t.Name = "GetThread:" + code.Name;
                     t.Start(code); // will grab the semaphore as soon as we make it available
-                    int nfr = workerSemaphore
-                        .Release(1); // release our hold on the semaphore, so that worker can grab it
+                    int nfr = newSemaphore.Release(1); // release our hold on the semaphore, so that worker can grab it
                     Threadslogger.Trace("Started " + code + " pool has " + nfr + " free");
                     Thread.Sleep(1); // allow the other thread a chance to run and grab
 
@@ -323,7 +331,7 @@ namespace TVRename
             }
             finally
             {
-                workers = null;
+                workers.Clear();
                 workerSemaphore = null;
                 DownloadDone = true;
             }

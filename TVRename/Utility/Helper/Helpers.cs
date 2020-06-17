@@ -13,7 +13,6 @@ using System.Text.RegularExpressions;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Diagnostics.Contracts;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -41,7 +40,7 @@ namespace TVRename
         {
             if (items == null)
             {
-                throw new ArgumentNullException("items");
+                throw new ArgumentNullException(nameof(items));
             }
 
             return items.Contains(item);
@@ -50,19 +49,14 @@ namespace TVRename
         [NotNull]
         public static string PrettyPrint(this TVSettings.ScanType st)
         {
-            switch (st)
+            return st switch
             {
-                case TVSettings.ScanType.Quick:
-                    return "Quick";
-                case TVSettings.ScanType.Full:
-                    return "Full";
-                case TVSettings.ScanType.Recent:
-                    return "Recent";
-                case TVSettings.ScanType.SingleShow:
-                    return "Single";
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(st), st, null);
-            }
+                TVSettings.ScanType.Quick => "Quick",
+                TVSettings.ScanType.Full => "Full",
+                TVSettings.ScanType.Recent => "Recent",
+                TVSettings.ScanType.SingleShow => "Single",
+                _ => throw new ArgumentOutOfRangeException(nameof(st), st, null)
+            };
         }
 
         public static void Swap<T>(
@@ -71,9 +65,6 @@ namespace TVRename
             int secondIndex
         )
         {
-            Contract.Requires(list != null);
-            Contract.Requires(firstIndex >= 0 && firstIndex < list.Count);
-            Contract.Requires(secondIndex >= 0 && secondIndex < list.Count);
             if (firstIndex == secondIndex)
             {
                 return;
@@ -162,31 +153,54 @@ namespace TVRename
 
         private static readonly DateTime Epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         private static readonly DateTime WindowsStartDateTime = new DateTime(1980, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        public static bool OpenFolder(string folder)
+        {
+            if (Directory.Exists(folder))
+            {
+                return SysOpen(folder);
+            }
+            return false;
+        }
 
-        public static void SysOpen([CanBeNull] string what) => SysOpen(what, null);
+        public static void OpenFolderSelectFile(string filename)
+        {
+            string args = $"/e, /select, \"{filename}\"";
 
-        public static void SysOpen([CanBeNull] string what, [CanBeNull] string arguments)
+            ProcessStartInfo info = new ProcessStartInfo {FileName = "explorer", Arguments = args};
+            Process.Start(info);
+        }
+
+        public static bool OpenUrl(string url) =>SysOpen(url);
+        public static void OpenFile(string filename) => SysOpen(filename);
+
+        private static bool SysOpen(string? what) => SysOpen(what, null);
+
+        private static bool SysOpen(string? what, string? arguments)
         {
             if (string.IsNullOrWhiteSpace(what))
             {
-                return;
+                return false;
             }
 
             try
             {
                 Process.Start(what, arguments);
+                return true;
             }
             catch (Win32Exception e)
             {
                 Logger.Warn(e, $"Could not open {what}");
+                return false;
             }
             catch (FileNotFoundException e)
             {
                 Logger.Warn(e, $"Could not open {what}");
+                return false;
             }
             catch (Exception e)
             {
                 Logger.Error(e, $"Could not open {what}");
+                return false;
             }
         }
 

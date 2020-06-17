@@ -13,21 +13,16 @@ namespace TVRename.TheTVDB
         {
             get
             {
-                switch (LocalCache.VERS)
+                return LocalCache.VERS switch
                 {
                     // ReSharper disable once ConditionIsAlwaysTrueOrFalse
-                    case ApiVersion.v2:
-                        return "https://api.thetvdb.com";
-
+                    ApiVersion.v2 => "https://api.thetvdb.com",
                     // ReSharper disable once HeuristicUnreachableCode
                     // ReSharper disable once HeuristicUnreachableCode
-                    case ApiVersion.v3:
-                        // ReSharper disable once HeuristicUnreachableCode
-                        return "https://api-dev.thetvdb.com";
-
-                    default:
-                        throw new NotSupportedException();
-                }
+                    ApiVersion.v3 => "https://api-dev.thetvdb.com",
+                    // ReSharper disable once HeuristicUnreachableCode
+                    _ => throw new NotSupportedException()
+                };
             }
         }
 
@@ -41,7 +36,7 @@ namespace TVRename.TheTVDB
         public string GetToken()
         {
             //If we have not logged on at all then logon
-            if (!IsTokenAquired())
+            if (!IsTokenAcquired())
             {
                 AcquireToken();
             }
@@ -70,7 +65,14 @@ namespace TVRename.TheTVDB
             JObject request = new JObject(new JProperty("apikey", TVDB_API_KEY));
             JObject jsonResponse = HttpHelper.JsonHttpPostRequest($"{TVDB_API_URL}/login", request, true);
 
-            UpdateToken((string)jsonResponse["token"]);
+            string newToken = (string)jsonResponse["token"];
+            if (newToken == null)
+            {
+                Logger.Error("Could not refresh Token");
+                return;
+            }
+            UpdateToken(newToken);
+
             Logger.Info("Performed login at " + DateTime.UtcNow);
             Logger.Info("New Token " + lastKnownToken);
         }
@@ -80,8 +82,15 @@ namespace TVRename.TheTVDB
             Logger.Info("Refreshing TheTVDB token... ");
             JObject jsonResponse = HttpHelper.JsonHttpGetRequest($"{TVDB_API_URL}/refresh_token", lastKnownToken);
 
-            UpdateToken((string)jsonResponse["token"]);
-            Logger.Info("refreshed token at " + DateTime.UtcNow);
+            string newToken = (string)jsonResponse["token"];
+            if (newToken == null)
+            {
+                Logger.Error("Could not refresh Token");
+                return;
+            }
+            UpdateToken(newToken);
+
+            Logger.Info("Refreshed token at " + DateTime.UtcNow);
             Logger.Info("New Token " + lastKnownToken);
         }
 
@@ -95,6 +104,6 @@ namespace TVRename.TheTVDB
 
         private bool TokenIsValid() => DateTime.Now - lastRefreshTime < TimeSpan.FromDays(1) - TimeSpan.FromMinutes(1);
 
-        private bool IsTokenAquired() => lastKnownToken != string.Empty;
+        private bool IsTokenAcquired() => lastKnownToken != string.Empty;
     }
 }

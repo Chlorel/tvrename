@@ -27,13 +27,13 @@ namespace TVRename
     /// </summary>
     public partial class ActorsGrid : Form
     {
-        private int Internal;
+        private int @internal;
         private DataArr theData;
         private readonly TVDoc mDoc;
 
         public ActorsGrid(TVDoc doc)
         {
-            Internal = 0;
+            @internal = 0;
 
             InitializeComponent();
 
@@ -42,6 +42,7 @@ namespace TVRename
             BuildData();
             DoSort();
             Cursor.Current = Cursors.Default;
+            theData = new DataArr(mDoc.Library.Count);
         }
 
         private void BuildData()
@@ -52,10 +53,10 @@ namespace TVRename
                 theData = new DataArr(mDoc.Library.Count);
                 foreach (ShowItem ser in mDoc.Library.Shows)
                 {
-                    SeriesInfo si = ser.TheSeries();
+                    SeriesInfo? si = ser.TheSeries();
                     foreach (string aa in ser.Actors.Select(act => act.ActorName.Trim()).Where(aa => !string.IsNullOrEmpty(aa)))
                     {
-                        theData.Set(si?.Name, aa, true);
+                        theData.Set(ser.ShowName, aa, true);
                     }
 
                     if (cbGuestStars.Checked && si != null)
@@ -64,7 +65,7 @@ namespace TVRename
                         {
                             foreach (string g in ep.GuestStars)
                             {
-                                theData.Set(si.Name, g.Trim(), false);
+                                theData.Set(ser.ShowName, g.Trim(), false);
                             }
                         }
                     }
@@ -76,45 +77,45 @@ namespace TVRename
 
         private void SortByName()
         {
-            Internal++;
+            @internal++;
             rbName.Checked = true;
-            Internal--;
+            @internal--;
             theData.SortRows(false);
             theData.SortCols(false);
         }
 
         private void SortByTotals()
         {
-            Internal++;
+            @internal++;
             rbTotals.Checked = true;
-            Internal--;
+            @internal--;
             theData.SortRows(true);
             theData.SortCols(true);
         }
 
         private void SortRowsByCount()
         {
-            Internal++;
+            @internal++;
             rbCustom.Checked = true;
-            Internal--;
+            @internal--;
             theData.SortRows(true);
             FillGrid();
         }
 
         private void SortColsByCount()
         {
-            Internal++;
+            @internal++;
             rbCustom.Checked = true;
-            Internal--;
+            @internal--;
             theData.SortCols(true);
             FillGrid();
         }
 
         private void ActorToTop(string a)
         {
-            Internal++;
+            @internal++;
             rbCustom.Checked = true;
-            Internal--;
+            @internal--;
 
             theData.MoveColToTop(a);
 
@@ -139,9 +140,9 @@ namespace TVRename
 
         private void ShowToTop(string s)
         {
-            Internal++;
+            @internal++;
             rbCustom.Checked = true;
-            Internal--;
+            @internal--;
 
             theData.MoveRowToTop(s);
 
@@ -318,7 +319,7 @@ namespace TVRename
         private void bnSave_Click(object sender, EventArgs e)
         {
             saveFile.Filter = "PNG Files (*.png)|*.png|All Files (*.*)|*.*";
-            if (saveFile.ShowDialog() != DialogResult.OK)
+            if (saveFile.ShowDialog(this) != DialogResult.OK)
             {
                 return;
             }
@@ -344,7 +345,7 @@ namespace TVRename
 
         private void rbName_CheckedChanged(object sender, EventArgs e)
         {
-            if (Internal != 0)
+            if (@internal != 0)
             {
                 return;
             }
@@ -354,7 +355,7 @@ namespace TVRename
 
         private void rbTotals_CheckedChanged(object sender, EventArgs e)
         {
-            if (Internal != 0)
+            if (@internal != 0)
             {
                 return;
             }
@@ -375,7 +376,7 @@ namespace TVRename
 
             public override void OnClick(SourceGrid.CellContext sender, EventArgs e)
             {
-                Helpers.SysOpen("http://www.imdb.com/find?s=nm&q=" + who);
+                Helpers.OpenUrl("http://www.imdb.com/find?s=nm&q=" + who);
             }
         }
 
@@ -435,7 +436,7 @@ namespace TVRename
                 Rows[r2] = t2;
             }
 
-            public int RowScore(int r, [CanBeNull] IReadOnlyList<bool> onlyCols)
+            public int RowScore(int r, IReadOnlyList<bool>? onlyCols)
             {
                 int t = 0;
                 for (int c = 0; c < DataC; c++)
@@ -770,9 +771,9 @@ namespace TVRename
         private class SideClickEvent : SourceGrid.Cells.Controllers.ControllerBase
         {
             private readonly ActorsGrid g;
-            private readonly string show;
+            private readonly string? show;
 
-            public SideClickEvent(ActorsGrid g, string show)
+            public SideClickEvent(ActorsGrid g, string? show)
             {
                 this.show = show;
                 this.g = g;

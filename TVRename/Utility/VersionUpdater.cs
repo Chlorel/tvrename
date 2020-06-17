@@ -20,7 +20,7 @@ namespace TVRename
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
         [ItemCanBeNull]
-        public static async Task<Release> CheckForUpdatesAsync()
+        public static async Task<ServerRelease?> CheckForUpdatesAsync()
         {
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
             Release currentVersion;
@@ -35,25 +35,22 @@ namespace TVRename
                 return null;
             }
 
-            (Release latestVersion, Release latestBetaVersion) = await GetLatestReleases().ConfigureAwait(false);
+            (ServerRelease latestVersion, ServerRelease latestBetaVersion) = await GetLatestReleases().ConfigureAwait(false);
 
-            switch (TVSettings.Instance.mode)
+            return TVSettings.Instance.mode switch
             {
-                case TVSettings.BetaMode.ProductionOnly when latestVersion?.NewerThan(currentVersion)?? false:
-                    return latestVersion;
-
-                case TVSettings.BetaMode.BetaToo when latestBetaVersion?.NewerThan(currentVersion)??false:
-                    return latestBetaVersion;
-
-                default:
-                    return null;
-            }
+                TVSettings.BetaMode.ProductionOnly when (latestVersion?.NewerThan(currentVersion) ?? false) =>
+                latestVersion,
+                TVSettings.BetaMode.BetaToo when (latestBetaVersion?.NewerThan(currentVersion) ?? false) =>
+                latestBetaVersion,
+                _ => null
+            };
         }
 
-        private static async Task<(Release latestVersion, Release latestBetaVersion)> GetLatestReleases()
+        private static async Task<(ServerRelease? latestVersion, ServerRelease? latestBetaVersion)> GetLatestReleases()
         {
-            Release latestVersion = null;
-            Release latestBetaVersion = null;
+            ServerRelease latestVersion = null;
+            ServerRelease latestBetaVersion = null;
 
             try
             {
@@ -78,12 +75,18 @@ namespace TVRename
                 {
                     try
                     {
-                        if (!gitHubReleaseJson["assets"].HasValues)
+                        JToken? jToken = gitHubReleaseJson["assets"];
+                        if (jToken is null)
                         {
                             continue; //we have no files for this release, so ignore
                         }
 
-                        Release testVersion = ParseFromJson(gitHubReleaseJson);
+                        ServerRelease? testVersion = ParseFromJson(gitHubReleaseJson);
+                        if (testVersion is null)
+                        {
+                            Logger.Error($"Could not parse {gitHubReleaseJson}");
+                            continue;
+                        }
 
                         (latestBetaVersion, latestVersion) = UpdateLatest(testVersion, latestBetaVersion, latestVersion);
                     }
@@ -130,10 +133,10 @@ namespace TVRename
             return (latestVersion, latestBetaVersion);
         }
 
-        private static (Release latestBetaVersion, Release latestVersion) UpdateLatest([NotNull] Release testVersion,
-            Release latestBetaVersion, Release latestVersion)
+        private static (ServerRelease? latestBetaVersion, ServerRelease? latestVersion) UpdateLatest([NotNull] ServerRelease testVersion,
+            ServerRelease? latestBetaVersion, ServerRelease? latestVersion)
         {
-//all versions want to be considered if you are in the beta stream
+            //all versions want to be considered if you are in the beta stream
             if (testVersion.NewerThan(latestBetaVersion))
             {
                 latestBetaVersion = testVersion;
@@ -151,20 +154,28 @@ namespace TVRename
             return (latestBetaVersion, latestVersion);
         }
 
-        [NotNull]
-        private static Release ParseFromJson([NotNull] JObject gitHubReleaseJson)
+        private static ServerRelease? ParseFromJson([NotNull] JObject gitHubReleaseJson)
         {
-            DateTime.TryParse(gitHubReleaseJson["published_at"].ToString(), out DateTime releaseDate);
-            Release testVersion = new Release(gitHubReleaseJson["tag_name"].ToString(),
-                Release.VersionType.semantic)
+            DateTime.TryParse(gitHubReleaseJson["published_at"]?.ToString(), out DateTime releaseDate);
+
+            string url = (string) gitHubReleaseJson["assets"]?[0]?["browser_download_url"];
+            string releaseNotesText = gitHubReleaseJson["body"]?.ToString();
+            string releaseNotesUrl = gitHubReleaseJson["html_url"]?.ToString();
+            string version = gitHubReleaseJson["tag_name"]?.ToString();
+
+            if (url is null || releaseNotesText is null || releaseNotesUrl is null || version is null)
             {
-                DownloadUrl = gitHubReleaseJson["assets"][0]["browser_download_url"].ToString(),
-                ReleaseNotesText = gitHubReleaseJson["body"].ToString(),
-                ReleaseNotesUrl = gitHubReleaseJson["html_url"].ToString(),
-                ReleaseDate = releaseDate,
-                IsBeta = gitHubReleaseJson["prerelease"].ToString() == "True"
-            };
-            return testVersion;
+                return null;
+            }
+
+            return new ServerRelease(
+                version,
+                Release.VersionType.semantic,
+                url,
+                releaseNotesText,
+                releaseNotesUrl,
+                gitHubReleaseJson["prerelease"]?.ToString() == "True",
+                releaseDate);
         }
 
         [NotNull]

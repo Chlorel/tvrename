@@ -4,11 +4,14 @@ using System.Linq;
 using System.Xml;
 using System.Xml.Linq;
 using JetBrains.Annotations;
+using NLog;
 
 namespace TVRename
 {
     public static class XmlHelper
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
         public static void WriteStringsToXml([NotNull] IEnumerable<string> strings, [NotNull] XmlWriter writer, [NotNull] string elementName, [NotNull] string stringName)
         {
             writer.WriteStartElement(elementName);
@@ -35,12 +38,12 @@ namespace TVRename
             return res;
         }
 
-        public static void WriteElement(this XmlWriter writer, string elementName, [CanBeNull] string value)
+        public static void WriteElement(this XmlWriter writer, string elementName, string? value)
         {
             WriteElement(writer, elementName, value, false);
         }
 
-        public static void WriteElement(this XmlWriter writer, string elementName, [CanBeNull] string value,bool ignoreIfBlank)
+        public static void WriteElement(this XmlWriter writer, string elementName, string? value,bool ignoreIfBlank)
         {
             if (ignoreIfBlank && string.IsNullOrWhiteSpace(value))
             {
@@ -57,7 +60,7 @@ namespace TVRename
             WriteElement(writer, elementName, value, null);
         }
 
-        public static void WriteElement([NotNull] this XmlWriter writer, [NotNull] string elementName, double value,[CanBeNull] string format)
+        public static void WriteElement([NotNull] this XmlWriter writer, [NotNull] string elementName, double value,string? format)
         {
             writer.WriteStartElement(elementName);
             if (format is null)
@@ -115,7 +118,7 @@ namespace TVRename
         {
             if (root.Elements(elementName).Any())
             {
-                return root.Elements(elementName).Single();
+                return root.Elements(elementName).First();
             }
             XElement e = new XElement(elementName);
             root.Add(e);
@@ -126,7 +129,7 @@ namespace TVRename
         {
             if (root.Elements(elementName).Any(el => el.HasAttribute(name,value)))
             {
-                return root.Elements(elementName).Single(el => el.HasAttribute(name,value));
+                return root.Elements(elementName).First(el => el.HasAttribute(name,value));
             }
             XElement e = new XElement(elementName);
             root.Add(e);
@@ -169,7 +172,7 @@ namespace TVRename
             writer.WriteEndAttribute();
         }
 
-        public static void WriteInfo(this XmlWriter writer, string elemName, [CanBeNull] string attribute, [CanBeNull] string attributeVal, [CanBeNull] string value)
+        public static void WriteInfo(this XmlWriter writer, string elemName, string? attribute, string? attributeVal, string? value)
         {
             if (!string.IsNullOrEmpty(value))
             {
@@ -183,20 +186,31 @@ namespace TVRename
             }
         }
 
-        public static void UpdateElement(this XElement root, string elementName, string value, bool ignoreIfBlank)
+        public static void UpdateElement(this XElement root, string elementName, string? value, bool ignoreIfBlank)
         {
             if (ignoreIfBlank && value.IsNullOrWhitespace())
             {
                 return;
             }
-            UpdateElement(root, elementName, value);
+            UpdateElement(root, elementName, value!);
         }
 
-        public static void UpdateElement([NotNull] this XElement e, [NotNull] string elementName, string value)
+        public static void UpdateElement([NotNull] this XElement e, [NotNull] string elementName, string? value)
         {
+            if (value is null)
+            {
+                return;
+            }
             if (e.Elements(elementName).Any())
             {
-                e.Elements(elementName).Single().Value = value;
+                try
+                {
+                    e.Elements(elementName).Single().Value = value;
+                }
+                catch (InvalidOperationException)
+                {
+                    Logger.Error($"COuld not update element {elementName} in {e}");
+                }
             }
             else
             {
@@ -250,7 +264,7 @@ namespace TVRename
             }
         }
 
-        public static void WriteInfo(this XmlWriter writer, string elemName, [CanBeNull] string attribute, [CanBeNull] string attributeVal)
+        public static void WriteInfo(this XmlWriter writer, string elemName, string? attribute, string? attributeVal)
         {
             if (!string.IsNullOrEmpty(attributeVal))
             {
@@ -263,7 +277,7 @@ namespace TVRename
             }
         }
 
-        public static void WriteInfo([NotNull] this XmlWriter writer, [NotNull] string elemName, [CanBeNull] string attribute, bool attributeVal)
+        public static void WriteInfo([NotNull] this XmlWriter writer, [NotNull] string elemName, string? attribute, bool attributeVal)
         {
             writer.WriteStartElement(elemName);
             if (!string.IsNullOrEmpty(attribute))
@@ -322,6 +336,17 @@ namespace TVRename
         {
             return ExtractString(xmlSettings, elementName, string.Empty);
         }
+
+        public static string? ExtractStringOrNull([NotNull] this XElement xmlSettings, string elementName)
+        {
+            if (xmlSettings.Descendants(elementName).Any())
+            {
+                return (string)xmlSettings.Descendants(elementName).First();
+            }
+
+            return null;
+        }
+
         public static string ExtractString([NotNull] this XElement xmlSettings, string elementName,string defaultValue)
         {
             if (xmlSettings.Descendants(elementName).Any())

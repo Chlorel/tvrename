@@ -7,6 +7,7 @@
 // 
 
 using System.Collections.Generic;
+using System.Linq;
 using JetBrains.Annotations;
 using FileInfo = Alphaleonis.Win32.Filesystem.FileInfo;
 
@@ -41,7 +42,7 @@ namespace TVRename
         }
 
         [NotNull]
-        public ItemList ProcessShow([CanBeNull] ShowItem si)
+        public ItemList ProcessShow(ShowItem? si)
         {
             ItemList theActionList = new ItemList();
             if (si is null)
@@ -57,7 +58,7 @@ namespace TVRename
         }
 
         [NotNull]
-        public ItemList ProcessSeason([CanBeNull] ShowItem si, string folder, int snum)
+        public ItemList ProcessSeason(ShowItem? si, string folder, int snum)
         {
             ItemList theActionList = new ItemList();
             if (si is null)
@@ -72,18 +73,17 @@ namespace TVRename
             return theActionList;
         }
 
-        [NotNull]
-        public ItemList ProcessEpisode([CanBeNull] ProcessedEpisode dbep, FileInfo filo)
+        public ItemList? ProcessEpisode(ProcessedEpisode? episode, FileInfo filo)
         {
-            ItemList theActionList = new ItemList();
-            if (dbep is null)
+            if (episode is null)
             {
-                return theActionList;
+                return null;
             }
 
+            ItemList theActionList = new ItemList();
             foreach (DownloadIdentifier di in identifiers)
             {
-                theActionList.Add(di.ProcessEpisode(dbep,filo));
+                theActionList.Add(di.ProcessEpisode(episode,filo));
             }
             return theActionList;
         }
@@ -96,7 +96,7 @@ namespace TVRename
         }
 
         [NotNull]
-        public ItemList ForceUpdateShow(DownloadIdentifier.DownloadType dt, [CanBeNull] ShowItem si)
+        public ItemList ForceUpdateShow(DownloadIdentifier.DownloadType dt, ShowItem? si)
         {
             ItemList theActionList = new ItemList();
             if (si is null)
@@ -115,7 +115,7 @@ namespace TVRename
         }
 
         [NotNull]
-        public ItemList ForceUpdateSeason(DownloadIdentifier.DownloadType dt, [CanBeNull] ShowItem si, string folder, int snum)
+        public ItemList ForceUpdateSeason(DownloadIdentifier.DownloadType dt, ShowItem? si, string folder, int snum)
         {
             ItemList theActionList = new ItemList();
             if (si is null)
@@ -134,20 +134,12 @@ namespace TVRename
         }
 
         [NotNull]
-        public ItemList ForceUpdateEpisode(DownloadIdentifier.DownloadType dt, [CanBeNull] ProcessedEpisode dbep, FileInfo filo)
+        public ItemList ForceUpdateEpisode(DownloadIdentifier.DownloadType dt, ProcessedEpisode episode, FileInfo filo)
         {
             ItemList theActionList = new ItemList();
-            if (dbep is null)
+            foreach (DownloadIdentifier di in identifiers.Where(di => dt == di.GetDownloadType()))
             {
-                return theActionList;
-            }
-
-            foreach (DownloadIdentifier di in identifiers)
-            {
-                if (dt == di.GetDownloadType())
-                {
-                    theActionList.Add(di.ProcessEpisode(dbep,filo, true));
-                }
+                theActionList.Add(di.ProcessEpisode(episode, filo, true));
             }
             return theActionList;
         }

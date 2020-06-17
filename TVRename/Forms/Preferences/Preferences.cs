@@ -7,6 +7,7 @@
 // 
 using Alphaleonis.Win32.Filesystem;
 using DaveChambers.FolderBrowserDialogEx;
+using JetBrains.Annotations;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -14,11 +15,10 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
-using JetBrains.Annotations;
-using ColumnHeader = SourceGrid.Cells.ColumnHeader;
-using DirectoryInfo = Alphaleonis.Win32.Filesystem.DirectoryInfo;
 using TimeZoneConverter;
+using ColumnHeader = SourceGrid.Cells.ColumnHeader;
 using Control = System.Windows.Forms.Control;
+using DirectoryInfo = Alphaleonis.Win32.Filesystem.DirectoryInfo;
 
 namespace TVRename
 {
@@ -36,19 +36,19 @@ namespace TVRename
         private delegate void LoadLanguageDoneDel();
 
         private readonly TVDoc mDoc;
-        private Thread loadLanguageThread;
-        private string enterPreferredLanguage; // hold here until background language download task is done
+        private Thread? loadLanguageThread;
+        private string? enterPreferredLanguage; // hold here until background language download task is done
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
-        private CustomNameTagsFloatingWindow cntfw;
-        private readonly ProcessedSeason sampleProcessedSeason;
+        private CustomNameTagsFloatingWindow? cntfw;
+        private readonly ProcessedSeason? sampleProcessedSeason;
 
-        private readonly LoadLanguageDoneDel loadLanguageDone;
+        private readonly LoadLanguageDoneDel? loadLanguageDone;
 
         private class FailedValidationException : Exception
         {
         }
 
-        public Preferences(TVDoc doc, bool goToScanOpts, ProcessedSeason s)
+        public Preferences(TVDoc doc, bool goToScanOpts, ProcessedSeason? s)
         {
             sampleProcessedSeason = s;
             InitializeComponent();
@@ -116,8 +116,8 @@ namespace TVRename
             ValidateFilePath(txtSeasonFormat, tpLibraryFolders, true);
             if (cbCheckuTorrent.Checked)
             {
-                ValidateFilePath(txtUTResumeDatPath, tbuTorrentNZB,false);
-                ValidateFilePath(txtRSSuTorrentPath, tbuTorrentNZB,false);
+                ValidateFilePath(txtUTResumeDatPath, tpTorrentNZB,false);
+                ValidateFilePath(txtRSSuTorrentPath, tpTorrentNZB,false);
             }
         }
 
@@ -259,6 +259,7 @@ namespace TVRename
             s.KeepTogether = cbKeepTogether.Checked;
             s.LeadingZeroOnSeason = cbLeadingZero.Checked;
             s.ShowInTaskbar = chkShowInTaskbar.Checked;
+            s.ShowAccessibilityOptions = chkShowAccessibilityOptions.Checked;
             s.RenameTxtToSub = cbTxtToSub.Checked;
             s.ShowEpisodePictures = cbShowEpisodePictures.Checked;
             s.ReplaceWithBetterQuality = cbHigherQuality.Checked;
@@ -282,6 +283,7 @@ namespace TVRename
             s.qBitTorrentHost = tbqBitTorrentHost.Text;
             s.qBitTorrentPort = tbqBitTorrentPort.Text;
             s.CheckqBitTorrent = cbCheckqBitTorrent.Checked;
+            s.RemoveCompletedTorrents = chkRemoveCompletedTorrents.Checked;
             s.SearchRSS = cbSearchRSS.Checked;
             s.EpTBNs = cbEpTBNs.Checked;
             s.NFOShows = cbNFOShows.Checked;
@@ -301,7 +303,6 @@ namespace TVRename
             s.AutoSearchForDownloadedFiles = chkAutoSearchForDownloadedFiles.Checked;
             s.LeaveOriginals = cbLeaveOriginals.Checked;
             s.CheckuTorrent = cbCheckuTorrent.Checked;
-            s.LookForDateInFilename = cbLookForAirdate.Checked;
             s.AutoMergeDownloadEpisodes = chkAutoMergeDownloadEpisodes.Checked;
             s.AutoMergeLibraryEpisodes = chkAutoMergeLibraryEpisodes.Checked;
             s.RetainLanguageSpecificSubtitles = chkRetainLanguageSpecificSubtitles.Checked;
@@ -321,12 +322,23 @@ namespace TVRename
             s.SearchJSONFilenameToken = tbJSONFilenameToken.Text;
             s.SearchJSONURLToken = tbJSONURLToken.Text;
             s.SearchJSONFileSizeToken = tbJSONFilesizeToken.Text;
+            s.SearchJSONSeedersToken = tbJSONSeedersToken.Text;
             s.SearchRSSManualScanOnly = cbSearchRSSManualScanOnly.Checked;
             s.MonitorFolders = cbMonitorFolder.Checked;
             s.runStartupCheck = chkScanOnStartup.Checked;
             s.runPeriodicCheck = chkScheduledScan.Checked;
             s.periodCheckHours = int.Parse(domainUpDown1.SelectedItem?.ToString() ?? "1");
             s.periodUpdateCacheHours = int.Parse(domainUpDown2.SelectedItem?.ToString() ?? "1");
+
+            s.UnattendedMultiActionOutcome = ConvertToDupActEnum(cmbUnattendedDuplicateAction);
+            s.UserMultiActionOutcome = ConvertToDupActEnum(cmbSupervisedDuplicateAction);
+
+            s.SearchJackett = cbSearchJackett.Checked;
+            s.SearchJackettManualScanOnly = cbSearchJackettOnManualScansOnly.Checked;
+            s.JackettServer = txtJackettServer.Text;
+            s.JackettPort = txtJackettPort.Text;
+            s.JackettIndexer = txtJackettIndexer.Text;
+            s.JackettAPIKey = txtJackettAPIKey.Text;
 
             s.RemoveDownloadDirectoriesFiles = cbCleanUpDownloadDir.Checked;
             s.DeleteShowFromDisk = cbDeleteShowFromDisk.Checked;
@@ -364,7 +376,7 @@ namespace TVRename
             s.keepTogetherMode = KeepTogetherMode();
 
             s.PreferredLanguageCode =
-                TheTVDB.LocalCache.Instance.LanguageList.FirstOrDefault(l => l.Name == cbLanguages.Text)?.Abbreviation ??
+                TheTVDB.LocalCache.Instance.LanguageList?.FirstOrDefault(l => l.Name == cbLanguages.Text)?.Abbreviation ??
                 s.PreferredLanguageCode;
 
             if (string.IsNullOrWhiteSpace(s.PreferredLanguageCode))
@@ -395,10 +407,26 @@ namespace TVRename
             s.DefShowLocation = (string)cmbDefShowLocation.SelectedItem;
             s.DefaultShowTimezoneName = cbTimeZone.Text;
             s.DefShowSequentialMatching = cbDefShowSequentialMatching.Checked;
+            s.DefShowAirDateMatching = cbDefShowAirdateMatching.Checked;
+            s.DefShowEpNameMatching = cbDefShowEpNameMatching.Checked;
             s.DefShowSpecialsCount = cbDefShowSpecialsCount.Checked;
             s.DefShowUseBase = rbDefShowUseBase.Checked;
             s.DefShowUseDefLocation = cbDefShowUseDefLocation.Checked;
             s.DefShowUseSubFolders = rbDefShowUseSubFolders.Checked;
+        }
+
+        private static TVSettings.DuplicateActionOutcome ConvertToDupActEnum([NotNull] ComboBox p0)
+        {
+            return p0.Text switch
+            {
+                "Ask User" => TVSettings.DuplicateActionOutcome.Ask,
+                "Choose Largest File" => TVSettings.DuplicateActionOutcome.Largest,
+                "Use First" => TVSettings.DuplicateActionOutcome.ChooseFirst,
+                "Download All" => TVSettings.DuplicateActionOutcome.DoAll,
+                "Ignore" => TVSettings.DuplicateActionOutcome.IgnoreAll,
+                "Choose Most Popular" => TVSettings.DuplicateActionOutcome.MostSeeders,
+                _ => throw new ArgumentOutOfRangeException()
+            };
         }
 
         private TVSettings.ScanType ScanTypeMode()
@@ -417,18 +445,18 @@ namespace TVRename
         }
 
         // ReSharper disable once InconsistentNaming
-        private qBitTorrentAPIVersion qBitTorrentAPIVersionMode()
+        private qBitTorrent.qBitTorrentAPIVersion qBitTorrentAPIVersionMode()
         {
             if (rdoqBitTorrentAPIVersionv0.Checked)
             {
-                return qBitTorrentAPIVersion.v0;
+                return global::TVRename.qBitTorrent.qBitTorrentAPIVersion.v0;
             }
             if (rdoqBitTorrentAPIVersionv1.Checked)
             {
-                return qBitTorrentAPIVersion.v1;
+                return global::TVRename.qBitTorrent.qBitTorrentAPIVersion.v1;
             }
 
-            return qBitTorrentAPIVersion.v2;
+            return global::TVRename.qBitTorrent.qBitTorrentAPIVersion.v2;
         }
 
         private ShowItem.ProviderType ProviderMode()
@@ -477,15 +505,12 @@ namespace TVRename
 
         private TVSettings.KeepTogetherModes KeepTogetherMode()
         {
-            switch (cbKeepTogetherMode.Text)
+            return cbKeepTogetherMode.Text switch
             {
-                case "All but these":
-                    return TVSettings.KeepTogetherModes.AllBut;
-                case "Just":
-                    return TVSettings.KeepTogetherModes.Just;
-                default:
-                    return TVSettings.KeepTogetherModes.All;
-            }
+                "All but these" => TVSettings.KeepTogetherModes.AllBut,
+                "Just" => TVSettings.KeepTogetherModes.Just,
+                _ => TVSettings.KeepTogetherModes.All
+            };
         }
 
         #endregion
@@ -546,13 +571,16 @@ namespace TVRename
             string pref = string.Empty;
             lock(TheTVDB.LocalCache.LANGUAGE_LOCK)
             {
-                foreach (Language l in TheTVDB.LocalCache.Instance.LanguageList)
+                if (TheTVDB.LocalCache.Instance.LanguageList != null)
                 {
-                    cbLanguages.Items.Add(l.Name);
-
-                    if (enterPreferredLanguage == l.Abbreviation)
+                    foreach (Language l in TheTVDB.LocalCache.Instance.LanguageList)
                     {
-                        pref = l.Name;
+                        cbLanguages.Items.Add(l.Name);
+
+                        if (enterPreferredLanguage == l.Abbreviation)
+                        {
+                            pref = l.Name;
+                        }
                     }
                 }
             }
@@ -592,8 +620,8 @@ namespace TVRename
             ReplacementsGrid.AutoStretchColumnsToFitWidth = true;
             ReplacementsGrid.Columns.StretchToFit();
 
-            ReplacementsGrid.Columns[0].Width = ReplacementsGrid.Columns[0].Width - 8; // allow for scrollbar
-            ReplacementsGrid.Columns[1].Width = ReplacementsGrid.Columns[1].Width - 8;
+            ReplacementsGrid.Columns[0].Width -= 8; // allow for scrollbar
+            ReplacementsGrid.Columns[1].Width -= 8;
 
             //////////////////////////////////////////////////////////////////////
             // header row
@@ -611,7 +639,7 @@ namespace TVRename
             ReplacementsGrid[0, 2].View = titleModel;
         }
 
-        private void AddNewReplacementRow([CanBeNull] string from, string to, bool ins)
+        private void AddNewReplacementRow(string? from, string? to, bool ins)
         {
             SourceGrid.Cells.Views.Cell roModel = new SourceGrid.Cells.Views.Cell {ForeColor = Color.Gray};
 
@@ -659,7 +687,7 @@ namespace TVRename
             RSSGrid[0, 0].View = titleModel;
         }
 
-        private void AddNewRssRow(string text)
+        private void AddNewRssRow(string? text)
         {
             int r = RSSGrid.RowsCount;
             RSSGrid.RowsCount = r + 1;
@@ -774,6 +802,7 @@ namespace TVRename
 
             cbKeepTogether.Checked = s.KeepTogether;
             cbLeadingZero.Checked = s.LeadingZeroOnSeason;
+            chkShowAccessibilityOptions.Checked = s.ShowAccessibilityOptions;
             chkShowInTaskbar.Checked = s.ShowInTaskbar;
             cbTxtToSub.Checked = s.RenameTxtToSub;
             cbShowEpisodePictures.Checked = s.ShowEpisodePictures;
@@ -792,6 +821,7 @@ namespace TVRename
             tbqBitTorrentHost.Text = s.qBitTorrentHost;
             tbqBitTorrentPort.Text = s.qBitTorrentPort;
             cbCheckqBitTorrent.Checked = s.CheckqBitTorrent;
+            chkRemoveCompletedTorrents.Checked= s.RemoveCompletedTorrents;
             cbCheckSABnzbd.Checked = s.CheckSABnzbd;
             cbHigherQuality.Checked = s.ReplaceWithBetterQuality;
 
@@ -806,6 +836,7 @@ namespace TVRename
             tbJSONFilenameToken.Text = s.SearchJSONFilenameToken;
             tbJSONURLToken.Text = s.SearchJSONURLToken;
             tbJSONFilesizeToken.Text = s.SearchJSONFileSizeToken;
+            tbJSONSeedersToken.Text = s.SearchJSONSeedersToken;
 
             cbSearchRSSManualScanOnly.Checked = s.SearchRSSManualScanOnly;
             cbSearchRSS.Checked = s.SearchRSS;
@@ -820,7 +851,6 @@ namespace TVRename
             cbRenameCheck.Checked = s.RenameCheck;
             chkPreventMove.Checked = s.PreventMove;
             cbCheckuTorrent.Checked = s.CheckuTorrent;
-            cbLookForAirdate.Checked = s.LookForDateInFilename;
             chkRetainLanguageSpecificSubtitles.Checked = s.RetainLanguageSpecificSubtitles;
             chkForceBulkAddToUseSettingsOnly.Checked = s.ForceBulkAddToUseSettingsOnly;
             chkAutoMergeDownloadEpisodes.Checked = s.AutoMergeDownloadEpisodes;
@@ -839,6 +869,16 @@ namespace TVRename
             chkUseSearchFullPathWhenMatchingShows.Checked= s.UseFullPathNameToMatchSearchFolders;
             chkAutoAddAsPartOfQuickRename.Checked = s.AutoAddAsPartOfQuickRename;
             chkCleanLibraryAfterActions.Checked = s.CleanLibraryAfterActions;
+
+            cmbUnattendedDuplicateAction.Text = ConvertEnum(s.UnattendedMultiActionOutcome);
+            cmbSupervisedDuplicateAction.Text = ConvertEnum(s.UserMultiActionOutcome);
+
+            cbSearchJackett.Checked = s.SearchJackett;
+            cbSearchJackettOnManualScansOnly.Checked = s.SearchJackettManualScanOnly;
+            txtJackettServer.Text = s.JackettServer;
+            txtJackettPort.Text = s.JackettPort;
+            txtJackettIndexer.Text = s.JackettIndexer;
+            txtJackettAPIKey.Text = s.JackettAPIKey;
 
             cbMissing.Checked = s.MissingCheck;
             chkMoveLibraryFiles.Checked = s.MoveLibraryFiles;
@@ -881,6 +921,8 @@ namespace TVRename
             cbDefShowAutoFolders.Checked= s.DefShowAutoFolders;
             cmbDefShowLocation.SelectedText= s.DefShowLocation;
             cbDefShowSequentialMatching.Checked= s.DefShowSequentialMatching;
+            cbDefShowAirdateMatching.Checked = s.DefShowAirDateMatching;
+            cbDefShowEpNameMatching.Checked = s.DefShowEpNameMatching;
             cbDefShowSpecialsCount.Checked= s.DefShowSpecialsCount;
             rbDefShowUseBase.Checked= s.DefShowUseBase;
             cbDefShowUseDefLocation.Checked= s.DefShowUseDefLocation;
@@ -903,7 +945,7 @@ namespace TVRename
 
             FillTreeViewColoringShowStatusTypeCombobox();
 
-            EnableDisable(null, null);
+            EnableDisable();
         }
 
         private void PopulateFromEnums([NotNull] TVSettings s)
@@ -920,112 +962,97 @@ namespace TVRename
 
         private RadioButton ChooseRadioButton(TVSettings.ScanType enumType)
         {
-            switch (enumType)
+            return enumType switch
             {
-                case TVSettings.ScanType.Quick:
-                    return rdoQuickScan;
-                case TVSettings.ScanType.Recent:
-                    return rdoRecentScan;
-                case TVSettings.ScanType.Full:
-                    return rdoFullScan;
-                case TVSettings.ScanType.SingleShow:
-                    throw new InvalidOperationException("Unexpected value s.MonitoredFoldersScanType = SingleShow");
-                default:
-                    throw new InvalidOperationException("Unexpected value s.MonitoredFoldersScanType = " + enumType);
-            }
+                TVSettings.ScanType.Quick => rdoQuickScan,
+                TVSettings.ScanType.Recent => rdoRecentScan,
+                TVSettings.ScanType.Full => rdoFullScan,
+                TVSettings.ScanType.SingleShow => throw new InvalidOperationException("Unexpected value s.MonitoredFoldersScanType = SingleShow"),
+                _ => throw new InvalidOperationException("Unexpected value s.MonitoredFoldersScanType = " + enumType)
+            };
         }
 
         private RadioButton ChooseRadioButton(ShowItem.ProviderType enumType)
         {
-            switch (enumType)
+            return enumType switch
             {
-                case ShowItem.ProviderType.libraryDefault:
-                    return rdoTVDB;
-
-                case ShowItem.ProviderType.TVmaze:
-                    return rdoTVMaze;
-
-                case ShowItem.ProviderType.TheTVDB:
-                    return rdoTVDB;
-
-                default:
-                    throw new InvalidOperationException("Unexpected value s.DefaultProvider = " + enumType);
-            }
+                ShowItem.ProviderType.libraryDefault => rdoTVDB,
+                ShowItem.ProviderType.TVmaze => rdoTVMaze,
+                ShowItem.ProviderType.TheTVDB => rdoTVDB,
+                _ => throw new InvalidOperationException("Unexpected value s.DefaultProvider = " + enumType)
+            };
         }
 
-        private RadioButton ChooseRadioButton(qBitTorrentAPIVersion sQBitTorrentApiVersion)
+        private RadioButton ChooseRadioButton(qBitTorrent.qBitTorrentAPIVersion sQBitTorrentApiVersion)
         {
-            switch (sQBitTorrentApiVersion)
+            return sQBitTorrentApiVersion switch
             {
-                case qBitTorrentAPIVersion.v0:
-                    return rdoqBitTorrentAPIVersionv0;
-                case qBitTorrentAPIVersion.v1:
-                    return rdoqBitTorrentAPIVersionv1;
-                case qBitTorrentAPIVersion.v2:
-                    return rdoqBitTorrentAPIVersionv2;
-                default:
-                    throw new InvalidOperationException("Unexpected value s.qBitTorrentAPIVersion = " + sQBitTorrentApiVersion);
-            }
+                global::TVRename.qBitTorrent.qBitTorrentAPIVersion.v0 => rdoqBitTorrentAPIVersionv0,
+                global::TVRename.qBitTorrent.qBitTorrentAPIVersion.v1 => rdoqBitTorrentAPIVersionv1,
+                global::TVRename.qBitTorrent.qBitTorrentAPIVersion.v2 => rdoqBitTorrentAPIVersionv2,
+                _ => throw new InvalidOperationException("Unexpected value s.qBitTorrentAPIVersion = " +
+                                                         sQBitTorrentApiVersion)
+            };
         }
 
         private RadioButton ChooseRadioButton(TVSettings.FolderJpgIsType enumTyp)
         {
-            switch (enumTyp)
+            return enumTyp switch
             {
-                case TVSettings.FolderJpgIsType.FanArt:
-                    return rbFolderFanArt;
-                case TVSettings.FolderJpgIsType.Banner:
-                    return rbFolderBanner;
-                case TVSettings.FolderJpgIsType.SeasonPoster:
-                    return rbFolderSeasonPoster;
-                case TVSettings.FolderJpgIsType.Poster:
-                    return rbFolderPoster;
-                default:
-                    throw new InvalidOperationException("Unexpected value s.FolderJpgIs = " + enumTyp);
-            }
+                TVSettings.FolderJpgIsType.FanArt => rbFolderFanArt,
+                TVSettings.FolderJpgIsType.Banner => rbFolderBanner,
+                TVSettings.FolderJpgIsType.SeasonPoster => rbFolderSeasonPoster,
+                TVSettings.FolderJpgIsType.Poster => rbFolderPoster,
+                _ => throw new InvalidOperationException("Unexpected value s.FolderJpgIs = " + enumTyp)
+            };
         }
 
         private RadioButton ChooseRadioButton(TVSettings.WTWDoubleClickAction sWtwDoubleClick)
         {
-            switch (sWtwDoubleClick)
+            return sWtwDoubleClick switch
             {
-                case TVSettings.WTWDoubleClickAction.Search:
-                    return rbWTWSearch;
-                case TVSettings.WTWDoubleClickAction.Scan:
-                    return rbWTWScan;
-                default:
-                    throw new InvalidOperationException("Unexpected value s.WTWDoubleClick = " + sWtwDoubleClick);
-            }
+                TVSettings.WTWDoubleClickAction.Search => rbWTWSearch,
+                TVSettings.WTWDoubleClickAction.Scan => rbWTWScan,
+                _ => throw new InvalidOperationException("Unexpected value s.WTWDoubleClick = " + sWtwDoubleClick)
+            };
         }
 
         [NotNull]
         private static string ConvertEnum(TVSettings.BetaMode mode)
         {
-            switch (mode)
+            return mode switch
             {
-                case TVSettings.BetaMode.ProductionOnly:
-                    return "Production";
-                case TVSettings.BetaMode.BetaToo:
-                    return "Beta";
-                default:
-                    throw new InvalidOperationException("Unexpected value s.mode = " + mode);
-            }
+                TVSettings.BetaMode.ProductionOnly => "Production",
+                TVSettings.BetaMode.BetaToo => "Beta",
+                _ => throw new InvalidOperationException("Unexpected value s.mode = " + mode)
+            };
         }
 
         [NotNull]
         private static string ConvertEnum(TVSettings.KeepTogetherModes sKeepTogetherMode)
         {
-            switch (sKeepTogetherMode)
+            return sKeepTogetherMode switch
             {
-                case TVSettings.KeepTogetherModes.All:
-                    return "All";
-                case TVSettings.KeepTogetherModes.AllBut:
-                    return "All but these";
-                case TVSettings.KeepTogetherModes.Just:
-                    return "Just";
-                default:
-                    throw new InvalidOperationException("Unexpected value s.keepTogetherMode = " + sKeepTogetherMode);
-            }
+                TVSettings.KeepTogetherModes.All => "All",
+                TVSettings.KeepTogetherModes.AllBut => "All but these",
+                TVSettings.KeepTogetherModes.Just => "Just",
+                _ => throw new InvalidOperationException("Unexpected value s.keepTogetherMode = " + sKeepTogetherMode)
+            };
+        }
+
+        [NotNull]
+        private static string ConvertEnum(TVSettings.DuplicateActionOutcome outcome)
+        {
+            return outcome switch
+            {
+                TVSettings.DuplicateActionOutcome.IgnoreAll => "Ignore",
+                TVSettings.DuplicateActionOutcome.ChooseFirst => "Use First",
+                TVSettings.DuplicateActionOutcome.Ask => "Ask User",
+                TVSettings.DuplicateActionOutcome.DoAll => "Download All",
+                TVSettings.DuplicateActionOutcome.MostSeeders => "Choose Most Popular",
+                TVSettings.DuplicateActionOutcome.Largest => "Choose Largest File",
+                _ => throw new InvalidOperationException("Unexpected value s.outcome = " + outcome)
+            };
         }
 
         private void FillSearchFolderList()
@@ -1059,7 +1086,7 @@ namespace TVRename
             PopulateAndSetDefShowLocation(oldValue);
         }
 
-        private void PopulateAndSetDefShowLocation([CanBeNull] string path)
+        private void PopulateAndSetDefShowLocation(string? path)
         {
             TVSettings.Instance.LibraryFolders.Sort();
 
@@ -1091,11 +1118,6 @@ namespace TVRename
 
         private void PopulateShowStatusColours([NotNull] TVSettings s)
         {
-            if (s.ShowStatusColors is null)
-            {
-                return;
-            }
-
             foreach (
                 KeyValuePair<TVSettings.ColouringRule, Color> showStatusColor in
                 s.ShowStatusColors)
@@ -1184,7 +1206,7 @@ namespace TVRename
             saveFile.FileName = txt.Text;
             saveFile.DefaultExt = defaultExt;
             saveFile.FilterIndex = filterIndex;
-            if (saveFile.ShowDialog() == DialogResult.OK)
+            if (saveFile.ShowDialog(this) == DialogResult.OK)
             {
                 txt.Text = saveFile.FileName;
             }
@@ -1204,7 +1226,7 @@ namespace TVRename
         {
             openFile.FileName = txt.Text;
             openFile.Filter = filter;
-            if (saveFile.ShowDialog() == DialogResult.OK)
+            if (saveFile.ShowDialog(this) == DialogResult.OK)
             {
                 txt.Text = openFile.FileName;
             }
@@ -1236,7 +1258,7 @@ namespace TVRename
 
             if (rowsIndex.Length > 0)
             {
-                Helpers.SysOpen((string) RSSGrid[rowsIndex[0], 0].Value);
+                Helpers.OpenUrl((string) RSSGrid[rowsIndex[0], 0].Value);
             }
         }
 
@@ -1244,23 +1266,13 @@ namespace TVRename
 
         #region enable and disable settings as appropriate
 
-        private void cbNotificationIcon_CheckedChanged(object sender, EventArgs e) => EnableDisable(sender, e);
-        private void chkShowInTaskbar_CheckedChanged(object sender, EventArgs e) => EnableDisable(sender, e);
-        private void cbKeepTogether_CheckedChanged(object sender, EventArgs e) => EnableDisable(sender, e);
-        private void cbMissing_CheckedChanged(object sender, EventArgs e) => EnableDisable(sender, e);
-        private void cbSearchLocally_CheckedChanged(object sender, EventArgs e) => EnableDisable(sender, e);
-        private void cbMeta_CheckedChanged(object sender, EventArgs e) => EnableDisable(sender, e);
-        private void cbKeepTogetherMode_SelectedIndexChanged(object sender, EventArgs e) => EnableDisable(sender, e);
-        private void cbSearchRSS_CheckedChanged(object sender, EventArgs e) => EnableDisable(sender, e);
-        private void cbSearchJSON_CheckedChanged(object sender, EventArgs e) => EnableDisable(sender, e);
-        private void lvwDefinedColors_SelectedIndexChanged(object sender, EventArgs e) => EnableDisable(sender, e);
-
-        private void EnableDisable(object sender, EventArgs e)
+        private void EnableDisable()
         {
             bnRemoveDefinedColor.Enabled = lvwDefinedColors.SelectedItems.Count == 1;
             txtKeepTogether.Enabled = cbKeepTogether.Checked && cbKeepTogetherMode.Text != "All";
             gbRSS.Enabled = cbSearchRSS.Checked;
             gbJSON.Enabled = cbSearchJSON.Checked;
+            groupBox22.Enabled = cbSearchJackett.Checked;
 
             if (!cbNotificationIcon.Checked)
             {
@@ -1280,6 +1292,10 @@ namespace TVRename
             ExportersOptEnableDisable();
 
             ScanOptEnableDisable();
+
+            qBitTorrent.Enabled = cbCheckqBitTorrent.Checked;
+            gbSAB.Enabled = cbCheckSABnzbd.Checked;
+            gbuTorrent.Enabled = cbCheckuTorrent.Checked;
         }
 
         private void ExportersOptEnableDisable()
@@ -1337,9 +1353,11 @@ namespace TVRename
             cbCheckSABnzbd.Enabled = e;
             cbCheckqBitTorrent.Enabled = e;
             cbSearchJSON.Enabled = e;
+            cbSearchJackett.Enabled = e;
 
             cbSearchJSONManualScanOnly.Enabled = cbSearchJSON.Checked && e;
             cbSearchRSSManualScanOnly.Enabled = cbSearchRSS.Checked && e;
+            cbSearchJackettOnManualScansOnly.Enabled = cbSearchJackett.Checked && e;
 
             cbLeaveOriginals.Enabled = e && cbSearchLocally.Checked;
         }
@@ -1624,6 +1642,11 @@ namespace TVRename
 
         private void bnRemoveSearchFolder_Click(object sender, EventArgs e)
         {
+            RemoveSelectedSearchFolder();
+        }
+
+        private void RemoveSelectedSearchFolder()
+        {
             int n = lbSearchFolders.SelectedIndex;
             if (n == -1)
             {
@@ -1644,14 +1667,14 @@ namespace TVRename
                 return;
             }
 
-            Helpers.SysOpen(TVSettings.Instance.DownloadFolders[n]);
+            Helpers.OpenFolder(TVSettings.Instance.DownloadFolders[n]);
         }
 
         private void lbSearchFolders_KeyDown(object sender, [NotNull] KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Delete)
             {
-                bnRemoveSearchFolder_Click(null, null);
+                RemoveSelectedSearchFolder();
             }
         }
 
@@ -1684,6 +1707,11 @@ namespace TVRename
         }
 
         private void bnRemoveMonFolder_Click(object sender, EventArgs e)
+        {
+            RemoveSelectedMonitorFolder();
+        }
+
+        private void RemoveSelectedMonitorFolder()
         {
             for (int i = lstFMMonitorFolders.SelectedIndices.Count - 1; i >= 0; i--)
             {
@@ -1725,7 +1753,7 @@ namespace TVRename
         {
             if (lstFMMonitorFolders.SelectedIndex != -1)
             {
-                Helpers.SysOpen(TVSettings.Instance.LibraryFolders[lstFMMonitorFolders.SelectedIndex]);
+                Helpers.OpenFolder(TVSettings.Instance.LibraryFolders[lstFMMonitorFolders.SelectedIndex]);
             }
         }
 
@@ -1733,7 +1761,7 @@ namespace TVRename
         {
             if (e.KeyCode == Keys.Delete)
             {
-                bnRemoveMonFolder_Click(null, null);
+                RemoveSelectedMonitorFolder();
             }
         }
 
@@ -1797,7 +1825,7 @@ namespace TVRename
 
         private static void OpenInfoWindow(string page)
         {
-            Helpers.SysOpen($"https://www.tvrename.com/manual/options{page}");
+            Helpers.OpenUrl($"https://www.tvrename.com/manual/options{page}");
         }
 
         #endregion
@@ -1814,6 +1842,40 @@ namespace TVRename
         private void CbDefShowUseDefLocation_CheckedChanged(object sender, EventArgs e)
         {
             cmbDefShowLocation.Enabled = cbDefShowUseDefLocation.Checked;
+        }
+
+        private void LlJackettLink_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            Helpers.OpenUrl(llJackettLink.Text);
+        }
+
+        private void UpdateJackettLink()
+        {
+            llJackettLink.Text = $"http://{txtJackettServer.Text}:{txtJackettPort.Text}/UI/Dashboard";
+        }
+
+        private void EnableDisable(object sender, EventArgs e)
+        {
+            EnableDisable();
+        }
+        private void JackettDetailsUpdate(object sender, EventArgs e)
+        {
+            UpdateJackettLink();
+        }
+
+        private void LinkLabel1_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            Helpers.OpenUrl(llqBitTorrentLink.Text);
+        }
+
+        private void QBitDetailsChanged(object sender, EventArgs e)
+        {
+            UpdateQBitTorrentLink();
+        }
+
+        private void UpdateQBitTorrentLink()
+        {
+            llqBitTorrentLink.Text = $"http://{tbqBitTorrentHost.Text}:{tbqBitTorrentPort.Text}/";
         }
     }
 }

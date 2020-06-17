@@ -1,11 +1,13 @@
-// 
+//
 // Main website for TVRename is http://tvrename.com
-// 
+//
 // Source code available at https://github.com/TV-Rename/tvrename
-// 
+//
 // Copyright (c) TV Rename. This code is released under GPLv3 https://github.com/TV-Rename/tvrename/blob/master/LICENSE.md
-// 
+//
 
+using Humanizer;
+using JetBrains.Annotations;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Concurrent;
@@ -17,10 +19,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using Humanizer;
-using JetBrains.Annotations;
 using TVRename.Forms.Utilities;
-using TVRename.TVRename;
 using FileInfo = Alphaleonis.Win32.Filesystem.FileInfo;
 
 // Talk to the TheTVDB web API, and get tv series info
@@ -30,7 +29,7 @@ using FileInfo = Alphaleonis.Win32.Filesystem.FileInfo;
 
 namespace TVRename.TheTVDB
 {
-    public enum ApiVersion 
+    public enum ApiVersion
     {
         v2,
         v3
@@ -39,6 +38,7 @@ namespace TVRename.TheTVDB
     // ReSharper disable once InconsistentNaming
     public class LocalCache : iTVSource
     {
+#nullable enable
         public static readonly ApiVersion VERS = ApiVersion.v2;
 
         private FileInfo cacheFile;
@@ -52,7 +52,7 @@ namespace TVRename.TheTVDB
         private ConcurrentDictionary<int, ExtraEp> removeEpisodeIds; // IDs of episodes that should be removed
 
         private ConcurrentDictionary<int, int> forceReloadOn;
-        public Languages LanguageList;
+        public Languages? LanguageList;
         public bool LoadOk;
         private UpdateTimeTracker LatestUpdateTime;
         public static readonly object SERIES_LOCK = new object();
@@ -69,7 +69,7 @@ namespace TVRename.TheTVDB
         //We are using the singleton design pattern
         //http://msdn.microsoft.com/en-au/library/ff650316.aspx
 
-        private static volatile LocalCache IntenalInstance;
+        private static volatile LocalCache? InternalInstance;
         private static readonly object SyncRoot = new object();
 
         [NotNull]
@@ -77,33 +77,28 @@ namespace TVRename.TheTVDB
         {
             get
             {
-                if (IntenalInstance is null)
+                if (InternalInstance is null)
                 {
                     lock (SyncRoot)
                     {
-                        if (IntenalInstance is null)
-                        {
-                            IntenalInstance = new LocalCache();
-                        }
+                        InternalInstance ??= new LocalCache();
                     }
                 }
 
-                return IntenalInstance;
+                return InternalInstance;
             }
         }
 
-        [CanBeNull]
-        public Language PreferredLanguage =>
-            LanguageList.GetLanguageFromCode(TVSettings.Instance.PreferredLanguageCode);
+        public Language? PreferredLanguage =>
+            LanguageList?.GetLanguageFromCode(TVSettings.Instance.PreferredLanguageCode);
 
-        [CanBeNull]
-        public Language GetLanguageFromCode(string customLanguageCode) => LanguageList.GetLanguageFromCode(customLanguageCode);
+        public Language? GetLanguageFromCode(string customLanguageCode) => LanguageList?.GetLanguageFromCode(customLanguageCode);
 
         public bool IsConnected { get; private set; }
 
         public string LastErrorMessage { get; set; }
 
-        public void Setup([CanBeNull] FileInfo loadFrom, [NotNull] FileInfo cache, CommandLineArgs cla)
+        public void Setup(FileInfo? loadFrom, FileInfo cache, CommandLineArgs cla)
         {
             args = cla;
 
@@ -115,7 +110,7 @@ namespace TVRename.TheTVDB
             extraEpisodes = new ConcurrentDictionary<int, ExtraEp>();
             removeEpisodeIds = new ConcurrentDictionary<int, ExtraEp>();
 
-            LanguageList = new Languages {new Language(7, "en", "English", "English")};
+            LanguageList = new Languages { new Language(7, "en", "English", "English") };
 
             //assume that the data is up to date (this will be overridden by the value in the XML if we have a prior install)
             //If we have no prior install then the app has no shows and is by definition up-to-date
@@ -128,7 +123,7 @@ namespace TVRename.TheTVDB
             forceReloadOn = new ConcurrentDictionary<int, int>();
         }
 
-        public byte[] GetTvdbDownload(string url)
+        public byte[]? GetTvdbDownload(string url)
         {
             try
             {
@@ -136,19 +131,17 @@ namespace TVRename.TheTVDB
             }
             catch (WebException e)
             {
-                Logger.Warn(CurrentDLTask + " : " + e.Message + " : " + url);
-                LastErrorMessage = CurrentDLTask + " : " + e.Message;
+                Logger.Warn(CurrentDLTask + " : " + e.LoggableDetails() + " : " + url);
+                LastErrorMessage = CurrentDLTask + " : " + e.LoggableDetails();
                 return null;
             }
         }
 
         public bool HasSeries(int id) => series.ContainsKey(id);
 
-        [CanBeNull]
-        public SeriesInfo GetSeries(int id) => HasSeries(id) ? series[id] : null;
+        public SeriesInfo? GetSeries(int id) => HasSeries(id) ? series[id] : null;
 
-        [CanBeNull]
-        public SeriesInfo GetSeriesAndDownload(int id) => HasSeries(id)
+        public SeriesInfo? GetSeriesAndDownload(int id) => HasSeries(id)
             ? series[id]
             : DownloadSeriesNow(id, false, false, false, TVSettings.Instance.PreferredLanguageCode);
 
@@ -180,6 +173,7 @@ namespace TVRename.TheTVDB
         }
 
         private void SayNothing() => Say(string.Empty);
+
         private void Say(string s)
         {
             CurrentDLTask = s;
@@ -196,7 +190,7 @@ namespace TVRename.TheTVDB
             LatestUpdateTime.RecordSuccessfulUpdate();
         }
 
-        public SeriesInfo GetSeries(string showName, bool showErrorMsgBox)
+        public SeriesInfo? GetSeries(string showName, bool showErrorMsgBox)
         {
             Search(showName, showErrorMsgBox);
 
@@ -209,17 +203,12 @@ namespace TVRename.TheTVDB
 
             List<SeriesInfo> matchingShows = GetSeriesDictMatching(showName).Values.ToList();
 
-            switch (matchingShows.Count)
+            return matchingShows.Count switch
             {
-                case 0:
-                    return null;
-
-                case 1:
-                    return matchingShows.First();
-
-                default:
-                    return null;
-            }
+                0 => null,
+                1 => matchingShows.First(),
+                _ => null
+            };
         }
 
         [NotNull]
@@ -268,9 +257,16 @@ namespace TVRename.TheTVDB
                     foreach (JObject epJson in eps)
                     {
                         JToken episodeToUse = epJson["data"];
-                        foreach (JToken t in episodeToUse.Children())
+                        if (episodeToUse != null)
                         {
-                            EpisodeAccuracyCheck(si, t, issues, showsToUpdate, serverEpIds);
+                            foreach (JToken t in episodeToUse.Children())
+                            {
+                                EpisodeAccuracyCheck(si, t, issues, showsToUpdate, serverEpIds);
+                            }
+                        }
+                        else
+                        {
+                            throw new SourceConsistencyException($"Could not load 'data' from {epJson}", ShowItem.ProviderType.TheTVDB);
                         }
                     }
                 }
@@ -299,8 +295,8 @@ namespace TVRename.TheTVDB
 
         private static void EpisodeAccuracyCheck([NotNull] SeriesInfo si, [NotNull] JToken t, List<string> issues, List<SeriesInfo> showsToUpdate, [NotNull] List<long> serverEpIds)
         {
-            long serverUpdateTime = (long) t["lastUpdated"];
-            int epId = (int) t["id"];
+            long serverUpdateTime = (long)t["lastUpdated"];
+            int epId = (int)t["id"];
 
             serverEpIds.Add(epId);
             try
@@ -340,8 +336,7 @@ namespace TVRename.TheTVDB
             }
         }
 
-        [CanBeNull]
-        private Episode FindEpisodeById(int id)
+        private Episode? FindEpisodeById(int id)
         {
             lock (SERIES_LOCK)
             {
@@ -378,7 +373,7 @@ namespace TVRename.TheTVDB
             Logger.Info($"Forget everything, so we assume we have updates until {LatestUpdateTime}");
         }
 
-        public void ForgetShow(int tvdb, int tvmaze, bool makePlaceholder, bool useCustomLanguage, string customLanguageCode)
+        public void ForgetShow(int tvdb, int tvmaze, bool makePlaceholder, bool useCustomLanguage, string? customLanguageCode)
         {
             lock (SERIES_LOCK)
             {
@@ -388,13 +383,13 @@ namespace TVRename.TheTVDB
 
                     if (makePlaceholder)
                     {
-                        if (useCustomLanguage)
+                        if (useCustomLanguage && customLanguageCode.HasValue())
                         {
-                            AddPlaceholderSeries(tvdb,tvmaze, customLanguageCode);
+                            AddPlaceholderSeries(tvdb, tvmaze, customLanguageCode!);
                         }
                         else
                         {
-                            AddPlaceholderSeries(tvdb,tvmaze);
+                            AddPlaceholderSeries(tvdb, tvmaze);
                         }
 
                         forceReloadOn.TryAdd(tvdb, tvdb);
@@ -421,61 +416,88 @@ namespace TVRename.TheTVDB
             {
                 JObject jsonLanguagesResponse = API.GetLanguages();
 
-                LanguageList.Clear();
-
-                foreach (JToken jToken in jsonLanguagesResponse["data"])
+                lock (LANGUAGE_LOCK)
                 {
-                    JObject languageJson = (JObject) jToken;
-                    int id = (int) languageJson["id"];
-                    string name = (string) languageJson["name"];
-                    string englishName = (string) languageJson["englishName"];
-                    string abbrev = (string) languageJson["abbreviation"];
+                    LanguageList ??= new Languages();
+                    LanguageList.Clear();
 
-                    if (id != -1 && !string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(abbrev))
+                    JToken? jTokens = jsonLanguagesResponse["data"];
+                    if (jTokens is null)
                     {
-                        LanguageList.Add(new Language(id, abbrev, name, englishName));
+                        throw new SourceConsistencyException($"Data element not found in {jsonLanguagesResponse}",
+                            ShowItem.ProviderType.TheTVDB);
                     }
+
+                    LanguageList.AddRange(jTokens.Select(GenerateLanguage).Where(language => language != null));
                 }
 
-                SayNothing();
                 return true;
             }
             catch (WebException ex)
             {
-                Say("Could not connect to TVDB");
-
-                if (ex.IsUnimportant())
-                {
-                    Logger.Warn($"Error obtaining Languages from TVDB {ex.LoggableDetails()}");
-                }
-                else
-                {
-                    Logger.Error($"Error obtaining Languages from TVDB {ex.LoggableDetails()}");
-                }
-
-                LastErrorMessage = ex.Message;
-
-                if (showErrorMsgBox)
-                {
-                    CannotConnectForm ccform =
-                        new CannotConnectForm("Error while downloading languages from TVDB", ex.Message);
-
-                    DialogResult ccresult = ccform.ShowDialog();
-                    if (ccresult == DialogResult.Abort)
-                    {
-                        TVSettings.Instance.OfflineMode = true;
-                    }
-                }
-
-                LastErrorMessage = string.Empty;
-
+                HandleConnectionProblem(showErrorMsgBox, ex);
                 return false;
             }
+            finally
+            {
+                SayNothing();
+            }
         }
+
+        private static Language? GenerateLanguage(JToken jToken)
+        {
+            JObject languageJson = (JObject)jToken;
+            int? id = (int?)languageJson["id"];
+            if (!id.HasValue)
+            {
+                return null;
+            }
+
+            string name = (string)languageJson["name"];
+            string englishName = (string)languageJson["englishName"];
+            string abbrev = (string)languageJson["abbreviation"];
+
+            if (id != -1 && !string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(abbrev))
+            {
+                return new Language(id.Value, abbrev, name, englishName);
+            }
+
+            return null;
+        }
+
+        private void HandleConnectionProblem(bool showErrorMsgBox, WebException ex)
+        {
+            Say("Could not connect to TVDB");
+
+            if (ex.IsUnimportant())
+            {
+                Logger.Warn($"Error obtaining Languages from TVDB {ex.LoggableDetails()}");
+            }
+            else
+            {
+                Logger.Error($"Error obtaining Languages from TVDB {ex.LoggableDetails()}");
+            }
+
+            LastErrorMessage = ex.LoggableDetails();
+
+            if (showErrorMsgBox)
+            {
+                CannotConnectForm ccform =
+                    new CannotConnectForm("Error while downloading languages from TVDB", ex.LoggableDetails());
+
+                DialogResult ccresult = ccform.ShowDialog();
+                if (ccresult == DialogResult.Abort)
+                {
+                    TVSettings.Instance.OfflineMode = true;
+                    LastErrorMessage = string.Empty;
+                }
+            }
+        }
+
         private void AddPlaceholderSeries([NotNull] SeriesSpecifier ss)
             => AddPlaceholderSeries(ss.TvdbSeriesId, ss.TvMazeSeriesId, ss.CustomLanguageCode);
 
-        public bool GetUpdates(bool showErrorMsgBox, CancellationToken cts,[NotNull] IEnumerable<SeriesSpecifier> ss)
+        public bool GetUpdates(bool showErrorMsgBox, CancellationToken cts, IEnumerable<SeriesSpecifier> ss)
         {
             Say("Validating TheTVDB cache");
             foreach (SeriesSpecifier downloadShow in ss.Where(downloadShow => !HasSeries(downloadShow.TvdbSeriesId)))
@@ -518,7 +540,7 @@ namespace TVRename.TheTVDB
             }
 
             //We need to ask for updates in blocks of 7 days
-            //We'll keep asking until we get to a date within 7 days of today 
+            //We'll keep asking until we get to a date within 7 days of today
             //(up to a maximum of 52 - if you are this far behind then you may need multiple refreshes)
 
             List<JObject> updatesResponses = new List<JObject>();
@@ -542,13 +564,13 @@ namespace TVRename.TheTVDB
                     moreUpdates = false;
                 }
 
-                JObject jsonUpdateResponse  = GetUpdatesJson(updateFromEpochTime,requestedTime);
+                JObject jsonUpdateResponse = GetUpdatesJson(updateFromEpochTime, requestedTime);
                 if (jsonUpdateResponse is null)
                 {
                     return false;
                 }
 
-                int? numberOfResponses = GetNumResponses(jsonUpdateResponse,requestedTime);
+                int? numberOfResponses = GetNumResponses(jsonUpdateResponse, requestedTime);
                 if (numberOfResponses is null)
                 {
                     return false;
@@ -559,7 +581,7 @@ namespace TVRename.TheTVDB
                 if (numberOfResponses == 0 &&
                     updateFromEpochTime + 7.Days().TotalSeconds < DateTime.UtcNow.ToUnixTime())
                 {
-                    maxUpdateTime = updateFromEpochTime + (int) 7.Days().TotalSeconds;
+                    maxUpdateTime = updateFromEpochTime + (int)7.Days().TotalSeconds;
                 }
                 else
                 {
@@ -618,7 +640,7 @@ namespace TVRename.TheTVDB
 
             Say("Processing Updates from TVDB");
 
-            Parallel.ForEach(updatesResponses, o => ProcessUpdate(o,cts) );
+            Parallel.ForEach(updatesResponses, o => ProcessUpdate(o, cts));
 
             Say("Upgrading dirty locks");
 
@@ -629,12 +651,15 @@ namespace TVRename.TheTVDB
             return true;
         }
 
-        private int? GetNumResponses(JObject jsonUpdateResponse,DateTime requestedTime)
+        private int? GetNumResponses(JObject jsonUpdateResponse, DateTime requestedTime)
         {
             try
             {
                 JToken dataToken = jsonUpdateResponse["data"];
-
+                if (dataToken is null)
+                {
+                    return 0;
+                }
                 return !dataToken.HasValues ? 0 : ((JArray)dataToken).Count;
             }
             catch (InvalidCastException ex)
@@ -661,7 +686,7 @@ namespace TVRename.TheTVDB
             }
         }
 
-        private JObject GetUpdatesJson(long updateFromEpochTime, DateTime requestedTime)
+        private JObject? GetUpdatesJson(long updateFromEpochTime, DateTime requestedTime)
         {
             try
             {
@@ -669,10 +694,10 @@ namespace TVRename.TheTVDB
             }
             catch (WebException ex)
             {
-                Logger.LogWebException($"Error obtaining lastupdated query since (local) {requestedTime.ToLocalTime()}: Message is",ex);
-                
+                Logger.LogWebException($"Error obtaining lastupdated query since (local) {requestedTime.ToLocalTime()}: Message is", ex);
+
                 SayNothing();
-                LastErrorMessage = ex.Message;
+                LastErrorMessage = ex.LoggableDetails();
                 return null;
             }
             catch (AggregateException aex) when (aex.InnerException is WebException ex)
@@ -680,7 +705,7 @@ namespace TVRename.TheTVDB
                 Logger.LogWebException($"Error obtaining lastupdated query since (local) {requestedTime.ToLocalTime()}: Message is", ex);
 
                 SayNothing();
-                LastErrorMessage = ex.Message;
+                LastErrorMessage = ex.LoggableDetails();
                 return null;
             }
             catch (AggregateException aex) when (aex.InnerException is System.Net.Http.HttpRequestException ex)
@@ -688,7 +713,7 @@ namespace TVRename.TheTVDB
                 Logger.LogHttpRequestException($"Error obtaining lastupdated query since (local) {requestedTime.ToLocalTime()}: Message is", ex);
 
                 SayNothing();
-                LastErrorMessage = ex.Message;
+                LastErrorMessage = ex.LoggableDetails();
                 return null;
             }
         }
@@ -719,7 +744,7 @@ namespace TVRename.TheTVDB
                 float percentDirty = 100;
                 if (totaldirty > 0 || totaleps > 0)
                 {
-                    percentDirty = 100 * totaldirty / (float) totaleps;
+                    percentDirty = 100 * totaldirty / (float)totaleps;
                 }
 
                 if (totaleps > 0 && percentDirty >= TVSettings.Instance.PercentDirtyUpgrade()) // 10%
@@ -739,9 +764,16 @@ namespace TVRename.TheTVDB
         private void ProcessUpdate([NotNull] JObject jsonResponse, CancellationToken cts)
         {
             // if updatetime > localtime for item, then remove it, so it will be downloaded later
+            JToken? jToken = jsonResponse["data"];
+
+            if (jToken is null)
+            {
+                throw new SourceConsistencyException($"Could not get data element from {jsonResponse}", ShowItem.ProviderType.TheTVDB);
+            }
+
             try
             {
-                foreach (JObject seriesResponse in jsonResponse["data"].Cast<JObject>())
+                foreach (JObject seriesResponse in jToken.Cast<JObject>())
                 {
                     if (!cts.IsCancellationRequested)
                     {
@@ -753,20 +785,20 @@ namespace TVRename.TheTVDB
             {
                 Logger.Error("Did not receive the expected format of json from lastupdated query.");
                 Logger.Error(ex);
-                Logger.Error(jsonResponse["data"].ToString());
+                Logger.Error(jToken.ToString());
             }
             catch (OverflowException ex)
             {
                 Logger.Error("Could not parse the json from lastupdated query.");
                 Logger.Error(ex);
-                Logger.Error(jsonResponse["data"].ToString());
+                Logger.Error(jToken.ToString());
             }
         }
 
         private void ProcessSeriesUpdate([NotNull] JObject seriesResponse)
         {
-            int id = (int) seriesResponse["id"];
-            long time = (long) seriesResponse["lastUpdated"];
+            int id = (int)seriesResponse["id"];
+            long time = (long)seriesResponse["lastUpdated"];
 
             if (!series.ContainsKey(id))
             {
@@ -789,21 +821,33 @@ namespace TVRename.TheTVDB
             //now we wish to see if any episodes from the series have been updated. If so then mark them as dirty too
             List<JObject> episodeDefaultLangResponses = null;
             string requestedLanguageCode = selectedSeriesInfo.UseCustomLanguage
-                ? selectedSeriesInfo.TargetLanguageCode
+                ? selectedSeriesInfo.TargetLanguageCode ?? TVSettings.Instance.PreferredLanguageCode
                 : TVSettings.Instance.PreferredLanguageCode;
 
             try
             {
                 List<JObject> episodeResponses = GetEpisodes(id, requestedLanguageCode);
+                if (episodeResponses is null)
+                {
+                    //we got nothing good back from TVDB
+                    Logger.Warn($"Aborting updates for {selectedSeriesInfo.Name} ({id}) as there was an issue obtaining episodes");
+                    return;
+                }
                 if (IsNotDefaultLanguage(requestedLanguageCode))
                 {
                     episodeDefaultLangResponses = GetEpisodes(id, DefaultLanguageCode);
+                    if (episodeDefaultLangResponses is null)
+                    {
+                        //we got nothing good back from TVDB
+                        Logger.Warn($"Aborting updates for {selectedSeriesInfo.Name} ({id}) as there was an issue obtaining episodes in {DefaultLanguageCode}");
+                        return;
+                    }
                 }
 
                 Dictionary<int, Tuple<JToken, JToken>> episodesResponses =
                     MergeEpisodeResponses(episodeResponses, episodeDefaultLangResponses);
 
-                ProcessEpisodes(id, episodesResponses);
+                ProcessEpisodes(selectedSeriesInfo, episodesResponses);
             }
             catch (ShowNotFoundException ex)
             {
@@ -817,20 +861,20 @@ namespace TVRename.TheTVDB
             }
         }
 
-        private void ProcessEpisodes(int id, [NotNull] Dictionary<int, Tuple<JToken, JToken>> episodesResponses)
+        private void ProcessEpisodes([NotNull] SeriesInfo si, [NotNull] Dictionary<int, Tuple<JToken, JToken>> episodesResponses)
         {
             int numberOfNewEpisodes = 0;
             int numberOfUpdatedEpisodes = 0;
 
-            ICollection<int> oldEpisodeIds = GetOldEpisodeIds(id);
+            ICollection<int> oldEpisodeIds = GetOldEpisodeIds(si.TvdbCode);
 
             foreach (KeyValuePair<int, Tuple<JToken, JToken>> episodeData in episodesResponses)
             {
                 try
                 {
                     JToken episodeToUse = episodeData.Value.Item1 ?? episodeData.Value.Item2;
-                    long serverUpdateTime = (long) episodeToUse["lastUpdated"];
-                    (int newEps, int updatedEps) = ProcessEpisode(serverUpdateTime, episodeData, id, oldEpisodeIds);
+                    long serverUpdateTime = (long)episodeToUse["lastUpdated"];
+                    (int newEps, int updatedEps) = ProcessEpisode(serverUpdateTime, episodeData, si, oldEpisodeIds);
                     numberOfNewEpisodes += newEps;
                     numberOfUpdatedEpisodes += updatedEps;
                 }
@@ -848,30 +892,30 @@ namespace TVRename.TheTVDB
                 }
             }
 
-            Logger.Info(series[id].Name + " had " + numberOfUpdatedEpisodes +
+            Logger.Info(si.Name + " had " + numberOfUpdatedEpisodes +
                         " episodes updated and " + numberOfNewEpisodes + " new episodes ");
 
             if (oldEpisodeIds.Count > 0)
             {
                 Logger.Warn(
-                    $"{series[id].Name} had {oldEpisodeIds.Count} episodes deleted: {string.Join(",", oldEpisodeIds)}");
+                    $"{si.Name} had {oldEpisodeIds.Count} episodes deleted: {string.Join(",", oldEpisodeIds)}");
             }
 
             foreach (int episodeId in oldEpisodeIds)
             {
-                removeEpisodeIds.TryAdd(episodeId, new ExtraEp(id, episodeId));
+                removeEpisodeIds.TryAdd(episodeId, new ExtraEp(si.TvdbCode, episodeId));
             }
         }
 
         private (int newEps, int updatedEps) ProcessEpisode(long serverUpdateTime,
-            KeyValuePair<int, Tuple<JToken, JToken>> episodeData, int id, ICollection<int> oldEpisodeIds)
+            KeyValuePair<int, Tuple<JToken, JToken>> episodeData, [NotNull] SeriesInfo si, ICollection<int> oldEpisodeIds)
         {
             int newEpisodeCount = 0;
             int updatedEpisodeCount = 0;
             int serverEpisodeId = episodeData.Key;
 
             bool found = false;
-            foreach (Episode ep in series[id].Episodes.Where(ep => ep.EpisodeId == serverEpisodeId))
+            foreach (Episode ep in si.Episodes.Where(ep => ep.EpisodeId == serverEpisodeId))
             {
                 oldEpisodeIds.Remove(serverEpisodeId);
 
@@ -888,7 +932,7 @@ namespace TVRename.TheTVDB
             if (!found)
             {
                 // must be a new episode
-                extraEpisodes.TryAdd(serverEpisodeId, new ExtraEp(id, serverEpisodeId));
+                extraEpisodes.TryAdd(serverEpisodeId, new ExtraEp(si.TvdbCode, serverEpisodeId));
                 newEpisodeCount++;
             }
 
@@ -911,11 +955,11 @@ namespace TVRename.TheTVDB
         {
             try
             {
-                IEnumerable<long> updateTimes = from a in jsonUpdateResponse["data"] select (long) a["lastUpdated"];
+                IEnumerable<long> updateTimes = from a in jsonUpdateResponse["data"] select (long)a["lastUpdated"];
                 long maxUpdateTime = updateTimes.DefaultIfEmpty(0).Max();
 
                 //Add a day to take into account any timezone issues
-                long nowTime = DateTime.UtcNow.ToUnixTime() + (int) 1.Days().TotalSeconds;
+                long nowTime = DateTime.UtcNow.ToUnixTime() + (int)1.Days().TotalSeconds;
                 if (maxUpdateTime > nowTime)
                 {
                     Logger.Error(
@@ -945,9 +989,8 @@ namespace TVRename.TheTVDB
         {
             // anything with a srv_lastupdated of 0 should be marked as dirty
             // typically, this'll be placeholder series
-            foreach (KeyValuePair<int, SeriesInfo> kvp in series)
+            foreach (SeriesInfo ser in series.Select(kvp => kvp.Value))
             {
-                SeriesInfo ser = kvp.Value;
                 if (ser.SrvLastUpdated == 0 || ser.Episodes.Count == 0)
                 {
                     ser.Dirty = true;
@@ -966,10 +1009,9 @@ namespace TVRename.TheTVDB
             brute //keeps asking until we get a 0 length response
         }
 
-        [CanBeNull]
-        private List<JObject> GetEpisodes(int id, string lang)
+        private List<JObject>? GetEpisodes(int id, string lang)
         {
-            //Now deal with obtaining any episodes for the series 
+            //Now deal with obtaining any episodes for the series
             //tvDB only gives us responses in blocks of 100, so we need to iterate over the pages until we get one with <100 rows
             //We push the results into a bag to use later
             //If there is a problem with the while method then we can be proactive by using /series/{id}/episodes/summary to get the total
@@ -987,12 +1029,23 @@ namespace TVRename.TheTVDB
                     episodeResponses.Add(jsonEpisodeResponse);
                     try
                     {
-                        int numberOfResponses = ((JArray) jsonEpisodeResponse["data"]).Count;
+                        JToken? jToken = jsonEpisodeResponse["data"];
+
+                        if (jToken is null)
+                        {
+                            throw new SourceConsistencyException($"Data element not found in {jsonEpisodeResponse}", ShowItem.ProviderType.TheTVDB);
+                        }
+                        int numberOfResponses = ((JArray)jToken).Count;
                         bool moreResponses;
 
                         if (TVSettings.TVDBPagingMethod == PagingMethod.proper)
                         {
-                            JToken x = jsonEpisodeResponse["links"]["next"];
+                            JToken x = jsonEpisodeResponse["links"]?["next"];
+
+                            if (x is null)
+                            {
+                                throw new SourceConsistencyException($"links/next element not found in {jsonEpisodeResponse}", ShowItem.ProviderType.TheTVDB);
+                            }
                             moreResponses = !string.IsNullOrWhiteSpace(x.ToString());
                             Logger.Info(
                                 $"Page {pageNumber} of {GetSeries(id)?.Name} had {numberOfResponses} episodes listed in {lang} with {(moreResponses ? "" : "no ")}more to come");
@@ -1067,18 +1120,18 @@ namespace TVRename.TheTVDB
         }
 
         private int GetLanguageId() =>
-            LanguageList.GetLanguageFromCode(TVSettings.Instance.PreferredLanguageCode)?.Id ?? 7;
+            LanguageList?.GetLanguageFromCode(TVSettings.Instance.PreferredLanguageCode)?.Id ?? 7;
 
-        private int GetDefaultLanguageId() => LanguageList.GetLanguageFromCode(DefaultLanguageCode)?.Id ?? 7;
+        private int GetDefaultLanguageId() => LanguageList?.GetLanguageFromCode(DefaultLanguageCode)?.Id ?? 7;
 
-        public void AddOrUpdateEpisode([NotNull] Episode e)
+        public void AddOrUpdateEpisode(Episode e)
         {
             lock (SERIES_LOCK)
             {
                 if (!series.ContainsKey(e.SeriesId))
                 {
                     throw new SourceConsistencyException(
-                        $"Can't find the series to add the episode to (TheTVDB). EpId:{e.EpisodeId} SeriesId:{e.SeriesId} {e.Name}",ShowItem.ProviderType.TheTVDB);
+                        $"Can't find the series to add the episode to (TheTVDB). EpId:{e.EpisodeId} SeriesId:{e.SeriesId} {e.Name}", ShowItem.ProviderType.TheTVDB);
                 }
 
                 SeriesInfo ser = series[e.SeriesId];
@@ -1092,13 +1145,11 @@ namespace TVRename.TheTVDB
             return forceReloadOn.ContainsKey(code) || !series.ContainsKey(code);
         }
 
-        [CanBeNull]
-        private SeriesInfo DownloadSeriesNow([NotNull] SeriesSpecifier deets, bool episodesToo, bool bannersToo) =>
+        private SeriesInfo? DownloadSeriesNow([NotNull] SeriesSpecifier deets, bool episodesToo, bool bannersToo) =>
             DownloadSeriesNow(deets.TvdbSeriesId, episodesToo, bannersToo, deets.UseCustomLanguage,
                 deets.CustomLanguageCode);
 
-        [CanBeNull]
-        private SeriesInfo DownloadSeriesNow(int code, bool episodesToo, bool bannersToo, bool useCustomLangCode,
+        private SeriesInfo? DownloadSeriesNow(int code, bool episodesToo, bool bannersToo, bool useCustomLangCode,
             string langCode)
         {
             if (code == 0)
@@ -1124,7 +1175,7 @@ namespace TVRename.TheTVDB
                 }
             }
 
-            SeriesInfo si;
+            SeriesInfo? si;
             try
             {
                 si = DownloadSeriesInfo(code, requestedLanguageCode);
@@ -1133,15 +1184,6 @@ namespace TVRename.TheTVDB
             {
                 SayNothing();
                 return null;
-            }
-
-            Language languageFromCode = LanguageList.GetLanguageFromCode(requestedLanguageCode);
-            if (languageFromCode is null)
-            {
-                SayNothing();
-                throw new ArgumentException(
-                    $"Requested language ({requestedLanguageCode}) not found in Language Cache, cache has ({LanguageList.Select(language => language.Abbreviation).ToCsv()})",
-                    requestedLanguageCode);
             }
 
             lock (SERIES_LOCK)
@@ -1165,7 +1207,10 @@ namespace TVRename.TheTVDB
 
             if (episodesToo || forceReload)
             {
-                ReloadEpisodes(code, useCustomLangCode, langCode);
+                if (si != null)
+                {
+                    ReloadEpisodes(code, useCustomLangCode, langCode, si);
+                }
             }
 
             if (bannersToo || forceReload)
@@ -1235,17 +1280,15 @@ namespace TVRename.TheTVDB
             }
             int requestedLangId = languageFromCode.Id;
 
-            JObject seriesData = (JObject) jsonResponse["data"];
-
+            JObject seriesData = (JObject)jsonResponse["data"];
+            if (seriesData is null)
+            {
+                throw new SourceConsistencyException($"Data element not found in {jsonResponse}", ShowItem.ProviderType.TheTVDB);
+            }
             SeriesInfo si;
             if (isNotDefaultLanguage)
             {
-                if (jsonDefaultLangResponse is null)
-                {
-                    throw new ArgumentNullException(nameof(jsonDefaultLangResponse));
-                }
-
-                JObject seriesDataDefaultLang = (JObject) jsonDefaultLangResponse["data"];
+                JObject seriesDataDefaultLang = (JObject)jsonDefaultLangResponse["data"] ?? throw new InvalidOperationException();
 
                 si = new SeriesInfo(seriesData, seriesDataDefaultLang, requestedLangId);
             }
@@ -1279,6 +1322,7 @@ namespace TVRename.TheTVDB
             return (jsonResponse, jsonDefaultLangResponse);
         }
 
+        [NotNull]
         private JObject DownloadSeriesJson(int code, string requestedLanguageCode)
         {
             JObject jsonResponse;
@@ -1297,9 +1341,9 @@ namespace TVRename.TheTVDB
 
                     if (API.TvdbIsUp() && !CanFindEpisodesFor(code, requestedLanguageCode))
                     {
-                        LastErrorMessage = ex.Message;
+                        LastErrorMessage = ex.LoggableDetails();
                         string msg = $"Show with TVDB Id {code} is no longer found on TVDB. Please Update";
-                        throw new ShowNotFoundException(code,msg,ShowItem.ProviderType.TheTVDB,ShowItem.ProviderType.TheTVDB);
+                        throw new ShowNotFoundException(code, msg, ShowItem.ProviderType.TheTVDB, ShowItem.ProviderType.TheTVDB);
                     }
                 }
 
@@ -1314,7 +1358,7 @@ namespace TVRename.TheTVDB
                 }
 
                 SayNothing();
-                LastErrorMessage = ex.Message;
+                LastErrorMessage = ex.LoggableDetails();
                 throw new SourceConnectivityException();
             }
 
@@ -1356,14 +1400,19 @@ namespace TVRename.TheTVDB
                 JObject jsonActorsResponse = API.GetSeriesActors(code);
 
                 si.ClearActors();
-                foreach (JToken jsonActor in jsonActorsResponse["data"])
+                JToken? jsonActors = jsonActorsResponse["data"];
+                if (jsonActors is null)
                 {
-                    int actorId = (int) jsonActor["id"];
-                    string actorImage = (string) jsonActor["image"];
-                    string actorName = (string) jsonActor["name"];
-                    string actorRole = (string) jsonActor["role"];
-                    int actorSeriesId = (int) jsonActor["seriesId"];
-                    int actorSortOrder = (int) jsonActor["sortOrder"];
+                    throw new SourceConsistencyException($"Data element not found in {jsonActorsResponse}", ShowItem.ProviderType.TheTVDB);
+                }
+                foreach (JToken jsonActor in jsonActors)
+                {
+                    int actorId = (int)jsonActor["id"];
+                    string actorImage = (string)jsonActor["image"];
+                    string actorName = (string)jsonActor["name"] ?? throw new SourceConsistencyException("No Actor", ShowItem.ProviderType.TheTVDB);
+                    string actorRole = (string)jsonActor["role"];
+                    int actorSeriesId = (int)jsonActor["seriesId"];
+                    int actorSortOrder = (int)jsonActor["sortOrder"];
 
                     si.AddActor(new Actor(actorId, actorImage, actorName, actorRole, actorSeriesId,
                         actorSortOrder));
@@ -1373,9 +1422,9 @@ namespace TVRename.TheTVDB
             {
                 if (ex.Response is null) //probably a timeout
                 {
-                    Logger.LogWebException($"Unble to obtain actors for {series[code].Name}",ex);
+                    Logger.LogWebException($"Unble to obtain actors for {series[code].Name}", ex);
                 }
-                else if (((HttpWebResponse) ex.Response).StatusCode == HttpStatusCode.NotFound)
+                else if (((HttpWebResponse)ex.Response).StatusCode == HttpStatusCode.NotFound)
                 {
                     Logger.Info(
                         $"No actors found for {series[code].Name} using url {ex.Response.ResponseUri.AbsoluteUri}");
@@ -1385,7 +1434,7 @@ namespace TVRename.TheTVDB
                     Logger.LogWebException($"Unble to obtain actors for {series[code].Name}", ex);
                 }
 
-                LastErrorMessage = ex.Message;
+                LastErrorMessage = ex.LoggableDetails();
             }
         }
 
@@ -1409,9 +1458,14 @@ namespace TVRename.TheTVDB
         {
             foreach (JObject response in bannerResponses)
             {
+                JToken? jToken = response["data"];
+                if (jToken is null)
+                {
+                    throw new SourceConsistencyException($"Data element not found in {response}", ShowItem.ProviderType.TheTVDB);
+                }
                 try
                 {
-                    foreach (Banner b in response["data"]
+                    foreach (Banner b in jToken
                         .Cast<JObject>()
                         .Select(bannerData => new Banner(si.TvdbCode, bannerData, languageId)))
                     {
@@ -1427,7 +1481,7 @@ namespace TVRename.TheTVDB
                     Logger.Error(ex,
                         $"Did not receive the expected format of json from when downloading banners for series {code} in {languageCode}");
 
-                    Logger.Error(response["data"].ToString());
+                    Logger.Error(jToken.ToString());
                 }
             }
         }
@@ -1460,7 +1514,7 @@ namespace TVRename.TheTVDB
             string txt;
             if (series.ContainsKey(code))
             {
-                txt = series[code].Name;
+                txt = series[code].Name.HasValue() ? series[code].Name : "Code " + code;
             }
             else
             {
@@ -1484,7 +1538,7 @@ namespace TVRename.TheTVDB
             return txt;
         }
 
-        private void ReloadEpisodes(int code, bool useCustomLangCode, string langCode)
+        private void ReloadEpisodes(int code, bool useCustomLangCode, string langCode, SeriesInfo si)
         {
             string requestLangCode = useCustomLangCode ? langCode : TVSettings.Instance.PreferredLanguageCode;
             List<JObject> episodePrefLangResponses = GetEpisodes(code, requestLangCode);
@@ -1505,24 +1559,24 @@ namespace TVRename.TheTVDB
                 try
                 {
                     //TODO - Establish whether this has any value?
-                    UpdateEpisodeNow(code, prefLangEpisode,defltLangEpisode);
+                    UpdateEpisodeNow(code, prefLangEpisode, defltLangEpisode, si);
                 }
                 catch (InvalidCastException ex)
                 {
                     Logger.Error(ex,
-                        $"<TVDB ISSUE?>: Did not recieve the expected format of json for {episodeId}. {prefLangEpisode?.ToString()} ::: {defltLangEpisode?.ToString()}");
+                        $"<TVDB ISSUE?>: Did not recieve the expected format of json for {episodeId}. {prefLangEpisode} ::: {defltLangEpisode}");
                 }
                 catch (OverflowException ex)
                 {
                     Logger.Error(ex,
-                        $"<TVDB ISSUE?>: Could not parse the episode json from {episodeId}. {prefLangEpisode?.ToString()} ::: {defltLangEpisode?.ToString()}");
+                        $"<TVDB ISSUE?>: Could not parse the episode json from {episodeId}. {prefLangEpisode} ::: {defltLangEpisode}");
                 }
             });
         }
 
         [NotNull]
         private static Dictionary<int, Tuple<JToken, JToken>> MergeEpisodeResponses(
-            [CanBeNull] List<JObject> episodeResponses, [CanBeNull] List<JObject> episodeDefaultLangResponses)
+            List<JObject>? episodeResponses, List<JObject>? episodeDefaultLangResponses)
         {
             Dictionary<int, Tuple<JToken, JToken>> episodeIds = new Dictionary<int, Tuple<JToken, JToken>>();
 
@@ -1530,9 +1584,14 @@ namespace TVRename.TheTVDB
             {
                 foreach (JObject epResponse in episodeResponses)
                 {
-                    foreach (JToken episodeData in epResponse["data"])
+                    JToken? episodeDatas = epResponse["data"];
+                    if (episodeDatas is null)
                     {
-                        int x = (int) episodeData["id"];
+                        throw new SourceConsistencyException($"Could not get data element from {epResponse}", ShowItem.ProviderType.TheTVDB);
+                    }
+                    foreach (JToken episodeData in episodeDatas)
+                    {
+                        int x = (int)episodeData["id"];
                         if (x > 0)
                         {
                             if (episodeIds.ContainsKey(x))
@@ -1552,9 +1611,14 @@ namespace TVRename.TheTVDB
             {
                 foreach (JObject epResponse in episodeDefaultLangResponses)
                 {
-                    foreach (JToken episodeData in epResponse["data"])
+                    JToken? episodeDatas = epResponse["data"];
+                    if (episodeDatas is null)
                     {
-                        int x = (int) episodeData["id"];
+                        throw new SourceConsistencyException($"Could not get data element from {epResponse}", ShowItem.ProviderType.TheTVDB);
+                    }
+                    foreach (JToken episodeData in episodeDatas)
+                    {
+                        int x = (int)episodeData["id"];
                         if (x > 0)
                         {
                             if (episodeIds.ContainsKey(x))
@@ -1578,7 +1642,7 @@ namespace TVRename.TheTVDB
 
         private static bool IsNotDefaultLanguage(string languageCode) => DefaultLanguageCode != languageCode;
 
-        private bool DownloadEpisodeNow(int seriesId, int episodeId, string requestLangCode , bool dvdOrder = false)
+        private bool DownloadEpisodeNow(int seriesId, int episodeId, string requestLangCode, bool dvdOrder = false)
         {
             if (episodeId == 0)
             {
@@ -1595,7 +1659,8 @@ namespace TVRename.TheTVDB
             Episode ep = FindEpisodeById(episodeId);
             string eptxt = EpisodeDescription(dvdOrder, episodeId, ep);
 
-            Say($"{series[seriesId].Name} ({eptxt}) in {requestLangCode}");
+            SeriesInfo seriesInfo = series[seriesId];
+            Say($"{seriesInfo.Name} ({eptxt}) in {requestLangCode}");
 
             JObject jsonEpisodeResponse;
             JObject jsonEpisodeDefaultLangResponse = new JObject();
@@ -1620,24 +1685,24 @@ namespace TVRename.TheTVDB
                     Logger.Error($"Error obtaining episode [{episodeId}]: " + ex.LoggableDetails());
                 }
 
-                LastErrorMessage = ex.Message;
+                LastErrorMessage = ex.LoggableDetails();
                 SayNothing();
                 return false;
             }
 
-            JObject jsonResponseData = (JObject)jsonEpisodeResponse["data"];
+            JObject jsonResponseData = (JObject)jsonEpisodeResponse["data"] ?? throw new SourceConsistencyException("No Data in Ep Response", ShowItem.ProviderType.TheTVDB);
             if (IsNotDefaultLanguage(requestLangCode))
             {
                 JObject seriesDataDefaultLang = (JObject)jsonEpisodeDefaultLangResponse["data"];
-                return UpdateEpisodeNow(seriesId, jsonResponseData, seriesDataDefaultLang);
+                return UpdateEpisodeNow(seriesId, jsonResponseData, seriesDataDefaultLang, seriesInfo);
             }
             else
             {
-                return UpdateEpisodeNow(seriesId, jsonResponseData,null);
+                return UpdateEpisodeNow(seriesId, jsonResponseData, null, seriesInfo);
             }
         }
 
-        private bool UpdateEpisodeNow(int seriesId, JToken jsonResponseData, JToken seriesDataDefaultLang)
+        private bool UpdateEpisodeNow(int seriesId, JToken jsonResponseData, JToken? seriesDataDefaultLang, SeriesInfo si)
         {
             if (!series.ContainsKey(seriesId))
             {
@@ -1646,9 +1711,9 @@ namespace TVRename.TheTVDB
 
             try
             {
-                Episode e = seriesDataDefaultLang !=null
-                    ? new Episode(seriesId, (JObject)jsonResponseData, (JObject)seriesDataDefaultLang)
-                    : new Episode(seriesId, (JObject)jsonResponseData);
+                Episode e = seriesDataDefaultLang != null
+                    ? new Episode(seriesId, (JObject)jsonResponseData, (JObject)seriesDataDefaultLang, si)
+                    : new Episode(seriesId, (JObject)jsonResponseData, si);
 
                 if (e.Ok())
                 {
@@ -1671,7 +1736,7 @@ namespace TVRename.TheTVDB
         }
 
         [NotNull]
-        private static string EpisodeDescription(bool dvdOrder, int episodeId, [CanBeNull] Episode ep)
+        private static string EpisodeDescription(bool dvdOrder, int episodeId, Episode? ep)
         {
             if (ep == null)
             {
@@ -1688,23 +1753,24 @@ namespace TVRename.TheTVDB
 
         private void AddPlaceholderSeries(int tvdb, int tvmaze)
         {
-            series[tvdb] = new SeriesInfo(tvdb,tvmaze) {Dirty = true};
+            series[tvdb] = new SeriesInfo(tvdb, tvmaze) { Dirty = true };
         }
 
         private void AddPlaceholderSeries(int tvdb, int tvmaze, string customLanguageCode)
         {
-            series[tvdb] = new SeriesInfo(tvdb,tvmaze, customLanguageCode) {Dirty = true};
+            series[tvdb] = new SeriesInfo(tvdb, tvmaze, customLanguageCode) { Dirty = true };
         }
 
-        public bool EnsureUpdated([NotNull] SeriesSpecifier seriesd, bool bannersToo)
+        public bool EnsureUpdated(SeriesSpecifier seriesd, bool bannersToo)
         {
-            if (seriesd.Provider == ShowItem.ProviderType.TVmaze) {
+            if (seriesd.Provider == ShowItem.ProviderType.TVmaze)
+            {
                 throw new SourceConsistencyException($"Asked to update {seriesd.Name} from TV Maze, but the Id is not for TV maze.", ShowItem.ProviderType.TVmaze);
             }
 
-            int code = seriesd.TvdbSeriesId; 
-            
-            if (DoWeForceReloadFor(code) || series[code].Episodes.Count == 0) 
+            int code = seriesd.TvdbSeriesId;
+
+            if (DoWeForceReloadFor(code) || series[code].Episodes.Count == 0)
             {
                 return DownloadSeriesNow(seriesd, true, bannersToo) != null; // the whole lot!
             }
@@ -1718,9 +1784,13 @@ namespace TVRename.TheTVDB
                 ok = DownloadSeriesNow(seriesd, false, bannersToo) != null;
             }
 
-            foreach (Episode e in series[code]?.Episodes.Where(e => e.Dirty && e.EpisodeId > 0))
+            ICollection<Episode> collection = series[code]?.Episodes;
+            if (collection != null)
             {
-                extraEpisodes.TryAdd(e.EpisodeId, new ExtraEp(e.SeriesId, e.EpisodeId));
+                foreach (Episode e in collection.Where(e => e.Dirty && e.EpisodeId > 0))
+                {
+                    extraEpisodes.TryAdd(e.EpisodeId, new ExtraEp(e.SeriesId, e.EpisodeId));
+                }
             }
 
             Parallel.ForEach(extraEpisodes, ee =>
@@ -1801,10 +1871,10 @@ namespace TVRename.TheTVDB
                         Logger.Error($"Error obtaining results for search term '{text}': {ex.LoggableDetails()}");
                     }
 
-                    LastErrorMessage = ex.Message;
+                    LastErrorMessage = ex.LoggableDetails();
                     SayNothing();
                 }
-                else if (((HttpWebResponse) ex.Response).StatusCode == HttpStatusCode.NotFound)
+                else if (((HttpWebResponse)ex.Response).StatusCode == HttpStatusCode.NotFound)
                 {
                     Logger.Info(
                         $"Could not find any search results for {text} in {TVSettings.Instance.PreferredLanguageCode}");
@@ -1820,7 +1890,7 @@ namespace TVRename.TheTVDB
                         Logger.Error($"Error obtaining results for search term '{text}': {ex.LoggableDetails()}");
                     }
 
-                    LastErrorMessage = ex.Message;
+                    LastErrorMessage = ex.LoggableDetails();
                     SayNothing();
                 }
             }
@@ -1846,10 +1916,10 @@ namespace TVRename.TheTVDB
                                 $"Error obtaining results for search term '{text}' in {DefaultLanguageCode}: {ex.LoggableDetails()}");
                         }
 
-                        LastErrorMessage = ex.Message;
+                        LastErrorMessage = ex.LoggableDetails();
                         SayNothing();
                     }
-                    else if (((HttpWebResponse) ex.Response).StatusCode == HttpStatusCode.NotFound)
+                    else if (((HttpWebResponse)ex.Response).StatusCode == HttpStatusCode.NotFound)
                     {
                         Logger.Info(
                             $"Could not find any search results for {text} in {DefaultLanguageCode}");
@@ -1859,7 +1929,7 @@ namespace TVRename.TheTVDB
                         Logger.Error(
                             $"Error obtaining {ex.Response.ResponseUri} for search term '{text}' in {DefaultLanguageCode}: {ex.LoggableDetails()}");
 
-                        LastErrorMessage = ex.Message;
+                        LastErrorMessage = ex.LoggableDetails();
                         SayNothing();
                     }
                 }
@@ -1871,7 +1941,7 @@ namespace TVRename.TheTVDB
             }
 
             if (jsonSearchDefaultLangResponse != null)
-                //we also want to search for search terms that match in default language
+            //we also want to search for search terms that match in default language
             {
                 ProcessSearchResult(jsonSearchDefaultLangResponse, GetDefaultLanguageId());
             }
@@ -1879,9 +1949,14 @@ namespace TVRename.TheTVDB
 
         private void ProcessSearchResult([NotNull] JObject jsonResponse, int languageId)
         {
+            JToken? jToken = jsonResponse["data"];
+            if (jToken is null)
+            {
+                throw new SourceConsistencyException($"Could not get data element from {jsonResponse}", ShowItem.ProviderType.TheTVDB);
+            }
             try
             {
-                foreach (SeriesInfo si in jsonResponse["data"]
+                foreach (SeriesInfo si in jToken
                     .Cast<JObject>()
                     .Select(seriesResponse => new SeriesInfo(seriesResponse, languageId, true)))
                 {
@@ -1902,14 +1977,13 @@ namespace TVRename.TheTVDB
             {
                 Logger.Error("<TVDB ISSUE?>: Did not receive the expected format of json from search results.");
                 Logger.Error(ex);
-                Logger.Error(jsonResponse["data"].ToString());
+                Logger.Error(jToken.ToString());
             }
         }
 
-        // Next episode to air of a given show		
+        // Next episode to air of a given show
         /*
-                [CanBeNull]
-                public Episode NextAiring(int code)
+                public Episode? NextAiring(int code)
                 {
                     if (!series.ContainsKey(code) || series[code].AiredSeasons.Count == 0)
                     {
@@ -1976,11 +2050,11 @@ namespace TVRename.TheTVDB
         {
             lock (SERIES_LOCK)
             {
-                CachePersistor.SaveCache(series, cacheFile,LatestUpdateTime.LastSuccessfulServerUpdateTimecode());
+                CachePersistor.SaveCache(series, cacheFile, LatestUpdateTime.LastSuccessfulServerUpdateTimecode());
             }
         }
 
-        public void UpdateSeries([NotNull] SeriesInfo si)
+        public void UpdateSeries(SeriesInfo si)
         {
             lock (SERIES_LOCK)
             {
@@ -2006,7 +2080,7 @@ namespace TVRename.TheTVDB
                         if (!series.ContainsKey(b.SeriesId))
                         {
                             throw new SourceConsistencyException(
-                                $"Can't find the series to add the banner {b.BannerId} to (TheTVDB). {seriesId},{b.SeriesId}",ShowItem.ProviderType.TheTVDB);
+                                $"Can't find the series to add the banner {b.BannerId} to (TheTVDB). {seriesId},{b.SeriesId}", ShowItem.ProviderType.TheTVDB);
                         }
 
                         SeriesInfo ser = series[b.SeriesId];

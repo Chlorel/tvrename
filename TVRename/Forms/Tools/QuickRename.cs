@@ -8,7 +8,7 @@ using DirectoryInfo = Alphaleonis.Win32.Filesystem.DirectoryInfo;
 
 namespace TVRename.Forms.Tools
 {
-    public partial class QuickRename : Form
+    public partial class QuickRename : Form, IDialogParent
     {
         private readonly TVDoc mDoc;
         private readonly UI parent;
@@ -36,6 +36,20 @@ namespace TVRename.Forms.Tools
             cbShowList.SelectedItem = "<Auto>";
         }
 
+        private delegate void ShowChildConsumer(Form childForm);
+        public void ShowChildDialog(Form childForm)
+        {
+            if (InvokeRequired)
+            {
+                ShowChildConsumer d = ShowChildDialog;
+                Invoke(d, childForm);
+            }
+            else
+            {
+                childForm.ShowDialog(this);
+            }
+        }
+
         private void Panel1_DragDrop(object sender, [NotNull] DragEventArgs e)
         {
             Logger.Info("Starting quick rename.");
@@ -44,7 +58,7 @@ namespace TVRename.Forms.Tools
 
             foreach (FileInfo droppedFile in files.Select(droppedFileName => new FileInfo(droppedFileName)))
             {
-                ProcessUnknown(droppedFile);
+                ProcessUnknown(droppedFile,this);
             }
 
             parent.FillActionList(true);
@@ -63,7 +77,7 @@ namespace TVRename.Forms.Tools
 
             foreach (FileInfo subFile in droppedDir.GetFiles())
             {
-                ProcessUnknown(subFile);
+                ProcessUnknown(subFile,this);
             }
 
             foreach (DirectoryInfo subFile in droppedDir.GetDirectories())
@@ -72,7 +86,7 @@ namespace TVRename.Forms.Tools
             }
         }
 
-        private void ProcessUnknown([NotNull] FileInfo droppedFile)
+        private void ProcessUnknown([NotNull] FileInfo droppedFile, IDialogParent owner)
         {
             if ((droppedFile.Attributes & FileAttributes.Directory) == FileAttributes.Directory)
             {
@@ -80,11 +94,11 @@ namespace TVRename.Forms.Tools
             }
             else
             {
-                ProcessFile(droppedFile);
+                ProcessFile(droppedFile,owner);
             }
         }
 
-        private void ProcessFile([NotNull] FileInfo droppedFile)
+        private void ProcessFile([NotNull] FileInfo droppedFile, IDialogParent owner)
         {
             if ((droppedFile.Attributes & FileAttributes.Directory) == FileAttributes.Directory)
             {
@@ -98,6 +112,9 @@ namespace TVRename.Forms.Tools
                 return;
             }
 
+            // Note that the extension of the file may not be fi.extension as users can put ".mkv.t" for example as an extension
+            string otherExtension = TVSettings.Instance.FileHasUsefulExtensionDetails(droppedFile, true);
+
             ShowItem bestShow = (string)cbShowList.SelectedItem == "<Auto>"
                 ? FinderHelper.FindBestMatchingShow(droppedFile, mDoc.Library.Shows)
                 : mDoc.Library.Shows.FirstOrDefault(item => item.ShowName == (string)cbShowList.SelectedItem);
@@ -106,7 +123,7 @@ namespace TVRename.Forms.Tools
             {
                 if (TVSettings.Instance.AutoAddAsPartOfQuickRename)
                 {
-                    List<ShowItem> addedShows = FinderHelper.FindShows(new List<string> {droppedFile.Name}, mDoc);
+                    List<ShowItem> addedShows = FinderHelper.FindShows(new List<string> {droppedFile.Name}, mDoc,owner);
                     bestShow = addedShows.FirstOrDefault();
                 }
 
@@ -129,7 +146,7 @@ namespace TVRename.Forms.Tools
                 ProcessedEpisode episode = bestShow.GetEpisode(seasonNum, episodeNum);
 
                 string filename = TVSettings.Instance.FilenameFriendly(
-                    TVSettings.Instance.NamingStyle.NameFor(episode, droppedFile.Extension,
+                    TVSettings.Instance.NamingStyle.NameFor(episode, otherExtension,
                         droppedFile.DirectoryName.Length));
 
                 FileInfo targetFile =
@@ -146,7 +163,7 @@ namespace TVRename.Forms.Tools
                 mDoc.TheActionList.Add(new ActionCopyMoveRename(droppedFile, targetFile, episode,mDoc));
 
                 // if we're copying/moving a file across, we might also want to make a thumbnail or NFO for it
-                mDoc.TheActionList.AddRange(new DownloadIdentifiersController().ProcessEpisode(episode, targetFile));
+                mDoc.TheActionList.AddNullableRange(new DownloadIdentifiersController().ProcessEpisode(episode, targetFile));
 
                 //If keep together is active then we may want to copy over related files too
                 if (TVSettings.Instance.KeepTogether)

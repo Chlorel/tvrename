@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.Runtime.Remoting;
 using System.Windows.Forms;
 using Alphaleonis.Win32.Filesystem;
 using JetBrains.Annotations;
@@ -41,8 +42,8 @@ namespace TVRename.App
         /// </summary>
         protected override void OnCreateMainForm()
         {
-            CommandLineArgs clargs = new CommandLineArgs(CommandLineArgs);
-            if (clargs.Hide || !Environment.UserInteractive)
+            CommandLineArgs parameters = new CommandLineArgs(CommandLineArgs);
+            if (parameters.Hide || !Environment.UserInteractive)
             {
                 SplashScreen.SafeInvoke(
                     () => ((TVRenameSplash)SplashScreen).Visible = false, true);
@@ -55,7 +56,7 @@ namespace TVRename.App
             // Update RegVersion to bring the WebBrowser up to speed
             RegistryHelper.UpdateBrowserEmulationVersion();
 
-            TVDoc doc = LoadSettings(clargs);
+            TVDoc doc = LoadSettings(parameters);
 
             if (TVSettings.Instance.mode == TVSettings.BetaMode.BetaToo || TVSettings.Instance.ShareLogs)
             {
@@ -63,11 +64,19 @@ namespace TVRename.App
             }
 
             // Show user interface
-            UI ui = new UI(doc, (TVRenameSplash)SplashScreen, !clargs.Unattended && !clargs.Hide && Environment.UserInteractive);
+            UI ui = new UI(doc, (TVRenameSplash)SplashScreen, !parameters.Unattended && !parameters.Hide && Environment.UserInteractive);
             ui.Text = ui.Text + " " + Helpers.DisplayVersion;
 
             // Bind IPC actions to the form, this allows another instance to trigger form actions
-            RemoteClient.Bind(ui);
+            try
+            {
+                RemoteClient.Bind(ui);
+            }
+            catch (RemotingException ex)
+            {
+                Logger.Warn(
+                    $"Could not create IPC Port: {ex.Message} : TV Rename WIll nto be able to accept incoming commands");
+            }
 
             MainForm = ui;
         }

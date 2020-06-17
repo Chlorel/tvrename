@@ -7,14 +7,16 @@
 // 
 
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using JetBrains.Annotations;
 
 namespace TVRename
 {
-    public class ItemList : List<Item>
+    public sealed class ItemList : List<Item>, INotifyPropertyChanged
     {
-        public void Add([CanBeNull] ItemList slil)
+        public void Add(IEnumerable<Item>? slil)
         {
             if (slil is null)
             {
@@ -28,21 +30,32 @@ namespace TVRename
         }
 
         [NotNull]
-        public IEnumerable<Action> Actions( ) => this.OfType<Action>();
+        public List<Action> Actions => this.OfType<Action>().ToList();
 
         [NotNull]
-        public IEnumerable<ItemMissing> MissingItems() => this.OfType<ItemMissing>();
+        public List<ItemMissing> Missing => this.OfType<ItemMissing>().ToList();
 
         [NotNull]
-        public IEnumerable<ActionCopyMoveRename> CopyMoveItems() => this.OfType<ActionCopyMoveRename>();
+        public List<ActionCopyMoveRename> CopyMove => this.OfType<ActionCopyMoveRename>().Where(a=>a.Operation!=ActionCopyMoveRename.Op.rename).ToList();
 
-        public void Replace(ItemList toRemove, ItemList newList)
+        [NotNull]
+        public List<ActionTDownload> DownloadTorrents => this.OfType<ActionTDownload>().ToList();
+
+        [NotNull]
+        public List<ActionDownloadImage> SaveImages => this.OfType<ActionDownloadImage>().ToList();
+
+        [NotNull]
+        public List<ActionCopyMoveRename> CopyMoveRename => this.OfType<ActionCopyMoveRename>().ToList();
+
+        public void Replace(IEnumerable<Item>? toRemove, IEnumerable<Item>? newList)
         {
             Remove(toRemove);
             Add(newList);
         }
 
-        internal void Remove([CanBeNull] IEnumerable<Item> toRemove)
+        public List<Item> TorrentActions => this.Where(a => a is ActionTRemove || a is ActionTDownload).ToList();
+
+        internal void Remove(IEnumerable<Item>? toRemove)
         {
             if (toRemove is null)
             {
@@ -53,6 +66,25 @@ namespace TVRename
             {
                 Remove(sli);
             }
+        }
+
+        public void NotifyUpdated()
+        {
+            OnPropertyChanged();
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        [NotifyPropertyChangedInvocator]
+        private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            // ReSharper disable once ConstantConditionalAccessQualifier
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        public void Replace(IEnumerable<Item>? toRemove, Item? newItem)
+        {
+            Replace(toRemove,new List<Item>{newItem});
         }
     }
 }

@@ -39,34 +39,35 @@ namespace TVRename
         {
             foreach (string efi in TVSettings.Instance.DownloadFolders)
             {
-                if (!Directory.Exists(efi)) //Does not exist
-                {
-                    Logger.Warn($"Could not watch {efi} as it does not exist.");
-                    continue;
-                }
-
-                if ((File.GetAttributes(efi) & System.IO.FileAttributes.Directory) != System.IO.FileAttributes.Directory)  // not a folder
-                {
-                    Logger.Warn($"Could not watch {efi} as it is not a file.");
-                    continue;
-                }
-
-                if (!efi.IsValidDirectory())  // not a valid folder
-                {
-                    Logger.Error($"Could not watch {efi} as it is a path with invalid characters.");
-                    continue;
-                }
-
                 try
                 {
-                    System.IO.FileSystemWatcher watcher = new System.IO.FileSystemWatcher(efi);
+                    if (!Directory.Exists(efi)) //Does not exist
+                    {
+                        Logger.Warn($"Could not watch {efi} as it does not exist.");
+                        continue;
+                    }
+
+                    if ((File.GetAttributes(efi) & System.IO.FileAttributes.Directory) != System.IO.FileAttributes.Directory)  // not a folder
+                    {
+                        Logger.Warn($"Could not watch {efi} as it is not a file.");
+                        continue;
+                    }
+
+                    if (!efi.IsValidDirectory())  // not a valid folder
+                    {
+                        Logger.Error($"Could not watch {efi} as it is a path with invalid characters.");
+                        continue;
+                    }
+
+                    System.IO.FileSystemWatcher watcher = new System.IO.FileSystemWatcher(efi)
+                    {
+                        IncludeSubdirectories = true,
+                        EnableRaisingEvents = true
+                    };
+
                     watcher.Changed += watcher_Changed;
                     watcher.Created += watcher_Changed;
                     watcher.Renamed += watcher_Changed;
-                    //watcher.Deleted += new FileSystemEventHandler(watcher_Changed);
-                    //watcher.NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.CreationTime;
-                    watcher.IncludeSubdirectories = true;
-                    watcher.EnableRaisingEvents = true;
                     watchers.Add(watcher);
                     Logger.Info("Starting FileSystemWatcher for {0}", efi);
                 }
@@ -82,8 +83,8 @@ namespace TVRename
             Logger.Trace("Restarted delay timer");
             try
             {
-                mScanDelayTimer?.Stop();
-                mScanDelayTimer?.Start();
+                mScanDelayTimer.Stop();
+                mScanDelayTimer.Start();
             }
             catch (ObjectDisposedException)
             {
@@ -101,14 +102,11 @@ namespace TVRename
             {
                 Logger.Info("*******************************");
                 Logger.Info("Auto scan fired");
-                if (mainForm != null)
+                if (TVSettings.Instance.MonitoredFoldersScanType == TVSettings.ScanType.SingleShow)
                 {
-                    if (TVSettings.Instance.MonitoredFoldersScanType == TVSettings.ScanType.SingleShow)
-                    {
-                        throw new ArgumentException("Inappropriate action for auto-scan " + TVSettings.Instance.MonitoredFoldersScanType);
-                    }
-                    mainForm.BeginInvoke(mainForm.ScanAndDo,TVSettings.Instance.MonitoredFoldersScanType);
+                    throw new ArgumentException("Inappropriate action for auto-scan " + TVSettings.Instance.MonitoredFoldersScanType);
                 }
+                mainForm.BeginInvoke(mainForm.ScanAndDo,TVSettings.Instance.MonitoredFoldersScanType);
             }
             else
             {
@@ -129,11 +127,7 @@ namespace TVRename
 
         public void Dispose()
         {
-            // ReSharper disable once UseNullPropagation
-            if (mScanDelayTimer != null)
-            {
-                mScanDelayTimer.Dispose();
-            }
+            mScanDelayTimer.Dispose();
         }
     }
 }

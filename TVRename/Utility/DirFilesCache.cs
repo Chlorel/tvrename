@@ -29,7 +29,7 @@ namespace TVRename
         {
             if (cache.ContainsKey(folder))
             {
-                return cache[folder];
+                return cache[folder] ?? new FileInfo[] { };
             }
 
             DirectoryInfo di;
@@ -39,13 +39,13 @@ namespace TVRename
             }
             catch
             {
-                cache[folder] = null;
-                return null;
+                cache[folder] = new FileInfo[] { };
+                return new FileInfo[]{};
             }
             if (!di.Exists)
             {
-                cache[folder] = null;
-                return null;
+                cache[folder] = new FileInfo[] { };
+                return new FileInfo[] { };
             }
             
             try {
@@ -55,12 +55,12 @@ namespace TVRename
             }
             catch (System.IO.IOException) {
                Logger.Warn("IOException occurred trying to access " + folder);
-               return null;
+               return new FileInfo[] { };
             }
             catch (UnauthorizedAccessException)
             {
-                Logger.Warn("IOException occurred trying to access " + folder);
-                return null;
+                Logger.Warn("UnauthorizedAccessException occurred trying to access " + folder);
+                return new FileInfo[] { };
             }
         }
     }

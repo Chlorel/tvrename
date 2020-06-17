@@ -103,10 +103,20 @@ namespace TVRename
         }
 
         [NotNull]
-        public static string HttpRequest([NotNull] string method, [NotNull] string url, string json, string contentType, [CanBeNull] string token, string lang = "")
+        public static string HttpRequest([NotNull] string method, [NotNull] string url, string json, string contentType, string? token)
+        {
+            return HttpRequest(method, url, json, contentType, token, string.Empty );
+        }
+
+        [NotNull]
+        public static string HttpRequest([NotNull] string method, [NotNull] string url, string? postContent,
+            string? contentType, string? token, string? lang)
+        {
+            HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create(url);
+            if (!contentType.IsNullOrWhitespace())
             {
-                HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create(url);
-            httpWebRequest.ContentType = contentType;
+                httpWebRequest.ContentType = contentType;
+            }
             httpWebRequest.Method = method;
             if (!token.IsNullOrWhitespace())
             {
@@ -124,7 +134,7 @@ namespace TVRename
                 using (StreamWriter streamWriter =
                     new StreamWriter(httpWebRequest.GetRequestStream()))
                 {
-                    streamWriter.Write(json);
+                    streamWriter.Write(postContent);
                     streamWriter.Flush();
                 }
             }
@@ -266,9 +276,11 @@ namespace TVRename
             return s.ToString();
         }
 
-        public static JObject JsonHttpGetRequest([NotNull] string url, string authToken) =>
+        [NotNull]
+        public static JObject JsonHttpGetRequest([NotNull] string url, string? authToken) =>
             JObject.Parse(HttpRequest("GET",url, null, "application/json", authToken,string.Empty));
 
+        [NotNull]
         public static JObject JsonHttpPostRequest( string url, JObject request, bool retry)
         {
             TimeSpan pauseBetweenFailures = TimeSpan.FromSeconds(2);
@@ -289,7 +301,7 @@ namespace TVRename
         }
 
         [NotNull]
-        public static string GetHttpParameters([CanBeNull] Dictionary<string, string> parameters)
+        public static string GetHttpParameters(Dictionary<string, string>? parameters)
         {
             if (parameters is null)
             {
@@ -307,7 +319,7 @@ namespace TVRename
             return finalUrl.Remove(finalUrl.LastIndexOf("&", StringComparison.Ordinal));
         }
 
-        public static void RetryOnException(int times,TimeSpan delay,string url, Func<Exception, bool> retryableException,[NotNull] System.Action operation, [CanBeNull] System.Action updateOperation)
+        public static void RetryOnException(int times,TimeSpan delay,string url, Func<Exception, bool> retryableException,[NotNull] System.Action operation, System.Action? updateOperation)
         {
             if (times <= 0)
             {

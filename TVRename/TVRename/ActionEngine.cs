@@ -20,13 +20,13 @@ namespace TVRename
     public class ActionEngine
     {
         private bool actionPause;
-        private List<Thread> actionWorkers;
+        private List<Thread>? actionWorkers;
         private bool actionStarting;
 
         private readonly TVRenameStats mStats; //reference to the main TVRenameStats, so we can update the counts
 
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
-        private static readonly NLog.Logger Threadslogger = NLog.LogManager.GetLogger("threads");
+        private static readonly NLog.Logger ThreadsLogger = NLog.LogManager.GetLogger("threads");
 
         /// <summary>
         /// Asks for execution to pause
@@ -39,7 +39,7 @@ namespace TVRename
         /// <summary>
         /// Asks for execution to resume
         /// </summary>
-        public void Unpause()
+        public void Resume()
         {
             actionPause = false;
         }
@@ -66,31 +66,29 @@ namespace TVRename
                 actionStarting = false; // let our creator know we're started ok
 
                 Action action = info.TheAction;
-                if (action == null)
-                {
-                    return;
-                }
 
                 Logger.Trace("Triggering Action: {0} - {1} - {2}", action.Name, action.Produces, action.ToString());
                 action.Outcome = action.Go(mStats);
                 if (action.Outcome.Error)
                 {
-                    action.ErrorText = action.Outcome.LastError.Message;
+                    action.ErrorText = action.Outcome.LastError?.Message??string.Empty;
                 }
 
                 if (!action.Outcome.Done)
                 {
-                    Logger.Error("Hlep");
+                    Logger.Error("Action did not report whether it was completed");
+                    info.TheAction.Outcome = new ActionOutcome("Action did not report whether it was completed");
                 }
             }
-            catch (ThreadAbortException)
+            catch (ThreadAbortException te)
             {
                 //Thread has been killed off
+                info.TheAction.Outcome = new ActionOutcome(te);
             }
             catch (Exception e)
             {
                 Logger.Fatal(e, "Unhandled Exception in Process Single Action");
-                info.TheAction.Outcome = ActionOutcome.CompleteFail();
+                info.TheAction.Outcome = new ActionOutcome(e);
             }
             finally
             {
@@ -119,7 +117,7 @@ namespace TVRename
         /// </summary>
         /// <param name="theList">An ItemList to be processed.</param>
         /// <param name="showUi">Whether or not we should display a UI to inform the user about progress.</param>
-        public void DoActions([CanBeNull] ItemList theList, bool showUi)
+        public void DoActions(ItemList? theList, bool showUi, IDialogParent owner)
         {
             if (theList is null)
             {
@@ -128,7 +126,7 @@ namespace TVRename
             }
 
             Logger.Info("**********************");
-            Logger.Info($"Doing Selected Actions.... ({theList.Count} items detected, {theList.Actions().Count()} actions to be completed )");
+            Logger.Info($"Doing Selected Actions.... ({theList.Count} items detected, {theList.Actions.Count} actions to be completed )");
 
             // Run tasks in parallel (as much as is sensible)
 
@@ -150,16 +148,21 @@ namespace TVRename
 
             actionProcessorThread.Start(queues);
 
-            if (cmp != null && cmp.ShowDialog() == DialogResult.Cancel)
+            if (showUi)
             {
-                actionProcessorThread.Abort();
+                owner.ShowChildDialog(cmp);
+
+                if (cmp.DialogResult == DialogResult.Cancel)
+                {
+                    actionProcessorThread.Abort();
+                }
             }
 
             actionProcessorThread.Join();
 
             theList.RemoveAll(x => x is Action action && action.Outcome.Done && !action.Outcome.Error);
 
-            foreach (Action slia in theList.Actions())
+            foreach (Action slia in theList.Actions)
             {
                 Logger.Warn(slia.Outcome.LastError,$"Failed to complete the following action: {slia.Name}, doing {slia}. Error was {slia.Outcome.LastError?.Message}");
             }
@@ -249,7 +252,7 @@ namespace TVRename
             }
         }
 
-        private bool ReviewQueues([CanBeNull] IEnumerable<ActionQueue> queues)
+        private bool ReviewQueues(IEnumerable<ActionQueue>? queues)
         {
             // look through the list of semaphores to see if there is one waiting for some work to do
             if (queues is null)
@@ -266,11 +269,6 @@ namespace TVRename
                 if (currentQueue.Sem.WaitOne(20, false))
                 {
                     Action act = currentQueue.NextAction();
-
-                    if (act is null)
-                    {
-                        return false;
-                    }
 
                     if (!act.Outcome.Done)
                     {
@@ -306,7 +304,7 @@ namespace TVRename
             finally
             {
                 int nfr = pai.Sem.Release(); // release our hold on the semaphore, so that worker can grab it
-                Threadslogger.Trace("ActionProcessor[" + pai.Sem + "] pool has " + nfr + " free");
+                ThreadsLogger.Trace("ActionProcessor[" + pai.Sem + "] pool has " + nfr + " free");
             }
         }
 
@@ -317,14 +315,22 @@ namespace TVRename
                 return;
             }
 
-            // tidy up any finished workers
-            for (int i = actionWorkers.Count - 1; i >= 0; i--)
+            foreach (Thread aw in actionWorkers.ToList())
             {
-                if (actionWorkers[i] is null)
+                if (aw is null)
                 {
                     continue;
                 }
 
+                if (!aw.IsAlive)
+                {
+                    actionWorkers.Remove(aw);
+                }
+            }
+
+            // tidy up any finished workers
+            for (int i = actionWorkers.Count - 1; i >= 0; i--)
+            {
                 if (!actionWorkers[i].IsAlive)
                 {
                     actionWorkers.RemoveAt(i); // remove dead worker
@@ -347,7 +353,7 @@ namespace TVRename
 
             ActionQueue[] queues = new ActionQueue[4];
             queues[0] = new ActionQueue("Move/Copy", 1); // cross-filesystem moves (slow ones)
-            queues[1] = new ActionQueue("Move/Delete", 1); // local rename/moves
+            queues[1] = new ActionQueue("Rename/Delete", 1); // local rename/moves
             queues[2] = new ActionQueue("Write Metadata", 4); // writing KODI NFO files, etc.
             queues[3] = new ActionQueue("Download",
                 TVSettings.Instance.ParallelDownloads); // downloading torrents, banners, thumbnails
@@ -374,6 +380,7 @@ namespace TVRename
 
                 case ActionDownloadImage _:
                 case ActionTDownload _:
+                case ActionTRemove _:
                     return 3;
 
                 case ActionCopyMoveRename rename:
@@ -384,7 +391,7 @@ namespace TVRename
                     return 1;
 
                 case ActionDateTouch _:
-                    // add them after the slow move/reanems (ie last)
+                    // add them after the slow move/renames (ie last)
                     return 0;
 
                 default:

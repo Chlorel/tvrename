@@ -5,6 +5,7 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>9.0.21022</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
+    <Nullable>enable</Nullable>
     <ProjectGuid>{2FFF6A6D-6094-47FF-AB34-E04E644F8F9C}</ProjectGuid>
     <OutputType>WinExe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
@@ -62,7 +63,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <PlatformTarget>AnyCPU</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>
-    <LangVersion>7.3</LangVersion>
+    <LangVersion>8.0</LangVersion>
   </PropertyGroup>
   <PropertyGroup>
     <StartupObject>TVRename.App.Program</StartupObject>
@@ -74,17 +75,17 @@
     <Reference Include="CloudFlareUtilities, Version=1.3.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\CloudFlareUtilities.1.3.0\lib\netstandard1.1\CloudFlareUtilities.dll</HintPath>
     </Reference>
-    <Reference Include="Humanizer, Version=2.7.0.0, Culture=neutral, PublicKeyToken=979442b78dfc278e, processorArchitecture=MSIL">
-      <HintPath>..\packages\Humanizer.Core.2.7.9\lib\netstandard2.0\Humanizer.dll</HintPath>
+    <Reference Include="Humanizer, Version=2.8.0.0, Culture=neutral, PublicKeyToken=979442b78dfc278e, processorArchitecture=MSIL">
+      <HintPath>..\packages\Humanizer.Core.2.8.26\lib\netstandard2.0\Humanizer.dll</HintPath>
     </Reference>
     <Reference Include="Ical.Net, Version=4.1.8.0, Culture=neutral, PublicKeyToken=65c0446cd019ea53, processorArchitecture=MSIL">
       <HintPath>..\packages\Ical.Net.4.1.11\lib\net46\Ical.Net.dll</HintPath>
     </Reference>
-    <Reference Include="JetBrains.Annotations, Version=2019.1.3.0, Culture=neutral, PublicKeyToken=1010a0d8d6380325, processorArchitecture=MSIL">
-      <HintPath>..\packages\JetBrains.Annotations.2019.1.3\lib\net20\JetBrains.Annotations.dll</HintPath>
+    <Reference Include="JetBrains.Annotations, Version=2020.1.0.0, Culture=neutral, PublicKeyToken=1010a0d8d6380325, processorArchitecture=MSIL">
+      <HintPath>..\packages\JetBrains.Annotations.2020.1.0\lib\net20\JetBrains.Annotations.dll</HintPath>
     </Reference>
-    <Reference Include="MediaInfo.Wrapper, Version=19.4.1.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\MediaInfo.Wrapper.19.4.1\lib\net45\MediaInfo.Wrapper.dll</HintPath>
+    <Reference Include="MediaInfo.Wrapper, Version=19.9.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\MediaInfo.Wrapper.19.9.2\lib\net45\MediaInfo.Wrapper.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="Microsoft.VisualBasic" />
@@ -106,7 +107,7 @@
       <HintPath>..\packages\Newtonsoft.Json.12.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="NLog, Version=4.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
-      <HintPath>..\packages\NLog.4.6.8\lib\net45\NLog.dll</HintPath>
+      <HintPath>..\packages\NLog.4.7.2\lib\net45\NLog.dll</HintPath>
     </Reference>
     <Reference Include="NLog.Targets.Syslog, Version=6.0.0.0, Culture=neutral, PublicKeyToken=a15d6ba50060b73f, processorArchitecture=MSIL">
       <HintPath>..\packages\NLog.Targets.Syslog.6.0.0\lib\net452\NLog.Targets.Syslog.dll</HintPath>
@@ -114,8 +115,11 @@
     <Reference Include="NLog.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
       <HintPath>..\packages\NLog.Windows.Forms.4.3.0\lib\net35\NLog.Windows.Forms.dll</HintPath>
     </Reference>
-    <Reference Include="NodaTime, Version=2.4.7.0, Culture=neutral, PublicKeyToken=4226afe0d9b296d1, processorArchitecture=MSIL">
-      <HintPath>..\packages\NodaTime.2.4.7\lib\net45\NodaTime.dll</HintPath>
+    <Reference Include="NodaTime, Version=3.0.0.0, Culture=neutral, PublicKeyToken=4226afe0d9b296d1, processorArchitecture=MSIL">
+      <HintPath>..\packages\NodaTime.3.0.0\lib\netstandard2.0\NodaTime.dll</HintPath>
+    </Reference>
+    <Reference Include="ObjectListView, Version=2.9.1.1072, Culture=neutral, PublicKeyToken=b1c5bf581481bcd4, processorArchitecture=MSIL">
+      <HintPath>..\packages\ObjectListView.Official.2.9.1\lib\net20\ObjectListView.dll</HintPath>
     </Reference>
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
@@ -201,7 +205,7 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=4.0.6.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Runtime.CompilerServices.Unsafe.4.7.0\lib\netstandard2.0\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+      <HintPath>..\packages\System.Runtime.CompilerServices.Unsafe.4.7.1\lib\net461\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
     </Reference>
     <Reference Include="System.Runtime.Extensions, Version=4.1.1.1, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Runtime.Extensions.4.3.1\lib\net462\System.Runtime.Extensions.dll</HintPath>
@@ -267,6 +271,9 @@
     <Compile Include="App\ApplicationBase.cs" />
     <Compile Include="App\CommandLineArgs.cs" />
     <Compile Include="App\AutoFolderMonitor.cs" />
+    <Compile Include="Custom Controls\ObjectListViewFlickerFree.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="Custom Controls\NativeMethods.cs" />
     <Compile Include="DownloadIdentifers\DownloadWdtvMetaData.cs" />
     <Compile Include="DownloadIdentifers\IncorrectFileDates.cs" />
@@ -284,23 +291,53 @@
     <Compile Include="Exporter\ShowsHTML.cs" />
     <Compile Include="Exporter\UpcomingExporter.cs" />
     <Compile Include="Exporter\UpcomingiCAL.cs" />
-    <Compile Include="Finders\DownloadFinder.cs" />
-    <Compile Include="Finders\FinderHelper.cs" />
-    <Compile Include="Finders\LibraryFolderFileFinder.cs" />
-    <Compile Include="Finders\qBitTorrentFinder.cs" />
-    <Compile Include="Finders\JSONWebpageFinder.cs" />
-    <Compile Include="Finders\RSSItem.cs" />
-    <Compile Include="Finders\RSSItemList.cs" />
-    <Compile Include="Finders\SearchFolderFileFinder.cs" />
-    <Compile Include="Finders\DownloadingFinder.cs" />
+    <Compile Include="ScanActivity\Finders\DownloadFinder.cs" />
+    <Compile Include="ScanActivity\Finders\DownloadingProviderFinder.cs" />
+    <Compile Include="ScanActivity\Finders\FinderHelper.cs" />
+    <Compile Include="ScanActivity\Finders\LibraryFolderFileFinder.cs" />
+    <Compile Include="DownloadProvider\qBitTorrent.cs" />
+    <Compile Include="ScanActivity\Finders\qBitTorrentFinder.cs" />
+    <Compile Include="ScanActivity\Finders\JSONWebpageFinder.cs" />
+    <Compile Include="ScanActivity\Finders\JackettFinder.cs" />
+    <Compile Include="ScanActivity\Finders\RSSItem.cs" />
+    <Compile Include="ScanActivity\Finders\RSSItemList.cs" />
+    <Compile Include="ScanActivity\Finders\SearchFolderFileFinder.cs" />
+    <Compile Include="ScanActivity\Finders\DownloadingFinder.cs" />
+    <Compile Include="Forms\ListViewColumnSorter.cs" />
+    <Compile Include="Forms\ShowPreferences\ValidationFailedException.cs" />
+    <Compile Include="Forms\Supporting\ChooseDownload.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\Supporting\ChooseDownload.Designer.cs">
+      <DependentUpon>ChooseDownload.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\Tools\OrphanFiles.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\Tools\OrphanFiles.Designer.cs">
+      <DependentUpon>OrphanFiles.cs</DependentUpon>
+    </Compile>
     <Compile Include="Forms\Utilities\ThanksForm.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="Forms\Utilities\ThanksForm.Designer.cs">
       <DependentUpon>ThanksForm.cs</DependentUpon>
     </Compile>
+    <Compile Include="ItemsAndActions\ActionDateTouchDirectory.cs" />
+    <Compile Include="ItemsAndActions\ActionDateTouchEpisode.cs" />
+    <Compile Include="ItemsAndActions\ActionDateTouchSeason.cs" />
+    <Compile Include="ItemsAndActions\ActionDateTouchShow.cs" />
     <Compile Include="ItemsAndActions\ActionOutcome.cs" />
+    <Compile Include="ItemsAndActions\ActionTRemove.cs" />
+    <Compile Include="DownloadProvider\IDownloadProvider.cs" />
+    <Compile Include="DownloadProvider\uTorrent.cs" />
     <Compile Include="Model\Season.cs" />
+    <Compile Include="ScanActivity\CleanUpTorrents.cs" />
+    <Compile Include="Properties\Settings.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <DependentUpon>Settings.settings</DependentUpon>
+    </Compile>
     <Compile Include="Sources\SourceConsistencyException.cs" />
     <Compile Include="TVRename\CacheLoadException.cs" />
     <Compile Include="Sources\TheTVDB\TheTVDBAPI.cs" />
@@ -309,8 +346,10 @@
     <Compile Include="ItemsAndActions\ActionFailedException.cs" />
     <Compile Include="Sources\TVMAZE\LocalCache.cs" />
     <Compile Include="Sources\TVMAZE\TVmazeAPI.cs" />
+    <Compile Include="TVRename\FileIssue.cs" />
+    <Compile Include="TVRename\MergedEpisodeFinderController.cs" />
     <Compile Include="TVRename\UpdateTimeTracker.cs" />
-    <Compile Include="Utility\ListViewNativeMethods.cs" />
+    <Compile Include="Utility\ServerRelease.cs" />
     <Compile Include="Utility\UrlCache.cs" />
     <Compile Include="Forms\ShowPreferences\AutoAddShow.cs">
       <SubType>Form</SubType>
@@ -337,11 +376,11 @@
     <Compile Include="Forms\Supporting\ChooseFile.Designer.cs">
       <DependentUpon>ChooseFile.cs</DependentUpon>
     </Compile>
-    <Compile Include="Forms\Tools\DupEpFinder.cs">
+    <Compile Include="Forms\Tools\MergedEpisodeFinder.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="Forms\Tools\DupEpFinder.Designer.cs">
-      <DependentUpon>DupEpFinder.cs</DependentUpon>
+    <Compile Include="Forms\Tools\MergedEpisodeFinder.Designer.cs">
+      <DependentUpon>MergedEpisodeFinder.cs</DependentUpon>
     </Compile>
     <Compile Include="Forms\Supporting\UpdateNotification.cs">
       <SubType>Form</SubType>
@@ -396,11 +435,11 @@
     <Compile Include="Exporter\MissingXML.cs" />
     <Compile Include="Exporter\UpcomingRSS.cs" />
     <Compile Include="Exporter\UpcomingXML.cs" />
-    <Compile Include="Finders\FileFinder.cs" />
-    <Compile Include="Finders\RSSFinder.cs" />
-    <Compile Include="Finders\uTorrentFinder.cs" />
-    <Compile Include="Finders\SABnzbdFinder.cs" />
-    <Compile Include="Finders\Finder.cs" />
+    <Compile Include="ScanActivity\Finders\FileFinder.cs" />
+    <Compile Include="ScanActivity\Finders\RSSFinder.cs" />
+    <Compile Include="ScanActivity\Finders\uTorrentFinder.cs" />
+    <Compile Include="ScanActivity\Finders\SABnzbdFinder.cs" />
+    <Compile Include="ScanActivity\Finders\Finder.cs" />
     <Compile Include="Forms\Supporting\Filters.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -434,9 +473,9 @@
     <Compile Include="ItemsAndActions\ActionWdtvMeta.cs" />
     <Compile Include="ItemsAndActions\ActionWriteMetadata.cs" />
     <Compile Include="ItemsAndActions\ItemList.cs" />
-    <Compile Include="PostScanActivity\CleanUpEmptyLibraryFolders.cs" />
-    <Compile Include="PostScanActivity\PostScanActivity.cs" />
-    <Compile Include="ScanActivity\CheckAllFoldersExist.cs" />
+    <Compile Include="ScanActivity\PostScanActivity\CleanUpEmptyLibraryFolders.cs" />
+    <Compile Include="ScanActivity\PostScanActivity\PostScanActivity.cs" />
+    <Compile Include="ScanActivity\ScanShowActivity\CheckAllFoldersExist.cs" />
     <Compile Include="ScanActivity\CheckShows.cs" />
     <Compile Include="ScanActivity\FindMissingEpisodes.cs" />
     <Compile Include="ScanActivity\FindMissingEpisodesDownloading.cs" />
@@ -444,9 +483,9 @@
     <Compile Include="ScanActivity\FindMissingEpisodesSearch.cs" />
     <Compile Include="ScanActivity\FindNewShowsInDownloadFolders.cs" />
     <Compile Include="ScanActivity\FindNewShowsInLibrary.cs" />
-    <Compile Include="ScanActivity\MergeLibraryEpisodes.cs" />
-    <Compile Include="ScanActivity\RenameAndMissingCheck.cs" />
-    <Compile Include="ScanActivity\ScanShowActivity.cs" />
+    <Compile Include="ScanActivity\ScanShowActivity\MergeLibraryEpisodes.cs" />
+    <Compile Include="ScanActivity\ScanShowActivity\RenameAndMissingCheck.cs" />
+    <Compile Include="ScanActivity\ScanShowActivity\ScanShowActivity.cs" />
     <Compile Include="ScanActivity\ScanActivity.cs" />
     <Compile Include="Settings\CustomSeasonName.cs" />
     <Compile Include="Settings\Language.cs" />
@@ -470,9 +509,7 @@
     <Compile Include="TVRename\FolderMonitorEntryList.cs" />
     <Compile Include="TVRename\ShowLibrary.cs" />
     <Compile Include="TVRename\TVRenameOperationInteruptedException.cs" />
-    <Compile Include="Utility\Sorters\DateSorterScan.cs" />
     <Compile Include="Utility\Sorters\DateSorterWTW.cs" />
-    <Compile Include="Utility\Sorters\DaySorter.cs" />
     <Compile Include="Utility\Extensions\EnumerableExtensions.cs" />
     <Compile Include="Utility\Helper\ShowHtmlHelper.cs" />
     <Compile Include="Utility\Helper\FileHelper.cs" />
@@ -484,7 +521,7 @@
     <Compile Include="Utility\Sorters\ListViewItemDateSorter.cs" />
     <Compile Include="Utility\Sorters\ListViewItemSorter.cs" />
     <Compile Include="Utility\Sorters\NumberAsTextSorter.cs" />
-    <Compile Include="Utility\PossibleDuplicateEpisode.cs" />
+    <Compile Include="Utility\PossibleMergedEpisode.cs" />
     <Compile Include="Utility\DirFilesCache.cs" />
     <Compile Include="Forms\Tools\ActorsGrid.cs">
       <SubType>Form</SubType>
@@ -591,7 +628,6 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="TVRename\IgnoreItem.cs" />
-    <Compile Include="TVRename\LVResults.cs" />
     <Compile Include="TVRename\PathManager.cs" />
     <Compile Include="Utility\BT.cs" />
     <Compile Include="Forms\Utilities\BugReport.cs">
@@ -631,9 +667,7 @@
     <Compile Include="Forms\Supporting\MissingFolderAction.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="Custom Controls\MyListView.cs">
-      <SubType>Component</SubType>
-    </Compile>
+    <Compile Include="Custom Controls\MyListView.cs" />
     <Compile Include="Forms\Preferences\Preferences.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -646,6 +680,10 @@
     <Compile Include="Utility\UpdateVersion.cs" />
     <Compile Include="Utility\VersionUpdater.cs" />
     <Compile Include="Utility\Helper\XMLHelper.cs" />
+    <None Include="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
     <None Include="Resources\2738302-32.png" />
     <None Include="Resources\5172493-32.png" />
     <None Include="Resources\1587498-32.png" />
@@ -703,6 +741,9 @@
     <EmbeddedResource Include="Forms\ShowPreferences\QuickLocate.resx">
       <DependentUpon>QuickLocate.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="Forms\Supporting\ChooseDownload.resx">
+      <DependentUpon>ChooseDownload.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="Forms\Supporting\ChooseFile.resx">
       <DependentUpon>ChooseFile.cs</DependentUpon>
     </EmbeddedResource>
@@ -732,6 +773,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\Tools\QuickRename.resx">
       <DependentUpon>QuickRename.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\Tools\OrphanFiles.resx">
+      <DependentUpon>OrphanFiles.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\Utilities\BugReport.resx">
       <DependentUpon>BugReport.cs</DependentUpon>
@@ -777,8 +821,8 @@
       <DependentUpon>BulkAddProgress.cs</DependentUpon>
       <SubType>Designer</SubType>
     </EmbeddedResource>
-    <EmbeddedResource Include="Forms\Tools\DupEpFinder.resx">
-      <DependentUpon>DupEpFinder.cs</DependentUpon>
+    <EmbeddedResource Include="Forms\Tools\MergedEpisodeFinder.resx">
+      <DependentUpon>MergedEpisodeFinder.cs</DependentUpon>
       <SubType>Designer</SubType>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\Tools\ShowSummary.resx">
@@ -933,15 +977,15 @@
     <Folder Include="Forms\Torrent\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <Import Project="..\packages\MediaInfo.Native.19.4.0\build\MediaInfo.Native.targets" Condition="Exists('..\packages\MediaInfo.Native.19.4.0\build\MediaInfo.Native.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('..\packages\MediaInfo.Native.19.4.0\build\MediaInfo.Native.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\MediaInfo.Native.19.4.0\build\MediaInfo.Native.targets'))" />
     <Error Condition="!Exists('..\packages\NETStandard.Library.2.0.3\build\netstandard2.0\NETStandard.Library.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\NETStandard.Library.2.0.3\build\netstandard2.0\NETStandard.Library.targets'))" />
+    <Error Condition="!Exists('..\packages\MediaInfo.Native.19.9.0\build\MediaInfo.Native.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\MediaInfo.Native.19.9.0\build\MediaInfo.Native.targets'))" />
   </Target>
   <Import Project="..\packages\NETStandard.Library.2.0.3\build\netstandard2.0\NETStandard.Library.targets" Condition="Exists('..\packages\NETStandard.Library.2.0.3\build\netstandard2.0\NETStandard.Library.targets')" />
+  <Import Project="..\packages\MediaInfo.Native.19.9.0\build\MediaInfo.Native.targets" Condition="Exists('..\packages\MediaInfo.Native.19.9.0\build\MediaInfo.Native.targets')" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">

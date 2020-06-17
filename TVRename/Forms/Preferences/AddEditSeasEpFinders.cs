@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Windows.Forms;
 using System.Drawing;
 using System.Linq;
+using Alphaleonis.Win32.Filesystem;
 using JetBrains.Annotations;
 using SourceGrid;
 using Directory = Alphaleonis.Win32.Filesystem.Directory;
@@ -30,10 +31,10 @@ namespace TVRename
     public partial class AddEditSeasEpFinders : Form
     {
         private readonly List<ShowItem> shows;
-        private List<TorrentEntry> torrentCache;
+        private List<TorrentEntry>? torrentCache;
         public List<TVSettings.FilenameProcessorRE> OutputRegularExpressions { get; }
 
-        public AddEditSeasEpFinders(List<TVSettings.FilenameProcessorRE> rex, List<ShowItem> sil, ShowItem initialShow,
+        public AddEditSeasEpFinders(List<TVSettings.FilenameProcessorRE> rex, List<ShowItem> sil, ShowItem? initialShow,
             string initialFolder)
         {
             OutputRegularExpressions = rex;
@@ -176,8 +177,7 @@ namespace TVRename
             StartTimer();
         }
 
-        [CanBeNull]
-        private TVSettings.FilenameProcessorRE RegExForRow(int i)
+        private TVSettings.FilenameProcessorRE? RegExForRow(int i)
         {
             if (i < 1 || i >= Grid1.RowsCount) // row 0 is header
             {
@@ -231,7 +231,7 @@ namespace TVRename
                 folderBrowser.SelectedPath = txtFolder.Text;
             }
 
-            if (folderBrowser.ShowDialog() == DialogResult.OK)
+            if (folderBrowser.ShowDialog(this) == DialogResult.OK)
             {
                 txtFolder.Text = folderBrowser.SelectedPath;
             }
@@ -323,48 +323,59 @@ namespace TVRename
         {
             lvPreview.BeginUpdate();
 
-            foreach (string filename in GetFileNames())
+            if (rdoFileSystem.Checked)
             {
-                if (!TVSettings.Instance.FileHasUsefulExtension(filename, true))
+                foreach (FileInfo file in new DirectoryInfo(txtFolder.Text).GetFiles())
                 {
-                    continue; // move on
+                    if (!TVSettings.Instance.FileHasUsefulExtension(file, true))
+                    {
+                        continue; // move on
+                    }
+
+                    ShowItem si = cbShowList.SelectedIndex >= 0 ? shows[cbShowList.SelectedIndex] : null;
+                    bool r = FinderHelper.FindSeasEp(file, out int seas, out int ep, out int maxEp, si, rel, out TVSettings.FilenameProcessorRE matchRex);
+
+                    AddItemToListView(file.Name, seas, ep, maxEp, matchRex, r);
                 }
-
-                ShowItem si = cbShowList.SelectedIndex >= 0 ? shows[cbShowList.SelectedIndex] : null;
-                bool r = FinderHelper.FindSeasEp(filename, out int seas, out int ep, out int maxEp, si, rel, false,
-                    out TVSettings.FilenameProcessorRE matchRex);
-
-                IEnumerable<ShowItem> matchingShows = FinderHelper.FindMatchingShows(filename, shows);
-                string bestShowName = FinderHelper.FindBestMatchingShow(filename, shows)?.ShowName;
-
-                string otherShowNames = matchingShows.Select(item => item.ShowName).Where(s => s != bestShowName).ToCsv();
-                string showDisplayString = otherShowNames.Any() ? bestShowName + " - (" + otherShowNames + ")" : bestShowName;
-
-                ListViewItem lvi = new ListViewItem { Text = filename };
-                lvi.SubItems.Add(showDisplayString);
-                lvi.SubItems.Add(seas == -1 ? "-" : seas.ToString());
-                lvi.SubItems.Add(ep == -1 ? "-" : ep + (maxEp != -1 ? "-" + maxEp : ""));
-                lvi.SubItems.Add(matchRex is null ? "-" : matchRex.Notes);
-                if (!r)
+            }
+            else
+            {
+                foreach (string filename in GetTorrentDownloads().Select(entry => entry.DownloadingTo))
                 {
-                    lvi.BackColor = Helpers.WarningColor();
-                }
+                    if (!TVSettings.Instance.FileHasUsefulExtension(filename, true))
+                    {
+                        continue; // move on
+                    }
 
-                lvPreview.Items.Add(lvi);
+                    ShowItem si = cbShowList.SelectedIndex >= 0 ? shows[cbShowList.SelectedIndex] : null;
+                    bool r = FinderHelper.FindSeasEp(filename, out int seas, out int ep, out int maxEp, si, rel, out TVSettings.FilenameProcessorRE matchRex);
+
+                    AddItemToListView(filename, seas, ep, maxEp, matchRex, r);
+                }
             }
 
             lvPreview.EndUpdate();
         }
 
-        [NotNull]
-        private IEnumerable<string> GetFileNames()
+        private void AddItemToListView(string filename, int seas, int ep, int maxEp, TVSettings.FilenameProcessorRE? matchRex, bool r)
         {
-            if (rdoFileSystem.Checked)
+            IEnumerable<ShowItem> matchingShows = FinderHelper.FindMatchingShows(filename, shows);
+            string bestShowName = FinderHelper.FindBestMatchingShow(filename, shows)?.ShowName;
+
+            string otherShowNames = matchingShows.Select(item => item.ShowName).Where(s => s != bestShowName).ToCsv();
+            string showDisplayString = otherShowNames.Any() ? bestShowName + " - (" + otherShowNames + ")" : bestShowName;
+
+            ListViewItem lvi = new ListViewItem {Text = filename};
+            lvi.SubItems.Add(showDisplayString);
+            lvi.SubItems.Add(seas == -1 ? "-" : seas.ToString());
+            lvi.SubItems.Add(ep == -1 ? "-" : ep + (maxEp != -1 ? "-" + maxEp : ""));
+            lvi.SubItems.Add(matchRex is null ? "-" : matchRex.Notes);
+            if (!r)
             {
-                return new DirectoryInfo(txtFolder.Text).GetFiles().Select(info => info.Name);
+                lvi.BackColor = Helpers.WarningColor();
             }
 
-            return GetTorrentDownloads().Select(entry => entry.DownloadingTo);
+            lvPreview.Items.Add(lvi);
         }
 
         [NotNull]
@@ -375,12 +386,12 @@ namespace TVRename
                 torrentCache = new List<TorrentEntry>();
                 if (TVSettings.Instance.CheckuTorrent)
                 {
-                    torrentCache.AddNullableRange(uTorrentFinder.GetTorrentDownloads());
+                    torrentCache.AddNullableRange(new uTorrent().GetTorrentDownloads());
                 }
 
                 if (TVSettings.Instance.CheckqBitTorrent)
                 {
-                    torrentCache.AddNullableRange(qBitTorrentFinder.GetTorrentDownloads());
+                    torrentCache.AddNullableRange(new qBitTorrent().GetTorrentDownloads());
                 }
             }
 

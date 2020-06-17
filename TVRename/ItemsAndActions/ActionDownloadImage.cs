@@ -23,9 +23,9 @@ namespace TVRename
         private readonly ShowItem si;
         private readonly bool shrinkLargeMede8ErImage;
 
-        public ActionDownloadImage(ShowItem si, ProcessedEpisode pe, FileInfo dest, string path) : this(si, pe, dest, path, false) { }
+        public ActionDownloadImage(ShowItem si, ProcessedEpisode? pe, FileInfo dest, string path) : this(si, pe, dest, path, false) { }
 
-        public ActionDownloadImage(ShowItem si, ProcessedEpisode pe, FileInfo dest, string path, bool shrink)
+        public ActionDownloadImage(ShowItem si, ProcessedEpisode? pe, FileInfo dest, string path, bool shrink)
         {
             Episode = pe;
             this.si = si;
@@ -36,7 +36,6 @@ namespace TVRename
 
         #region Action Members
 
-        [NotNull]
         public override string Name => "Download";
 
         public override string ProgressText => destination.Name;
@@ -85,12 +84,11 @@ namespace TVRename
             return bmPhoto;
         }
 
-        [NotNull]
         public override ActionOutcome Go(TVRenameStats stats)
         {
             try
             {
-                byte[] theData = si.Provider == ShowItem.ProviderType.TheTVDB
+                byte[]? theData = si.Provider == ShowItem.ProviderType.TheTVDB
                     ? TheTVDB.LocalCache.Instance.GetTvdbDownload(path)
                     : HttpHelper.Download(path,false);
                 
@@ -168,7 +166,7 @@ namespace TVRename
 
         public override int CompareTo(object o)
         {
-            return !(o is ActionDownloadImage dl) ? 0 : string.Compare(destination.FullName, dl.destination.FullName, StringComparison.Ordinal);
+            return !(o is ActionDownloadImage dl) ? -1 : string.Compare(destination.FullName, dl.destination.FullName, StringComparison.Ordinal);
         }
 
         #endregion
@@ -176,22 +174,13 @@ namespace TVRename
         #region Item Members
 
         public override int IconNumber => 5;
-
-        [CanBeNull]
-        public override IgnoreItem Ignore => GenerateIgnore(destination?.FullName);
-
-        protected override string SeriesName =>
-            Episode != null ? Episode.Show.ShowName : si != null ? si.ShowName : "";
-
-        [CanBeNull]
-        protected override string DestinationFolder => TargetFolder;
-        protected override string DestinationFile => destination.Name;
-        protected override string SourceDetails => path;
-        protected override bool InError => string.IsNullOrEmpty(path);
-        [NotNull]
+        public override IgnoreItem? Ignore => GenerateIgnore(destination.FullName);
+        public override string SeriesName => Episode != null ? Episode.Show.ShowName : si.ShowName;
+        public override string DestinationFolder => TargetFolder;
+        public override string DestinationFile => destination.Name;
+        public override string SourceDetails => path;
         public override string ScanListViewGroup => "lvgActionDownload";
-        [CanBeNull]
-        public override string TargetFolder => destination?.DirectoryName;
+        public override string TargetFolder => destination.DirectoryName;
         #endregion
     }
 }

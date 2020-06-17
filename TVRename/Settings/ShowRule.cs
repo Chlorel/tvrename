@@ -32,35 +32,32 @@ namespace TVRename
         public int First;
         public int Second;
         public string UserSuppliedText;
+        public bool RenumberAfter;
 
         public ShowRule()
         {
-            SetToDefaults();
+            DoWhatNow = RuleAction.kIgnoreEp;
+            First = -1;
+            Second = -1;
+            UserSuppliedText = string.Empty;
+            RenumberAfter = true;
         }
 
-        public ShowRule([CanBeNull] XElement xmlSettings)
+        public ShowRule(XElement? xmlSettings) :this()
         {
-            SetToDefaults();
             if (xmlSettings != null)
             {
                 DoWhatNow = xmlSettings.ExtractEnum("DoWhatNow",RuleAction.kIgnoreEp);
                 First = xmlSettings.ExtractInt("First",-1);
                 Second = xmlSettings.ExtractInt("Second",-1);
                 UserSuppliedText = xmlSettings.ExtractString("Text");
+                RenumberAfter = xmlSettings.ExtractBool("RenumberAfter", true);
             }
         }
 
         public override string ToString()
         {
-            return $"ShowRule: {ActionInWords()} with parameters {First}, {Second} and usertext: {UserSuppliedText}";
-        }
-
-        private void SetToDefaults()
-        {
-            DoWhatNow = RuleAction.kIgnoreEp;
-            First = -1;
-            Second = -1;
-            UserSuppliedText = string.Empty;
+            return $"ShowRule: {ActionInWords()} with parameters {First}, {Second} and usertext: {UserSuppliedText} ({RenumberAfter})";
         }
 
         public void WriteXml([NotNull] XmlWriter writer)
@@ -70,33 +67,25 @@ namespace TVRename
             writer.WriteElement("First",First);
             writer.WriteElement("Second",Second);           
             writer.WriteElement("Text",UserSuppliedText);
+            writer.WriteElement("RenumberAfter",RenumberAfter);
             writer.WriteEndElement(); // Rule
         }
 
         [NotNull]
         public string ActionInWords()
         {
-            switch (DoWhatNow)
+            return DoWhatNow switch
             {
-                case RuleAction.kIgnoreEp:
-                    return "Ignore";
-                case RuleAction.kRemove:
-                    return "Remove";
-                case RuleAction.kCollapse:
-                    return "Collapse";
-                case RuleAction.kSwap:
-                    return "Swap";
-                case RuleAction.kMerge:
-                    return "Merge";
-                case RuleAction.kSplit:
-                    return "Split";
-                case RuleAction.kInsert:
-                    return "Insert";
-                case RuleAction.kRename:
-                    return "Rename";
-                default:
-                    return "<Unknown>";
-            }
+                RuleAction.kIgnoreEp => "Ignore",
+                RuleAction.kRemove => "Remove",
+                RuleAction.kCollapse => "Collapse",
+                RuleAction.kSwap => "Swap",
+                RuleAction.kMerge => "Merge",
+                RuleAction.kSplit => "Split",
+                RuleAction.kInsert => "Insert",
+                RuleAction.kRename => "Rename",
+                _ => "<Unknown>"
+            };
         }
     }
 }

@@ -17,7 +17,8 @@ namespace TVRename
                 new qBitTorrentFinder(doc),
                 new SABnzbdFinder(doc),
                 new RSSFinder(doc), //RSS Finder Should Be last as it is the finder if all others fail
-                new JSONFinder(doc), //Except for JSON which is dead last
+                new JSONWebpageFinder(doc), //Except for JSON which is dead last
+                new JackettFinder(doc)
             };
         }
 
@@ -37,7 +38,7 @@ namespace TVRename
                     return;
                 }
 
-                if (!MDoc.TheActionList.MissingItems().Any())
+                if (!MDoc.TheActionList.Missing.Any())
                 {
                     continue;
                 }

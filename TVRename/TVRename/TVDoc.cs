@@ -12,7 +12,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
 using System.Linq;
@@ -22,6 +21,7 @@ using System.Xml.Linq;
 using JetBrains.Annotations;
 using NLog;
 using NodaTime.Extensions;
+using TVRename.Forms.Supporting;
 
 namespace TVRename
 {
@@ -31,8 +31,8 @@ namespace TVRename
         private readonly DownloadIdentifiersController downloadIdentifiers;
         public readonly ShowLibrary Library;
         public readonly CommandLineArgs Args;
-        internal TVRenameStats CurrentStats;
-        public ItemList TheActionList;
+        internal readonly TVRenameStats CurrentStats;
+        public readonly ItemList TheActionList;
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private readonly ActionEngine actionManager;
         private readonly CacheUpdater cacheManager;
@@ -40,9 +40,9 @@ namespace TVRename
         private readonly FindMissingEpisodes searchFinders;
         private readonly FindMissingEpisodes downloadFinders;
 
-        public string LoadErr;
+        public string? LoadErr;
         public readonly bool LoadOk;
-        private ScanProgress scanProgDlg;
+        private ScanProgress? scanProgDlg;
         private bool mDirty;
 
         // ReSharper disable once RedundantDefaultMemberInitializer
@@ -51,7 +51,7 @@ namespace TVRename
         private bool LastScanComplete { get; set; }
         private TVSettings.ScanType lastScanType;
 
-        public TVDoc([CanBeNull] FileInfo settingsFile, CommandLineArgs args)
+        public TVDoc(FileInfo? settingsFile, CommandLineArgs args)
         {
             Args = args;
 
@@ -69,25 +69,6 @@ namespace TVRename
             downloadIdentifiers = new DownloadIdentifiersController();
 
             LoadOk = (settingsFile is null || LoadXMLSettings(settingsFile)) && TheTVDB.LocalCache.Instance.LoadOk && TVmaze.LocalCache.Instance.LoadOk;
-            LoadLanguages();
-            LoadStats();
-            actionManager = new ActionEngine(CurrentStats);
-        }
-
-        private void LoadStats()
-        {
-            try
-            {
-                CurrentStats = TVRenameStats.Load();
-            }
-            catch (Exception)
-            {
-                // not worried if stats loading fails
-            }
-        }
-
-        private static void LoadLanguages()
-        {
             try
             {
                 TheTVDB.LocalCache.Instance.LanguageList = Languages.Load();
@@ -96,6 +77,16 @@ namespace TVRename
             {
                 // not worried if language loading fails as we'll repopulate
             }
+            try
+            {
+                CurrentStats = TVRenameStats.Load() ?? new TVRenameStats();
+            }
+            catch (Exception)
+            {
+                CurrentStats = new TVRenameStats();
+                // not worried if stats loading fails
+            }
+            actionManager = new ActionEngine(CurrentStats);
         }
 
         [NotNull]
@@ -118,7 +109,7 @@ namespace TVRename
             return CurrentStats;
         }
 
-        public void UpdateIdsFromCache()
+        private void UpdateIdsFromCache()
         {
             lock (TVmaze.LocalCache.SERIES_LOCK)
             {
@@ -145,21 +136,33 @@ namespace TVRename
 
         public bool Dirty() => mDirty;
 
-        public void DoActions(ItemList theList)
+        public void DoActions([NotNull] ItemList theList, IDialogParent owner)
         {
-            actionManager.DoActions(theList, !Args.Hide && Environment.UserInteractive);
+            foreach (Item i in theList)
+            {
+                if (i is Action a)
+                {
+                    a.ResetOutcome();
+                }
+            }
+
+            actionManager.DoActions(theList, !Args.Hide && Environment.UserInteractive,owner);
+
+            // remove items from master list, unless it had an error
+            TheActionList.RemoveAll(x => x is Action action && action.Outcome.Done && !action.Outcome.Error);
 
             new CleanUpEmptyLibraryFolders(this).Check(null);
+
         }
 
         // ReSharper disable once InconsistentNaming
-        public bool DoDownloadsFG(bool unattended,bool tvrMinimised)
+        public bool DoDownloadsFG(bool unattended,bool tvrMinimised, IDialogParent owner)
         {
             ICollection<SeriesSpecifier> shows = Library.SeriesSpecifiers;
             bool showProgress = !Args.Hide && Environment.UserInteractive && !tvrMinimised;
             bool showMsgBox = !unattended && !Args.Unattended && !Args.Hide && Environment.UserInteractive;
 
-            bool returnValue = cacheManager.DoDownloadsFg(showProgress, showMsgBox, shows);
+            bool returnValue = cacheManager.DoDownloadsFg(showProgress, showMsgBox, shows,owner);
             UpdateIdsFromCache();
             Library.GenDict();
             return returnValue;
@@ -202,22 +205,32 @@ namespace TVRename
         {
             cacheManager.StopBgDownloadThread();
             Stats().Save();
-            TheTVDB.LocalCache.Instance.LanguageList.Save();
+            TheTVDB.LocalCache.Instance.LanguageList?.Save();
         }
 
-        public static void SearchForEpisode([CanBeNull] ProcessedEpisode ep)
+        public static void SearchForEpisode(ProcessedEpisode? ep)
         {
             if (ep is null)
             {
                 return;
             }
 
-            Helpers.SysOpen(TVSettings.Instance.BTSearchURL(ep));
+            Helpers.OpenUrl(TVSettings.Instance.BTSearchURL(ep));
         }
 
-        public void DoWhenToWatch(bool cachedOnly,bool unattended,bool hidden)
+        public static void SearchForEpisode(SearchEngine s, ProcessedEpisode? epi)
         {
-            if (!cachedOnly && !DoDownloadsFG(unattended,hidden))
+            if (epi is null)
+            {
+                return;
+            }
+
+            Helpers.OpenUrl(CustomEpisodeName.NameForNoExt(epi, s.Url, true));
+        }
+
+        public void DoWhenToWatch(bool cachedOnly,bool unattended,bool hidden, IDialogParent owner)
+        {
+            if (!cachedOnly && !DoDownloadsFG(unattended,hidden,owner))
             {
                 return;
             }
@@ -277,11 +290,11 @@ namespace TVRename
 
             mDirty = false;
             Stats().Save();
-            TheTVDB.LocalCache.Instance.LanguageList.Save();
+            TheTVDB.LocalCache.Instance.LanguageList?.Save();
         }
 
         // ReSharper disable once InconsistentNaming
-        private bool LoadXMLSettings([CanBeNull] FileInfo from)
+        private bool LoadXMLSettings(FileInfo? from)
         {
             Logger.Info("Loading Settings from {0}", from?.FullName);
             if (from is null)
@@ -413,18 +426,18 @@ namespace TVRename
             }
         }
 
-        internal void ShowAddedOrEdited(bool download, bool unattended,bool hidden)
+        internal void ShowAddedOrEdited(bool download, bool unattended,bool hidden, IDialogParent owner)
         {
             SetDirty();
             if (download)
             {
-                if (!DoDownloadsFG(unattended,hidden))
+                if (!DoDownloadsFG(unattended,hidden,owner))
                 {
                     return;
                 }
             }
 
-            DoWhenToWatch(true, unattended,hidden);
+            DoWhenToWatch(true, unattended,hidden,owner);
 
             WriteUpcoming();
             WriteRecent();
@@ -434,7 +447,7 @@ namespace TVRename
 
         public ConcurrentBag<ShowNotFoundException> ShowProblems => cacheManager.Problems;
 
-        public void Scan([CanBeNull] IEnumerable<ShowItem> passedShows, bool unattended, TVSettings.ScanType st, bool hidden)
+        public void Scan(IEnumerable<ShowItem>? passedShows, bool unattended, TVSettings.ScanType st, bool hidden, IDialogParent owner)
         {
             try
             {
@@ -450,7 +463,7 @@ namespace TVRename
                     return;
                 }
 
-                if (!DoDownloadsFG(unattended,hidden))
+                if (!DoDownloadsFG(unattended,hidden,owner))
                 {
                     return;
                 }
@@ -461,16 +474,29 @@ namespace TVRename
 
                 SetupScanUi(hidden);
 
-                actionWork.Start(new ScanSettings(shows.ToList(),unattended,hidden,st,cts.Token));
+                actionWork.Start(new ScanSettings(shows.ToList(),unattended,hidden,st,cts.Token,owner));
 
-                if (scanProgDlg != null && scanProgDlg.ShowDialog() == DialogResult.Cancel)
+                if (scanProgDlg != null)
                 {
-                    cts.Cancel();
-                }
+                    owner.ShowChildDialog(scanProgDlg);
+                    DialogResult ccresult = scanProgDlg.DialogResult;
+
+                    if (ccresult == DialogResult.Cancel)
+                    {
+                        cts.Cancel();
+                    }
+                    else
+                    {
+                        actionWork.Join();
+                    }
+                } 
                 else
                 {
                     actionWork.Join();
                 }
+
+                RemoveDuplicateDownloads(unattended,owner);
+
                 downloadIdentifiers.Reset();
                 OutputActionFiles(); //Save missing shows to XML (and others)
             }
@@ -484,21 +510,23 @@ namespace TVRename
             }
         }
 
-        public struct ScanSettings : IEquatable<ScanSettings>
+        public readonly struct ScanSettings : IEquatable<ScanSettings>
         {
             public readonly bool Unattended;
             public readonly bool Hidden;
             public readonly TVSettings.ScanType Type;
             public readonly List<ShowItem> Shows;
             public readonly CancellationToken Token;
+            public readonly IDialogParent Owner;
 
-            public ScanSettings(List<ShowItem> list, bool unattended, bool hidden, TVSettings.ScanType st,CancellationToken tok)
+            public ScanSettings(List<ShowItem> list, bool unattended, bool hidden, TVSettings.ScanType st,CancellationToken tok, IDialogParent owner)
             {
                 Shows = list;
                 Unattended = unattended;
                 Hidden = hidden;
                 Type = st;
                 Token = tok;
+                Owner = owner;
             }
 
             public bool Equals(ScanSettings other) => Shows==other.Shows && Unattended==other.Unattended && Hidden==other.Hidden && Type==other.Type && Token==other.Token;
@@ -528,36 +556,26 @@ namespace TVRename
             }
         }
 
-        [CanBeNull]
-        private IEnumerable<ShowItem> GetShowList(TVSettings.ScanType st, IEnumerable<ShowItem> passedShows)
+        private IEnumerable<ShowItem>? GetShowList(TVSettings.ScanType st, IEnumerable<ShowItem>? passedShows)
         {
-            switch (st)
+            return st switch
             {
-                case TVSettings.ScanType.Full:
-                    return Library.GetSortedShowItems();
-
-                case TVSettings.ScanType.Quick:
-                    return GetQuickShowsToScan(true, true);
-
-                case TVSettings.ScanType.Recent:
-                    return Library.GetRecentShows();
-
-                case TVSettings.ScanType.SingleShow:
-                    return passedShows;
-
-                default:
-                    return null;
-            }
+                TVSettings.ScanType.Full => Library.GetSortedShowItems(),
+                TVSettings.ScanType.Quick => GetQuickShowsToScan(true, true),
+                TVSettings.ScanType.Recent => Library.GetRecentShows(),
+                TVSettings.ScanType.SingleShow => passedShows,
+                _ => null
+            };
         }
 
-        public void DoAllActions()
+        public void DoAllActions(IDialogParent owner)
         {
             PreventAutoScan("Do all actions");
             ItemList theList = new ItemList();
 
-            theList.AddRange(TheActionList.Actions());
+            theList.AddRange(TheActionList.Actions);
 
-            DoActions(theList);
+            DoActions(theList,owner);
             AllowAutoScan();
         }
 
@@ -584,21 +602,27 @@ namespace TVRename
         public void RemoveIgnored()
         {
             ItemList toRemove = new ItemList();
+            int numberIgnored=0;
+            int numberPreviouslySeen = 0;
             foreach (Item item in TheActionList)
             {
                 if (TVSettings.Instance.Ignore.Any(ii => ii.SameFileAs(item.Ignore)))
                 {
                     toRemove.Add(item);
+                    numberIgnored++;
                 }
 
                 if (TVSettings.Instance.IgnorePreviouslySeen)
                 {
-                    if (TVSettings.Instance.PreviouslySeenEpisodes.Includes(item))
+                    if (TVSettings.Instance.PreviouslySeenEpisodes.Includes(item) && item is ItemMissing)
                     {
                         toRemove.Add(item);
+                        numberPreviouslySeen++;
                     }
                 }
             }
+
+            Logger.Info($"Removing {toRemove.Count} items from the missing items because they are either in the ignore list ({numberIgnored}) or you have ignore previously seen episodes enables ({numberPreviouslySeen})");
 
             foreach (Item action in toRemove)
             {
@@ -608,7 +632,7 @@ namespace TVRename
 
         public void ForceUpdateImages([NotNull] ShowItem si)
         {
-            TheActionList = new ItemList();
+            TheActionList.Clear();
 
             Logger.Info("*******************************");
             Logger.Info("Force Update Images: " + si.ShowName);
@@ -671,7 +695,7 @@ namespace TVRename
                     Thread.Sleep(10); // wait for thread to create the dialog
                 }
 
-                TheActionList = new ItemList();
+                TheActionList.Clear();
                 SetProgressDelegate noProgress = NoProgress;
 
                 if (!settings.Unattended && settings.Type != TVSettings.ScanType.SingleShow)
@@ -685,6 +709,7 @@ namespace TVRename
                 localFinders.Check(scanProgDlg is null ? noProgress : scanProgDlg.LocalSearchProg, specific, settings);
                 downloadFinders.Check(scanProgDlg is null ? noProgress : scanProgDlg.DownloadingProg, specific, settings);
                 searchFinders.Check(scanProgDlg is null? noProgress : scanProgDlg.ToBeDownloadedProg, specific, settings);
+                new CleanUpTorrents(this).Check(scanProgDlg is null ? noProgress : scanProgDlg.ToBeDownloadedProg, specific, settings);
 
                 if (settings.Token.IsCancellationRequested)
                 {
@@ -717,30 +742,72 @@ namespace TVRename
             }
         }
 
+        private void RemoveDuplicateDownloads(bool unattended, IDialogParent owner)
+        {
+            foreach (IGrouping<ProcessedEpisode, ActionTDownload> epGroup in TheActionList.DownloadTorrents
+                .GroupBy(item => item.Episode).Where(items => items.Count() > 1))
+            {
+                List<ActionTDownload> actions = epGroup.ToList();
+
+                switch (WhatAction(unattended))
+                {
+                    case TVSettings.DuplicateActionOutcome.IgnoreAll:
+                        TheActionList.Replace(actions, actions.First().UndoItemMissing);
+                        break;
+
+                    case TVSettings.DuplicateActionOutcome.ChooseFirst:
+                        TheActionList.Replace(actions, actions.First());
+                        break;
+
+                    case TVSettings.DuplicateActionOutcome.Ask:
+                       
+                        ChooseDownload form = new ChooseDownload(epGroup.Key, actions);
+                        owner.ShowChildDialog(form);
+                        DialogResult dr = form.DialogResult;
+                        ActionTDownload userChosenAction = form.UserChosenAction;
+                        form.Dispose();
+
+                        if (dr == DialogResult.OK)
+                        {
+                            TheActionList.Replace(actions, userChosenAction);
+                        }
+                        else
+                        {
+                            TheActionList.Replace(actions, actions.First().UndoItemMissing);
+                        }
+
+                        break;
+
+                    case TVSettings.DuplicateActionOutcome.DoAll:
+                        //Don't need to do anything as it's the default behaviour
+                        break;
+
+                    case TVSettings.DuplicateActionOutcome.MostSeeders:
+                        ActionTDownload bestAction = actions.OrderByDescending(download => download.Seeders).First();
+                        TheActionList.Replace(actions, bestAction);
+                        break;
+
+                    case TVSettings.DuplicateActionOutcome.Largest:
+                        ActionTDownload largestAction = actions.OrderByDescending(download => download.sizeBytes).First();
+                        TheActionList.Replace(actions, largestAction);
+                        break;
+
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
+        }
+
+        private static TVSettings.DuplicateActionOutcome WhatAction(bool unattended)
+        {
+            return unattended
+                ? TVSettings.Instance.UnattendedMultiActionOutcome
+                : TVSettings.Instance.UserMultiActionOutcome;
+        }
+
         private static void NoProgress(int pct, string message)
         {
             //Nothing to do - Method is called if we have no UI
-        }
-
-        public static bool  MatchesSequentialNumber(string filename, [NotNull] ProcessedEpisode pe)
-        {
-            if (pe.OverallNumber == -1)
-            {
-                return false;
-            }
-
-            string num = pe.OverallNumber.ToString();
-            string matchText = "X" + filename + "X"; // need to pad to let it match non-numbers at start and end
-
-            Match betterMatch = Regex.Match(matchText, @"(E|e|Ep|Episode) +0*(?<sequencenumber>\d+)\D");
-
-            if (betterMatch.Success)
-            {
-                int sequenceNUm = int.Parse(betterMatch.Groups["sequencenumber"]?.Value??"-2");
-                return sequenceNUm == pe.OverallNumber;
-            }
-
-            return Regex.Match(matchText, @"\D0*" + num + @"\D").Success;
         }
 
         [NotNull]
@@ -887,7 +954,7 @@ namespace TVRename
             return showsToScan;
         }
 
-        internal void ForceRefresh([CanBeNull] IEnumerable<ShowItem> sis, bool unattended,bool tvrMinimised)
+        internal void ForceRefresh(IEnumerable<ShowItem>? sis, bool unattended,bool tvrMinimised, IDialogParent owner)
         {
             PreventAutoScan("Force Refresh");
             if (sis != null)
@@ -910,17 +977,17 @@ namespace TVRename
                 }
             }
 
-            DoDownloadsFG(unattended, tvrMinimised);
+            DoDownloadsFG(unattended, tvrMinimised,owner);
             AllowAutoScan();
         }
 
         // ReSharper disable once InconsistentNaming
-        internal void TVDBServerAccuracyCheck(bool unattended,bool hidden)
+        internal void TVDBServerAccuracyCheck(bool unattended,bool hidden, IDialogParent owner)
         {
             PreventAutoScan("TVDB Accuracy Check");
             IEnumerable<SeriesInfo> seriesToUpdate = TheTVDB.LocalCache.Instance.ServerAccuracyCheck();
             IEnumerable<ShowItem> showsToUpdate = seriesToUpdate.Select(info => Library.GetShowItem(info.TvdbCode));
-            ForceRefresh(showsToUpdate, unattended, hidden);
+            ForceRefresh(showsToUpdate, unattended, hidden,owner);
             DoDownloadsBG();
             AllowAutoScan();
         }
@@ -941,11 +1008,7 @@ namespace TVRename
                     scanProgDlg.Dispose();
                 }
 
-                // ReSharper disable once UseNullPropagation
-                if (cacheManager != null)
-                {
-                    cacheManager.Dispose();
-                }
+                cacheManager.Dispose();
             }
         }
 
@@ -988,6 +1051,134 @@ namespace TVRename
         public void ReindexLibrary()
         {
             Library.ReIndex();
+        }
+
+        public void UpdateMissingAction([NotNull] ItemMissing mi, string fileName)
+        {
+            // make new Item for copying/moving to specified location
+            FileInfo from = new FileInfo(fileName);
+            FileInfo to = FinderHelper.GenerateTargetName(mi, from); 
+            TheActionList.Add(
+                new ActionCopyMoveRename(
+                    TVSettings.Instance.LeaveOriginals
+                        ? ActionCopyMoveRename.Op.copy
+                        : ActionCopyMoveRename.Op.move, from, to
+                    , mi.MissingEpisode, true, mi, this));
+
+            // and remove old Missing item
+            TheActionList.Remove(mi);
+
+            // if we're copying/moving a file across, we might also want to make a thumbnail or NFO for it
+            DownloadIdentifiersController di = new DownloadIdentifiersController();
+            TheActionList.Add(di.ProcessEpisode(mi.Episode, to));
+
+            //If keep together is active then we may want to copy over related files too
+            if (TVSettings.Instance.KeepTogether)
+            {
+                FileFinder.KeepTogether(TheActionList, false, true, this);
+            }
+        }
+
+        public void IgnoreSeasonForItem(Item? er)
+        {
+            if (er?.Episode is null)
+            {
+                return;
+            }
+
+            int snum = er.Episode.AppropriateSeasonNumber;
+
+            if (!er.Episode.Show.IgnoreSeasons.Contains(snum))
+            {
+                er.Episode.Show.IgnoreSeasons.Add(snum);
+            }
+
+            // remove all other episodes of this season from the Action list
+            ItemList remove = new ItemList();
+            foreach (Item action in TheActionList)
+            {
+                Item er2 = action;
+                if (er2?.Episode is null)
+                {
+                    continue;
+                }
+
+                if (er2.Episode.AppropriateSeasonNumber != snum)
+                {
+                    continue;
+                }
+
+                if (er2.TargetFolder == er.TargetFolder) //ie if they are for the same series
+                {
+                    remove.Add(action);
+                }
+            }
+
+            foreach (Item action in remove)
+            {
+                TheActionList.Remove(action);
+            }
+
+            if (remove.Count > 0)
+            {
+                SetDirty();
+            }
+        }
+
+        public void RevertAction(Item item)
+        {
+            Action revertAction = (Action)item;
+            ItemMissing m2 = revertAction.UndoItemMissing;
+
+            if (m2 is null)
+            {
+                return;
+            }
+
+            TheActionList.Add(m2);
+            TheActionList.Remove(revertAction);
+
+            //We can remove any CopyMoveActions that are closely related too
+            if (!(revertAction is ActionCopyMoveRename))
+            {
+                return;
+            }
+
+            ActionCopyMoveRename i2 = (ActionCopyMoveRename)item;
+            List<Item> toRemove = new List<Item>();
+
+            foreach (Item a in TheActionList)
+            {
+                switch (a)
+                {
+                    case ItemMissing _:
+                        continue;
+
+                    case ActionCopyMoveRename i1:
+                    {
+                        if (i1.From.RemoveExtension(true).StartsWith(i2.From.RemoveExtension(true), StringComparison.Ordinal))
+                        {
+                            toRemove.Add(i1);
+                        }
+
+                        break;
+                    }
+
+                    case Item ad:
+                    {
+                        if (ad.Episode?.AppropriateEpNum == i2.Episode?.AppropriateEpNum &&
+                            ad.Episode?.AppropriateSeasonNumber == i2.Episode?.AppropriateSeasonNumber)
+                        {
+                            toRemove.Add(a);
+                        }
+
+                        break;
+                    }
+                }
+            }
+
+            //Remove all similar items
+            TheActionList.Remove(toRemove);
         }
     }
 }

@@ -25,7 +25,7 @@ namespace TVRename
         public readonly FileInfo To;
         private readonly TVDoc doc;
 
-        public ActionCopyMoveRename(Op operation, FileInfo from, FileInfo to, ProcessedEpisode ep, bool doTidyup,ItemMissing undoItem,TVDoc tvDoc)
+        public ActionCopyMoveRename(Op operation, FileInfo from, FileInfo to, ProcessedEpisode ep, bool doTidyup,ItemMissing? undoItem,TVDoc tvDoc)
         {
             Tidyup = doTidyup? TVSettings.Instance.Tidyup:null;
             PercentDone = 0;
@@ -45,15 +45,13 @@ namespace TVRename
 
         #region Action Members
 
-        [NotNull]
-        public override string Name => IsMoveRename() ? "Move" : "Copy";
+        public override string Name => Operation==Op.rename? "Rename" :  IsMoveRename() ? "Move" : "Copy";
 
         public override string ProgressText => To.Name;
 
         // 0.0 to 100.0
         public override long SizeOfWork => QuickOperation() ? 10000 : SourceFileSize();
 
-        [NotNull]
         public override ActionOutcome Go(TVRenameStats stats)
         {
             // read NTFS permissions (if any)
@@ -107,7 +105,7 @@ namespace TVRename
                     //File is correct name
                     LOGGER.Debug($"Just copied {To.FullName} to the right place. Marking it as 'seen'.");
                     //Record this episode as seen
-                    TVSettings.Instance.PreviouslySeenEpisodes.EnsureAdded(Episode);
+                    TVSettings.Instance.PreviouslySeenEpisodes.EnsureAdded(SourceEpisode);
 
                     if (TVSettings.Instance.IgnorePreviouslySeen) { doc.SetDirty(); }
                 }
@@ -196,31 +194,26 @@ namespace TVRename
         public override int IconNumber => IsMoveRename() ? 4 : 3;
         #endregion
 
-        #region Item Members
-        [CanBeNull]
-        public override IgnoreItem Ignore => To is null ? null : new IgnoreItem(To.FullName);
+        public ProcessedEpisode SourceEpisode => Episode ?? throw new InvalidOperationException();
 
-        [NotNull]
+        #region Item Members
+        public override IgnoreItem Ignore => new IgnoreItem(To.FullName);
+
         public override string ScanListViewGroup
         {
             get
             {
-                switch (Operation)
+                return Operation switch
                 {
-                    case Op.rename:
-                        return "lvgActionRename";
-                    case Op.copy:
-                        return "lvgActionCopy";
-                    case Op.move:
-                        return "lvgActionMove";
-                    default:
-                        return "lvgActionCopy";
-                }
+                    Op.rename => "lvgActionRename",
+                    Op.copy => "lvgActionCopy",
+                    Op.move => "lvgActionMove",
+                    _ => "lvgActionCopy"
+                };
             }
         }
 
-        [CanBeNull]
-        public override  string TargetFolder => To?.DirectoryName;
+        public override  string TargetFolder => To.DirectoryName;
 
         #endregion
 
@@ -229,7 +222,7 @@ namespace TVRename
 
         public bool QuickOperation()
         {
-            if (From is null || To is null || From.Directory is null || To.Directory is null)
+            if (From.Directory is null || To.Directory is null)
             {
                 return false;
             }
@@ -273,8 +266,8 @@ namespace TVRename
             }
         }
 
-        protected override string DestinationFolder => To.DirectoryName;
-        protected override string DestinationFile => To.Name;
-        protected override string SourceDetails => From.FullName;
+        public override string DestinationFolder => To.DirectoryName;
+        public override string DestinationFile => To.Name;
+        public override string SourceDetails => From.FullName;
     }
 }

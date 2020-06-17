@@ -84,7 +84,7 @@ namespace TVRename
         public IEnumerable<string> GetStatuses()
         {
             return Values
-                .Where(s => !string.IsNullOrWhiteSpace(s?.ShowStatus))
+                .Where(s => !string.IsNullOrWhiteSpace(s.ShowStatus))
                 .Select(s => s.ShowStatus)
                 .Distinct()
                 .OrderBy(s => s);
@@ -129,8 +129,7 @@ namespace TVRename
             return returnList;
         }
 
-        [CanBeNull]
-        public ShowItem GetShowItem(int id) => ContainsKey(id) ? this[id] : null;
+        public ShowItem? GetShowItem(int id) => ContainsKey(id) ? this[id] : null;
 
         public void GenDict()
         {
@@ -206,8 +205,7 @@ namespace TVRename
             }
         }
 
-        [CanBeNull]
-        public static List<ProcessedEpisode> GenerateEpisodes([NotNull] ShowItem si, int snum, bool applyRules)
+        public static List<ProcessedEpisode>? GenerateEpisodes([NotNull] ShowItem si, int snum, bool applyRules)
         {
             if (!si.AppropriateSeasons().ContainsKey(snum))
             {
@@ -349,63 +347,65 @@ namespace TVRename
         {
             foreach (ShowRule sr in rules)
             {
-                try
-                {
-                    // turn nn1 and nn2 from ep number into position in array
-                    int n1 = FindIndex(eis, sr.First);
-                    int n2 = FindIndex(eis, sr.Second);
-
-                    switch (sr.DoWhatNow)
-                    {
-                        case RuleAction.kRename:
-                            RenameEpisode(eis, n1, sr.UserSuppliedText);
-                            break;
-
-                        case RuleAction.kRemove:
-                            RemoveEpisode(eis, n1, n2);
-                            break;
-
-                        case RuleAction.kIgnoreEp:
-                            IgnoreEpisodes(eis, n1, n2);
-                            break;
-
-                        case RuleAction.kSplit:
-                            SplitEpisode(eis, show, sr.Second, n1);
-                            break;
-
-                        case RuleAction.kMerge:
-                        case RuleAction.kCollapse:
-                            MergeEpisodes(eis, show, sr.DoWhatNow, n1, n2, sr.UserSuppliedText);
-                            break;
-
-                        case RuleAction.kSwap:
-                            SwapEpisode(eis, n1, n2);
-                            break;
-
-                        case RuleAction.kInsert:
-                        {
-                            // this only applies for inserting an episode, at the end of the list
-                            if (sr.First == eis[eis.Count - 1].AppropriateEpNum + 1) // after the last episode
-                            {
-                                n1 = eis.Count;
-                            }
-
-                            InsertEpisode(eis, show, n1, sr.UserSuppliedText);
-                            break;
-                        }
-                    }
-
-                    Renumber(eis);
-                }
-                catch (Exception e)
-                {
-                    Logger.Warn(
-                        $"Please review rules for {show.ShowName} season {eis.FirstOrDefault()?.AppropriateSeasonNumber}");
-                    Logger.Warn(e,$"Could not process rule for {show.ShowName}, {sr.DoWhatNow}:{sr.First}:{sr.Second}:{sr.UserSuppliedText}");
-                }
+                ApplyRule(eis, show, sr);
             } // for each rule
 
             RemoveIgnoredEpisodes(eis);
+        }
+
+        private static void ApplyRule([NotNull] List<ProcessedEpisode> episodes, ShowItem show, [NotNull] ShowRule sr)
+        {
+            try
+            {
+                // turn nn1 and nn2 from ep number into position in array
+                int n1 = FindIndex(episodes, sr.First);
+                int n2 = FindIndex(episodes, sr.Second);
+
+                switch (sr.DoWhatNow)
+                {
+                    case RuleAction.kRename:
+                        RenameEpisode(episodes, n1, sr.UserSuppliedText);
+                        break;
+
+                    case RuleAction.kRemove:
+                        RemoveEpisode(episodes, n1, n2);
+                        break;
+
+                    case RuleAction.kIgnoreEp:
+                        IgnoreEpisodes(episodes, n1, n2);
+                        break;
+
+                    case RuleAction.kSplit:
+                        SplitEpisode(episodes, show, sr.Second, n1);
+                        break;
+
+                    case RuleAction.kMerge:
+                    case RuleAction.kCollapse:
+                        MergeEpisodes(episodes, show, sr.DoWhatNow, n1, n2, sr.UserSuppliedText);
+                        break;
+
+                    case RuleAction.kSwap:
+                        SwapEpisode(episodes, n1, n2);
+                        break;
+
+                    case RuleAction.kInsert:
+                        InsertEpisode(episodes, show, n1, sr.UserSuppliedText, sr);
+                        break;
+                }
+
+                if (sr.RenumberAfter)
+                {
+                    Renumber(episodes);
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Warn(
+                    $"Please review rules for {show.ShowName} season {episodes.FirstOrDefault()?.AppropriateSeasonNumber}");
+
+                Logger.Warn(e,
+                    $"Could not process rule for {show.ShowName}, {sr.DoWhatNow}:{sr.First}:{sr.Second}:{sr.UserSuppliedText}");
+            }
         }
 
         private static void RemoveIgnoredEpisodes([NotNull] IList<ProcessedEpisode> eis)
@@ -511,7 +511,7 @@ namespace TVRename
             }
         }
 
-        private static void MergeEpisodes([NotNull] List<ProcessedEpisode> eis, ShowItem si, RuleAction action, int fromIndex, int toIndex, [CanBeNull] string newName)
+        private static void MergeEpisodes([NotNull] List<ProcessedEpisode> eis, ShowItem si, RuleAction action, int fromIndex, int toIndex, string? newName)
         {
             int ec = eis.Count;
             if (ValidIndex(fromIndex, ec) && ValidIndex(toIndex, ec) && fromIndex < toIndex)
@@ -553,8 +553,14 @@ namespace TVRename
             }
         }
 
-        private static void InsertEpisode([NotNull] IList<ProcessedEpisode> eis, ShowItem si, int index, string txt)
+        private static void InsertEpisode([NotNull] IList<ProcessedEpisode> eis, ShowItem si, int index, string txt, [NotNull] ShowRule sr)
         {
+            // this only applies for inserting an episode, at the end of the list
+            if (sr.First == eis[eis.Count - 1].AppropriateEpNum + 1) // after the last episode
+            {
+                index = eis.Count;
+            }
+
             int ec = eis.Count;
 
             if (ValidIndex(index, ec))
@@ -669,8 +675,7 @@ namespace TVRename
             return found;
         }
 
-        [CanBeNull]
-        private ProcessedEpisode GetNextMostRecentProcessedEpisode(int nDaysFuture, ICollection<ProcessedEpisode> found, DateTime notBefore)
+        private ProcessedEpisode? GetNextMostRecentProcessedEpisode(int nDaysFuture, ICollection<ProcessedEpisode> found, DateTime notBefore)
         {
             ProcessedEpisode nextAfterThat = null;
             TimeSpan howClose = TimeSpan.MaxValue;

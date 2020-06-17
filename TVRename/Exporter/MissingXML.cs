@@ -41,19 +41,19 @@ namespace TVRename
                 writer.WriteAttributeToXml("Version", "2.1");
                 writer.WriteStartElement("MissingItems");
 
-                foreach (ItemMissing missing in TheActionList.MissingItems().ToList())
+                foreach (ItemMissing missing in TheActionList.Missing.ToList())
                 {
                     writer.WriteStartElement("MissingItem");
 
-                    writer.WriteElement("id", missing.Episode.Show.TvdbCode);
-                    writer.WriteElement("title", missing.Episode.TheSeries.Name);
-                    writer.WriteElement("season", Helpers.Pad(missing.Episode.AppropriateSeasonNumber));
-                    writer.WriteElement("episode", Helpers.Pad(missing.Episode.AppropriateEpNum));
-                    writer.WriteElement("episodeName", missing.Episode.Name);
-                    writer.WriteElement("description", missing.Episode.Overview);
+                    writer.WriteElement("id", missing.MissingEpisode.Show.TvdbCode);
+                    writer.WriteElement("title", missing.MissingEpisode.TheSeries.Name);
+                    writer.WriteElement("season", Helpers.Pad(missing.MissingEpisode.AppropriateSeasonNumber));
+                    writer.WriteElement("episode", Helpers.Pad(missing.MissingEpisode.AppropriateEpNum));
+                    writer.WriteElement("episodeName", missing.MissingEpisode.Name);
+                    writer.WriteElement("description", missing.MissingEpisode.Overview);
 
                     writer.WriteStartElement("pubDate");
-                    DateTime? dt = missing.Episode.GetAirDateDt(true);
+                    DateTime? dt = missing.MissingEpisode.GetAirDateDt(true);
                     if (dt != null)
                     {
                         writer.WriteValue(dt.Value.ToString("F"));

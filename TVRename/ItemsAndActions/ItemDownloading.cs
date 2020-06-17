@@ -8,7 +8,6 @@
 
 using Alphaleonis.Win32.Filesystem;
 using System;
-using JetBrains.Annotations;
 
 namespace TVRename
 {
@@ -17,28 +16,28 @@ namespace TVRename
         private readonly IDownloadInformation entry;
         public readonly string DesiredLocationNoExt;
 
-        [CanBeNull]
-        public override IgnoreItem Ignore => GenerateIgnore(DesiredLocationNoExt);
-        [NotNull]
+        public override IgnoreItem? Ignore => GenerateIgnore(DesiredLocationNoExt);
         public override string ScanListViewGroup => "lvgDownloading";
 
-        [CanBeNull]
-        protected override string DestinationFolder => TargetFolder;
-        protected override string DestinationFile => entry.FileIdentifier;
-        protected override string SourceDetails => entry.RemainingText;
+        public override string? DestinationFolder => TargetFolder;
+        public override string DestinationFile => entry.FileIdentifier;
+        public override string SourceDetails => entry.RemainingText;
 
         public override int IconNumber { get; }
-        [CanBeNull]
-        public override string TargetFolder => string.IsNullOrEmpty(entry.Destination) ? null : new FileInfo(entry.Destination).DirectoryName;
+        public override string? TargetFolder => string.IsNullOrEmpty(entry.Destination) ? null : new FileInfo(entry.Destination).DirectoryName;
 
         public ItemDownloading(IDownloadInformation dl, ProcessedEpisode pe, string desiredLocationNoExt, DownloadingFinder.DownloadApp tApp)
         {
             Episode = pe;
             DesiredLocationNoExt = desiredLocationNoExt;
             entry = dl;
-            IconNumber = tApp == DownloadingFinder.DownloadApp.uTorrent ? 2 :
-                         tApp == DownloadingFinder.DownloadApp.SABnzbd  ? 8 :
-                         tApp == DownloadingFinder.DownloadApp.qBitTorrent ? 10 : 0;
+            IconNumber = tApp switch
+            {
+                DownloadingFinder.DownloadApp.uTorrent => 2,
+                DownloadingFinder.DownloadApp.SABnzbd => 8,
+                DownloadingFinder.DownloadApp.qBitTorrent => 10,
+                _ => 0
+            };
         }
 
         #region Item Members
@@ -47,6 +46,8 @@ namespace TVRename
         {
             return o is ItemDownloading torrenting && entry == torrenting.entry;
         }
+
+        public override string Name => "Already Downloading";
 
         public override int CompareTo(object o)
         {

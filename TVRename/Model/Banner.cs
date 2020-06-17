@@ -20,14 +20,14 @@ namespace TVRename
     {
         public int BannerId;
         public int LanguageId;
-        public string BannerPath;
-        public string BannerType;
-        private string resolution;
+        public string? BannerPath;
+        public string? BannerType;
+        private string? resolution;
         public double Rating;
         public int RatingCount;
         public int SeasonId;
         public int SeriesId;
-        private string thumbnailPath;
+        private string? thumbnailPath;
 
         public Banner(int seriesId, [NotNull] XElement r)
         {
@@ -82,8 +82,8 @@ namespace TVRename
             BannerType = (string)json["keyType"];
             LanguageId = json["languageId"] is null ? langId  : (int)json["languageId"];
             
-            double.TryParse((string)json["ratingsInfo"]["average"], NumberStyles.AllowDecimalPoint | NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite, CultureInfo.CreateSpecificCulture("en-US"), out Rating);
-            RatingCount = (int)json["ratingsInfo"]["count"];
+            double.TryParse((string)json["ratingsInfo"]?["average"], NumberStyles.AllowDecimalPoint | NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite, CultureInfo.CreateSpecificCulture("en-US"), out Rating);
+            RatingCount = (int)json["ratingsInfo"]?["count"];
 
             resolution = (string)json["resolution"];
             int.TryParse((string)json["subKey"], out SeasonId);

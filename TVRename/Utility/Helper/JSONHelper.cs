@@ -19,7 +19,7 @@ namespace TVRename
     public static class JsonHelper
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-        public static DateTime? ParseAirTime([CanBeNull] string theTime)
+        public static DateTime? ParseAirTime(string? theTime)
         {
             try
             {
@@ -44,7 +44,7 @@ namespace TVRename
         }
 
         [NotNull]
-        public static string Flatten([CanBeNull]this JToken ja,string delimiter)
+        public static string Flatten(this JToken? ja,string delimiter)
         {
             if (ja is null)
             {
@@ -58,7 +58,12 @@ namespace TVRename
 
             JArray ja2 = (JArray)ja;
             string[] values = ja2.ToObject<string[]>();
-            return string.Join(delimiter, values);
+            if (values != null)
+            {
+                return string.Join(delimiter, values);
+            }
+
+            return string.Empty;
         }
 
         [NotNull]
@@ -85,7 +90,7 @@ namespace TVRename
         {
             string valueAsString = (string)r[key];
 
-            if (valueAsString.IsNullOrWhitespace())
+            if (!valueAsString.HasValue())
             {
                 return 0;
             }
@@ -98,7 +103,7 @@ namespace TVRename
             return returnValue;
         }
 
-        public static DateTime? ParseFirstAired([CanBeNull] string theDate)
+        public static DateTime? ParseFirstAired(string? theDate)
         {
             if (DateTime.TryParseExact(theDate, new[] { "yyyy-MM-dd", "yyyy-MM-d" }, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime output))
             {

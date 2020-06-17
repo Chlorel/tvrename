@@ -55,10 +55,10 @@ namespace TVRename
             return source.IndexOf(toCheck, comp) >= 0;
         }
 
-        public static bool HasValue([CanBeNull] this string s) => !string.IsNullOrWhiteSpace(s);
+        public static bool HasValue(this string? s) => !string.IsNullOrWhiteSpace(s);
 
         [NotNull]
-        public static string ReplaceInsensitive([NotNull] this string source, [NotNull] string search, [NotNull] string replacement)
+        public static string ReplaceInsensitive([NotNull] this string source, [NotNull] string search, string? replacement)
         {
             if (!source.HasValue())
             {
@@ -72,16 +72,16 @@ namespace TVRename
                 RegexOptions.IgnoreCase);
         }
 
-        public static bool ContainsAnyCharctersFrom(this string source, [NotNull] IEnumerable<char> possibleChars)
+        public static bool ContainsAnyCharactersFrom(this string source, [NotNull] IEnumerable<char> possibleChars)
         {
             return possibleChars.Any(testChar => source.Contains(testChar.ToString()));
         }
-        public static bool ContainsAnyCharctersFrom(this string source, [NotNull] string possibleChars)
+        public static bool ContainsAnyCharactersFrom(this string source, [NotNull] string possibleChars)
         {
-            return ContainsAnyCharctersFrom(source,possibleChars.ToCharArray());
+            return ContainsAnyCharactersFrom(source,possibleChars.ToCharArray());
         }
 
-        public static bool IsNullOrWhitespace([CanBeNull] this string text) => string.IsNullOrWhiteSpace(text);
+        public static bool IsNullOrWhitespace(this string? text) => string.IsNullOrWhiteSpace(text);
 
         [NotNull]
         public static string RemoveLastCharacter([NotNull] this string instr)
@@ -130,12 +130,31 @@ namespace TVRename
         [NotNull]
         public static string TrimEnd([NotNull] this string root, [NotNull] string ending)
         {
+            if (!root.HasValue())
+            {
+                return root;
+            }
             if (!root.EndsWith(ending, StringComparison.OrdinalIgnoreCase))
             {
                 return root;
             }
 
             return root.RemoveLast(ending.Length);
+        }
+
+        [NotNull]
+        public static string TrimStartString([NotNull] this string root, [NotNull] string startString)
+        {
+            if (!root.HasValue())
+            {
+                return root;
+            }
+            if (!root.StartsWith(startString, StringComparison.OrdinalIgnoreCase))
+            {
+                return root;
+            }
+
+            return root.RemoveFirst(startString.Length);
         }
 
         [NotNull]
@@ -188,6 +207,11 @@ namespace TVRename
         public static string ToCsv([NotNull] this IEnumerable<string> values)
         {
             return string.Join(", ", values);
+        }
+        [NotNull]
+        public static string Concat([NotNull] this IEnumerable<string> values)
+        {
+            return string.Join(string.Empty,values);
         }
     }
 }

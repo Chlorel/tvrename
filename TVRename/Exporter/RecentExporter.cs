@@ -24,7 +24,7 @@ namespace TVRename
 
         protected override void Do()
         {
-            IEnumerable<ProcessedEpisode> lpe = doc.Library.RecentEpisodes(TVSettings.Instance.WTWRecentDays);
+            IEnumerable<ProcessedEpisode> lpe = doc.Library.RecentEpisodes(TVSettings.Instance.WTWRecentDays).ToList();
             DirFilesCache dfc = new DirFilesCache();
 
             //Write Contents to file
@@ -50,7 +50,7 @@ namespace TVRename
                     catch (Exception ex)
                     {
                         LOGGER.Error(ex,
-                            $"Had to skip saving {episode?.Show?.ShowName} S{episode?.AppropriateSeasonNumber}E{episode?.AppropriateEpNum} saving to {Location()}");
+                            $"Had to skip saving {episode?.Show.ShowName} S{episode?.AppropriateSeasonNumber}E{episode?.AppropriateEpNum} saving to {Location()}");
                     }
                 }
 

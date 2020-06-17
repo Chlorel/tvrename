@@ -86,7 +86,7 @@ namespace TVRename
         public string NameFor([NotNull] ProcessedEpisode pe) => NameFor(pe,string.Empty,0);
 
         [NotNull]
-        public string NameFor([NotNull] ProcessedEpisode pe, [CanBeNull] string extension,int folderNameLength)
+        public string NameFor([NotNull] ProcessedEpisode pe, string? extension,int folderNameLength)
         {
             const int MAX_LENGTH = 260;
             int maxFilenameLength = MAX_LENGTH - 1 - folderNameLength - (extension?.Length ?? 5); //Assume a max 5 character extension
@@ -158,7 +158,7 @@ namespace TVRename
             name = name.ReplaceInsensitive("{Number}", "");
             name = name.ReplaceInsensitive("{Number:2}", "");
             name = name.ReplaceInsensitive("{Number:3}", "");
-            name = name.ReplaceInsensitive("{Imdb}", ep.ImdbCode);
+            name = name.ReplaceInsensitive("{Imdb}", ep.ImdbCode??string.Empty);
 
             SeriesInfo si = show.TheSeries();
             name = name.ReplaceInsensitive("{ShowImdb}", si?.Imdb??string.Empty);
@@ -225,19 +225,21 @@ namespace TVRename
         {
             try
             {
-                string name = styleString;
+                string name = pe.Show.UseCustomNamingFormat && pe.Show.CustomNamingFormat.HasValue()
+                    ? pe.Show.CustomNamingFormat
+                    : styleString;
 
-                string showname = pe.Show.ShowName;
-                string epname = pe.Name;
+                string showName = pe.Show.ShowName;
+                string episodeName = pe.Name;
                 if (urlEncode)
                 {
-                    showname = Uri.EscapeDataString(showname);
-                    epname = Uri.EscapeDataString(epname);
+                    showName = Uri.EscapeDataString(showName);
+                    episodeName = Uri.EscapeDataString(episodeName);
                 }
 
-                name = name.ReplaceInsensitive("{ShowName}", showname);
+                name = name.ReplaceInsensitive("{ShowName}", showName);
                 name = name.ReplaceInsensitive("{ShowNameLower}", pe.Show.ShowName.ToLower().Replace(' ','-').RemoveCharactersFrom("()[]{}&$:"));
-                name = name.ReplaceInsensitive("{ShowNameInitial}", showname.Initial().ToLower());
+                name = name.ReplaceInsensitive("{ShowNameInitial}", showName.Initial().ToLower());
                 name = name.ReplaceInsensitive("{Season}", pe.AppropriateSeasonNumber.ToString());
                 name = name.ReplaceInsensitive("{Season:2}", pe.AppropriateSeasonNumber.ToString("00"));
                 name = name.ReplaceInsensitive("{SeasonNumber}", pe.AppropriateSeasonIndex.ToString());
@@ -247,14 +249,14 @@ namespace TVRename
                 name = name.ReplaceInsensitive("{Episode}", pe.AppropriateEpNum.ToString(episodeFormat));
                 name = name.ReplaceInsensitive("{Episode2}", pe.EpNum2.ToString(episodeFormat));
 
-                name = name.ReplaceInsensitive("{EpisodeName}", epname);
+                name = name.ReplaceInsensitive("{EpisodeName}", episodeName);
                 name = name.ReplaceInsensitive("{Number}", pe.OverallNumber.ToString());
                 name = name.ReplaceInsensitive("{Number:2}", pe.OverallNumber.ToString("00"));
                 name = name.ReplaceInsensitive("{Number:3}", pe.OverallNumber.ToString("000"));
                 name = name.ReplaceInsensitive("{Year}", pe.TheSeries.MinYear.ToString());
                 name = name.ReplaceInsensitive("{SeasonYear}", pe.AppropriateProcessedSeason.MinYear().ToString());
                 name = name.ReplaceInsensitive("{Imdb}", pe.ImdbCode);
-                name = name.ReplaceInsensitive("{ShowImdb}", pe.Show?.TheSeries()?.Imdb ?? string.Empty);
+                name = name.ReplaceInsensitive("{ShowImdb}", pe.Show.TheSeries()?.Imdb ?? string.Empty);
 
                 name = ReplaceDates(urlEncode, name, pe.GetAirDateDt(false));
                 name = Regex.Replace(name, "{AllEpisodes}", AllEpsText(pe), RegexOptions.IgnoreCase);

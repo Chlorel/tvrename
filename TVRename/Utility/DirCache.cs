@@ -22,9 +22,9 @@ namespace TVRename
         {
         }
 
-        public DirCache(SetProgressDelegate prog, string folder, bool subFolders)
+        public DirCache(SetProgressDelegate progress, string folder, bool subFolders)
         {
-            BuildDirCache(prog, 0, 0, folder, subFolders);
+            BuildDirCache(progress, 0, 0, folder, subFolders);
         }
 
         public static int CountFiles(string folder, bool subFolders)
@@ -81,7 +81,7 @@ namespace TVRename
             return n;
         }
 
-        public void AddFolder(SetProgressDelegate prog, int initialCount, int totalFiles, string folder,
+        public void AddFolder(SetProgressDelegate? prog, int initialCount, int totalFiles, string folder,
             bool subFolders)
         {
             BuildDirCache(prog, initialCount, totalFiles, folder, subFolders);
@@ -89,12 +89,12 @@ namespace TVRename
 
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
-        private int BuildDirCache(SetProgressDelegate prog, int count, int totalFiles, string folder, bool subFolders)
+        private void BuildDirCache(SetProgressDelegate? prog, int count, int totalFiles, string folder, bool subFolders)
         {
             if (!Directory.Exists(folder))
             {
                 Logger.Warn("The search folder \"" + folder + " does not exist.");
-                return count;
+                return;
             }
 
             try
@@ -102,12 +102,11 @@ namespace TVRename
                 DirectoryInfo di = new DirectoryInfo(folder);
                 if (!di.Exists)
                 {
-                    return count;
+                    return;
                 }
 
                 foreach (FileInfo ff in GetFiles(di))
                 {
-                    count++;
                     Add(new DirCacheEntry(ff));
                     if (prog != null && totalFiles != 0)
                     {
@@ -119,7 +118,7 @@ namespace TVRename
                 {
                     foreach (DirectoryInfo di2 in GetDirectoryInfo(di))
                     {
-                        count += BuildDirCache(prog, count, totalFiles, di2.FullName, true);
+                        BuildDirCache(prog, count, totalFiles, di2.FullName, true);
                     }
                 }
             }
@@ -127,7 +126,6 @@ namespace TVRename
             {
                 Logger.Error(exception);
             }
-            return count;
         }
 
         private static IEnumerable<DirectoryInfo> GetDirectoryInfo(DirectoryInfo di)

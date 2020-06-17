@@ -18,10 +18,9 @@ namespace TVRename
         public FindNewShowsInLibrary(TVDoc doc) : base(doc)
         {
         }
-        [NotNull]
         protected override string CheckName() => "Looked in the library for any new shows to be added (bulk add)";
 
-        protected override void DoCheck([NotNull] SetProgressDelegate prog, ICollection<ShowItem> showList, TVDoc.ScanSettings settings)
+        protected override void DoCheck(SetProgressDelegate prog, ICollection<ShowItem> showList, TVDoc.ScanSettings settings)
         {
             BulkAddManager bam = new BulkAddManager(MDoc);
             bam.CheckFolders(settings.Token, prog, false,!settings.Unattended);
@@ -37,7 +36,7 @@ namespace TVRename
             bam.AddAllToMyShows();
 
             MDoc.SetDirty();
-            MDoc.DoDownloadsFG(settings.Unattended,settings.Hidden);
+            MDoc.DoDownloadsFG(settings.Unattended,settings.Hidden,settings.Owner);
 
             List<ShowItem> addedShows = idsToAdd.Select(s => MDoc.Library.GetShowItem(s)).ToList();
 
@@ -46,9 +45,9 @@ namespace TVRename
             {
                 showList.Add(si);
             }
-            LOGGER.Info("Added new shows called: {0}", addedShows.Select(si => si?.ShowName).ToCsv());
+            LOGGER.Info("Added new shows called: {0}", addedShows.Select(si => si.ShowName).ToCsv());
 
-            MDoc.DoWhenToWatch(true,settings.Unattended,settings.Hidden);
+            MDoc.DoWhenToWatch(true,settings.Unattended,settings.Hidden, settings.Owner);
 
             MDoc.WriteUpcoming();
             MDoc.WriteRecent();
@@ -63,11 +62,11 @@ namespace TVRename
                     break;
                 }
 
-                AskUserAboutShow(folder);
+                AskUserAboutShow(folder,settings.Owner);
             }
         }
 
-        private void AskUserAboutShow([NotNull] FoundFolder folder)
+        private void AskUserAboutShow([NotNull] FoundFolder folder, IDialogParent owner)
         {
             if (folder.CodeKnown)
             {
@@ -82,12 +81,18 @@ namespace TVRename
             }
 
             FolderMonitorEdit ed = new FolderMonitorEdit(folder);
-            if (ed.ShowDialog() != DialogResult.OK || ed.Code == -1)
+
+            owner.ShowChildDialog(ed);
+            DialogResult x = ed.DialogResult;
+            int code = ed.Code;
+            ed.Dispose();
+
+            if (x != DialogResult.OK || code == -1)
             {
                 return;
             }
 
-            folder.TVDBCode = ed.Code;
+            folder.TVDBCode = code;
         }
 
         public override bool Active() => TVSettings.Instance.DoBulkAddInScan;

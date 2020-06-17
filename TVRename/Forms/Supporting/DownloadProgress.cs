@@ -25,14 +25,12 @@ namespace TVRename
         public DownloadProgress(CacheUpdater doc)
         {
             InitializeComponent();
-
             mDoc = doc;
         }
 
         private void bnCancel_Click(object sender, System.EventArgs e)
         {
             tmrUpdate.Stop();
-            //mDoc.StopBgDownloadThread();
             DialogResult = DialogResult.Abort;
         }
 
@@ -46,11 +44,6 @@ namespace TVRename
             {
                 UpdateStuff();
             }
-        }
-
-        private void DownloadProgress_Load(object sender, System.EventArgs e)
-        {
-            //UpdateStuff();
         }
 
         private void UpdateStuff()

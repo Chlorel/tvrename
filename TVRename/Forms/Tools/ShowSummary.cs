@@ -24,14 +24,14 @@ using RowHeader = SourceGrid.Cells.RowHeader;
 
 namespace TVRename
 {
-    public partial class ShowSummary : Form
+    public partial class ShowSummary : Form,IDialogParent
     {
         private readonly TVDoc mDoc;
 
         private List<string> mFoldersToOpen;
         private List<FileInfo> mLastFileList;
-        private ProcessedSeason mLastProcessedSeasonClicked;
-        private ShowItem mLastShowClicked;
+        private ProcessedSeason? mLastProcessedSeasonClicked;
+        private ShowItem? mLastShowClicked;
         private readonly List<ShowSummaryData> showList;
 
         public ShowSummary(TVDoc doc)
@@ -40,6 +40,8 @@ namespace TVRename
 
             mDoc = doc;
             showList = new List<ShowSummaryData>();
+            mFoldersToOpen = new List<string>();
+            mLastFileList = new List<FileInfo>();
         }
 
         public void GenerateData()
@@ -199,14 +201,16 @@ namespace TVRename
                 foreach (int snum in si.AppropriateSeasons().Keys)
                 {
                     ShowSummaryData.ShowSummarySeasonData seasonData = GetSeasonDetails(si, snum);
-                    showSummary.AddSeason(seasonData);
+                    if (seasonData != null)
+                    {
+                        showSummary.AddSeason(seasonData);
+                    }
                 }
             }
             return showSummary;
         }
 
-        [NotNull]
-        private static ShowSummaryData.ShowSummarySeasonData GetSeasonDetails([NotNull] ShowItem si, int snum)
+        private static ShowSummaryData.ShowSummarySeasonData? GetSeasonDetails([NotNull] ShowItem si, int snum)
         {
             int epCount = 0;
             int epGotCount = 0;
@@ -239,7 +243,14 @@ namespace TVRename
                     }
                 }
             }
-            return new ShowSummaryData.ShowSummarySeasonData(snum, epCount, epAiredCount, epGotCount, processedSeason,si.IgnoreSeasons.Contains(snum));
+
+            if (processedSeason != null)
+            {
+                return new ShowSummaryData.ShowSummarySeasonData(snum, epCount, epAiredCount, epGotCount,
+                    processedSeason, si.IgnoreSeasons.Contains(snum));
+            }
+
+            return null;
         }
 
         private void showRightClickMenu_ItemClicked(object sender, [NotNull] ToolStripItemClickedEventArgs e)
@@ -267,9 +278,9 @@ namespace TVRename
                         if (n >= RightClickCommands.kWatchBase && n < RightClickCommands.kOpenFolderBase)
                         {
                             int wn = n - RightClickCommands.kWatchBase;
-                            if (mLastFileList != null && wn >= 0 && wn < mLastFileList.Count)
+                            if (wn >= 0 && wn < mLastFileList.Count)
                             {
-                                Helpers.SysOpen(mLastFileList[wn].FullName);
+                                Helpers.OpenFile(mLastFileList[wn].FullName);
                             }
                         }
                         else if (n >= RightClickCommands.kOpenFolderBase)
@@ -282,7 +293,7 @@ namespace TVRename
 
                                 if (Directory.Exists(folder))
                                 {
-                                    Helpers.SysOpen(folder);
+                                    Helpers.OpenFolder(folder);
                                 }
                             }
                         }
@@ -296,29 +307,43 @@ namespace TVRename
             }
         }
 
-        private static void TvdbFor([CanBeNull] ProcessedSeason seas)
+        private static void TvdbFor(ProcessedSeason? seas)
         {
             if (seas is null)
             {
                 return;
             }
 
-            Helpers.SysOpen(seas.TVDBWebsiteUrl);
+            Helpers.OpenUrl(seas.TVDBWebsiteUrl);
         }
 
-        private static void TvdbFor([CanBeNull] ShowItem si)
+        private static void TvdbFor(ShowItem? si)
         {
-            if (si is null)
+            if (si?.WebsiteUrl is null)
             {
                 return;
             }
 
-            Helpers.SysOpen(si.WebsiteUrl);
+            Helpers.OpenUrl(si.WebsiteUrl);
         }
 
-        private void ForceRefresh([CanBeNull] ShowItem si)
+        private delegate void ShowChildConsumer(Form childForm);
+        public void ShowChildDialog(Form childForm)
         {
-            mDoc.ForceRefresh(new List<ShowItem> {si},false,false );
+            if (InvokeRequired)
+            {
+                ShowChildConsumer d = ShowChildDialog;
+                Invoke(d, childForm);
+            }
+            else
+            {
+                childForm.ShowDialog(this);
+            }
+        }
+
+        private void ForceRefresh(ShowItem? si)
+        {
+            mDoc.ForceRefresh(new List<ShowItem> {si},false,false ,this);
         }
 
         #region Nested type: ShowClickEvent
@@ -326,7 +351,7 @@ namespace TVRename
         private class ShowClickEvent : ControllerBase
         {
             private readonly ShowSummary gridSummary;
-            private readonly ProcessedSeason processedSeason;
+            private readonly ProcessedSeason? processedSeason;
             private readonly ShowItem show;
 
             public ShowClickEvent(ShowSummary gridSummary, ShowItem show)
@@ -358,11 +383,6 @@ namespace TVRename
 
                 gridSummary.mLastShowClicked = show;
                 gridSummary.mLastProcessedSeasonClicked = processedSeason;
-
-                if (show is null)
-                {
-                    return;
-                }
 
                 if (seas is null)
                 {
@@ -699,5 +719,10 @@ namespace TVRename
         {
             PopulateGrid();
         }
+    }
+
+    public interface IDialogParent: IWin32Window
+    {
+        void ShowChildDialog(Form childForm);
     }
 }

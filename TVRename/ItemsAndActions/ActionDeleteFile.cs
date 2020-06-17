@@ -16,7 +16,7 @@ namespace TVRename
     {
         private readonly FileInfo toRemove;
 
-        public ActionDeleteFile(FileInfo remove, ProcessedEpisode ep, TVSettings.TidySettings tidyup)
+        public ActionDeleteFile(FileInfo remove, ProcessedEpisode? ep, TVSettings.TidySettings? tidyup)
         {
             Tidyup = tidyup;
             PercentDone = 0;
@@ -26,12 +26,10 @@ namespace TVRename
 
         public override string ProgressText => toRemove.Name;
         public override string Produces => toRemove.FullName;
-        [CanBeNull]
-        public override IgnoreItem Ignore => toRemove is null ? null : new IgnoreItem(toRemove.FullName);
-        [CanBeNull]
-        public override string TargetFolder => toRemove?.DirectoryName;
-
         [NotNull]
+        public override IgnoreItem Ignore => new IgnoreItem(toRemove.FullName);
+        public override string TargetFolder => toRemove.DirectoryName;
+
         public override ActionOutcome Go(TVRenameStats stats)
         {
             try
@@ -62,7 +60,7 @@ namespace TVRename
         {
             if (!(o is ActionDeleteFile cmr) || toRemove.Directory is null || cmr.toRemove.Directory is null )
             {
-                return 0;
+                return -1;
             }
 
             return string.Compare(toRemove.FullName , cmr.toRemove.FullName , StringComparison.Ordinal);

@@ -7,7 +7,6 @@
 // 
 
 using Alphaleonis.Win32.Filesystem;
-using JetBrains.Annotations;
 
 namespace TVRename
 {
@@ -28,19 +27,16 @@ namespace TVRename
 
         public override long SizeOfWork => 10000;
 
-        [CanBeNull]
-        public override string TargetFolder => Where?.DirectoryName;
+        public override string TargetFolder => Where.DirectoryName;
 
-        [CanBeNull]
-        public override IgnoreItem Ignore => Where is null ? null : new IgnoreItem(Where.FullName);
+        public override IgnoreItem Ignore => new IgnoreItem(Where.FullName);
 
-        [NotNull]
         public override string ScanListViewGroup => "lvgActionMeta";
 
         public override int IconNumber => 7;
 
-        protected override string SeriesName => Episode?.Show?.ShowName ?? SelectedShow.ShowName;
-        protected override string DestinationFolder => Where.DirectoryName;
-        protected override string DestinationFile => Where.Name;
+        public override string SeriesName => Episode?.Show.ShowName ?? SelectedShow.ShowName;
+        public override string DestinationFolder => Where.DirectoryName;
+        public override string DestinationFile => Where.Name;
     }
 }

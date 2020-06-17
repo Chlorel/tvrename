@@ -14,6 +14,7 @@ using System.Threading;
 using System.Xml;
 using Alphaleonis.Win32.Filesystem;
 using JetBrains.Annotations;
+using UnauthorizedAccessException = System.UnauthorizedAccessException;
 
 namespace TVRename
 {
@@ -162,6 +163,11 @@ namespace TVRename
                 Logger.Warn($"Could not parse {file.FullName} to try and see whether there is any TVDB Ids inside, got {xe.Message}");
                 return -1;
             }
+            catch (UnauthorizedAccessException xe)
+            {
+                Logger.Warn($"Could not parse {file.FullName} to try and see whether there is any TVDB Ids inside, got {xe.Message}");
+                return -1;
+            }
             catch (Exception e)
             {
                 Logger.Error(e,$"Could not parse {file.FullName} to try and see whether there is any TVDB Ids inside.");
@@ -204,7 +210,7 @@ namespace TVRename
             return showName;
         }
 
-        private bool HasSeasonFolders([NotNull] DirectoryInfo di, [CanBeNull] out DirectoryInfo[] subDirs, [NotNull] out string folderFormat)
+        private bool HasSeasonFolders([NotNull] DirectoryInfo di, out DirectoryInfo[]? subDirs, [NotNull] out string folderFormat)
         {
             try
             {

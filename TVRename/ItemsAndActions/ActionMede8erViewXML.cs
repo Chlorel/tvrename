@@ -6,8 +6,6 @@
 // Copyright (c) TV Rename. This code is released under GPLv3 https://github.com/TV-Rename/tvrename/blob/master/LICENSE.md
 // 
 
-using JetBrains.Annotations;
-
 namespace TVRename
 {
     using System;
@@ -31,10 +29,8 @@ namespace TVRename
 
         #region Action Members
 
-        [NotNull]
         public override string Name => "Write Mede8er View Data";
 
-        [NotNull]
         public override ActionOutcome Go(TVRenameStats stats)
         {
             XmlWriterSettings settings = new XmlWriterSettings
@@ -80,10 +76,10 @@ namespace TVRename
 
         #region Item Members
 
-        protected override string SeriesName => SelectedShow.ShowName;
-        protected override string SeasonNumber => snum > 0 ? snum.ToString() : "";
-        protected override string EpisodeNumber => string.Empty;
-        protected override string AirDate => string.Empty;
+        public override string SeriesName => SelectedShow.ShowName;
+        public override string SeasonNumber => snum > 0 ? snum.ToString() : "";
+        public override string EpisodeString => string.Empty;
+        public override string AirDateString => string.Empty;
 
         #endregion
     }

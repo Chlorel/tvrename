@@ -1,14 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
-using JetBrains.Annotations;
 
 namespace TVRename.Forms.ShowPreferences
 {
     public partial class NewSeenEpisode : Form
     {
-        public ProcessedEpisode ChosenEpisode;
-        public NewSeenEpisode([NotNull] IEnumerable<ProcessedEpisode> eps)
+        public ProcessedEpisode? ChosenEpisode;
+        public NewSeenEpisode(IEnumerable<ProcessedEpisode> eps)
         {
             InitializeComponent();
 
@@ -19,7 +18,6 @@ namespace TVRename.Forms.ShowPreferences
                 comboBox1.Items.Add(ep);
             }
             
-            //comboBox1.DisplayMember = "Name";
             comboBox1.EndUpdate();
         }
 

@@ -7,7 +7,6 @@
 // 
 
 using System.Linq;
-using JetBrains.Annotations;
 
 namespace TVRename
 {
@@ -16,19 +15,21 @@ namespace TVRename
     
     public class ActionPyTivoMeta : ActionWriteMetadata
     {
-        public ActionPyTivoMeta(FileInfo nfo, ProcessedEpisode pe) :base(nfo,null)
+        public ActionPyTivoMeta(FileInfo nfo, ProcessedEpisode pe) :base(nfo,pe.Show)
         {
             Episode = pe;
         }
 
         #region Action Members
 
-        [NotNull]
         public override string Name => "Write pyTivo Meta";
 
-        [NotNull]
         public override ActionOutcome Go(TVRenameStats stats)
         {
+            if (Episode is null)
+            {
+                return new ActionOutcome("PyTivoMetaData Go called with no Episode Set");
+            }
             try
             {
                 // create folder if it does not exist. (Only really applies when .meta\ folder is being used.)
@@ -72,7 +73,7 @@ namespace TVRename
             }
         }
     
-        private static void WriteEntries(System.IO.TextWriter writer, string heading, [CanBeNull] string entries)
+        private static void WriteEntries(System.IO.TextWriter writer, string heading, string? entries)
         {
             if (string.IsNullOrEmpty(entries))
             {
@@ -101,9 +102,9 @@ namespace TVRename
             return o is ActionPyTivoMeta meta && meta.Where == Where;
         }
 
-        public override int CompareTo(object o)
+        public override int CompareTo(object obj)
         {
-            ActionPyTivoMeta nfo = o as ActionPyTivoMeta;
+            ActionPyTivoMeta nfo = obj as ActionPyTivoMeta;
 
             if (Episode is null)
             {
