@@ -51,7 +51,15 @@ namespace TVRename
             }
 
             writer.WriteStartElement(elementName);
-            writer.WriteValue(value??string.Empty);
+            try
+            {
+                writer.WriteValue(value ?? string.Empty);
+            }
+            catch (ArgumentException e)
+            {
+                Logger.Error($"Cound not write {elementName} with value {value} because {e.Message}");
+            }
+
             writer.WriteEndElement();
         }
 
@@ -220,7 +228,7 @@ namespace TVRename
 
         public static void ReplaceElements([NotNull] this XElement root, string key, [NotNull] IEnumerable<string> values)
         {
-            IEnumerable<XElement> elementsToRemove = root.Elements(key);
+            IEnumerable<XElement> elementsToRemove = root.Elements(key).ToList();
             foreach (XElement oldValue in elementsToRemove)
             {
                 oldValue.Remove();
@@ -440,6 +448,17 @@ namespace TVRename
         {
             writer.WriteStartElement(elementName);
             foreach (int ep in previouslySeenEpisodes)
+            {
+                writer.WriteStartElement(stringName);
+                writer.WriteValue(ep);
+                writer.WriteEndElement();
+            }
+            writer.WriteEndElement();
+        }
+        internal static void WriteStringsToXml([NotNull] this XmlWriter writer, [NotNull] PreviouslySeenMovies previouslySeenMovies, [NotNull] string elementName, string stringName)
+        {
+            writer.WriteStartElement(elementName);
+            foreach (int ep in previouslySeenMovies)
             {
                 writer.WriteStartElement(stringName);
                 writer.WriteValue(ep);

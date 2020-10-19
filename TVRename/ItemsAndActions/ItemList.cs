@@ -14,7 +14,7 @@ using JetBrains.Annotations;
 
 namespace TVRename
 {
-    public sealed class ItemList : List<Item>, INotifyPropertyChanged
+    public sealed class ItemList : SafeList<Item>, INotifyPropertyChanged
     {
         public void Add(IEnumerable<Item>? slil)
         {
@@ -34,6 +34,8 @@ namespace TVRename
 
         [NotNull]
         public List<ItemMissing> Missing => this.OfType<ItemMissing>().ToList();
+        public List<ShowItemMissing> MissingEpisodes => this.OfType<ShowItemMissing>().ToList();
+        public List<MovieItemMissing> MissingMovies => this.OfType<MovieItemMissing>().ToList();
 
         [NotNull]
         public List<ActionCopyMoveRename> CopyMove => this.OfType<ActionCopyMoveRename>().Where(a=>a.Operation!=ActionCopyMoveRename.Op.rename).ToList();
@@ -53,7 +55,7 @@ namespace TVRename
             Add(newList);
         }
 
-        public List<Item> TorrentActions => this.Where(a => a is ActionTRemove || a is ActionTDownload).ToList();
+        public List<Action> TorrentActions => this.Where(a => a is ActionTRemove || a is ActionTDownload).OfType<Action>().ToList();
 
         internal void Remove(IEnumerable<Item>? toRemove)
         {
@@ -88,3 +90,4 @@ namespace TVRename
         }
     }
 }
+

@@ -24,7 +24,7 @@ namespace TVRename
         public override FinderDisplayType DisplayType() => FinderDisplayType.local;
 
         // ReSharper disable once FunctionComplexityOverflow
-        protected bool ReviewFile(ItemMissing me, ItemList addTo, FileInfo dce, TVDoc.ScanSettings settings, bool addMergeRules,bool preventMove,bool doExtraFiles,bool useFullPath)
+        protected bool ReviewFile(ShowItemMissing me, ItemList addTo, FileInfo dce, TVDoc.ScanSettings settings, bool addMergeRules,bool preventMove,bool doExtraFiles,bool useFullPath)
         {
             if (settings.Token.IsCancellationRequested)
             {
@@ -40,7 +40,7 @@ namespace TVRename
                     return false;
                 }
 
-                //do any of the possible names for the series match the filename?
+                //do any of the possible names for the cachedSeries match the filename?
                 matched = me.MissingEpisode.Show.NameMatch(dce, useFullPath);
 
                 if (!matched)
@@ -74,8 +74,7 @@ namespace TVRename
                         !TVSettings.Instance.DownloadFolders.Any(folder =>
                             folder.SameDirectoryLocation(fi.Directory.FullName));
 
-                    addTo.Add(new ActionCopyMoveRename(ActionCopyMoveRename.Op.copy, dce, fi, me.MissingEpisode, doTidyup,
-                        me,MDoc));
+                    addTo.Add(new ActionCopyMoveRename(ActionCopyMoveRename.Op.copy, dce, fi, me.MissingEpisode, doTidyup, me, MDoc));
                 }
 
                 if (doExtraFiles)
@@ -95,7 +94,7 @@ namespace TVRename
             return false;
         }
 
-        private static (bool  identifysuccess, int foundSeason, int foundEpisode,  int maxEp) IdentifyFile([NotNull] ItemMissing me, [NotNull] FileInfo dce)
+        private static (bool  identifysuccess, int foundSeason, int foundEpisode,  int maxEp) IdentifyFile([NotNull] ShowItemMissing me, [NotNull] FileInfo dce)
         {
             int season = me.MissingEpisode.AppropriateSeasonNumber;
             int epnum = me.MissingEpisode.AppropriateEpNum;
@@ -143,7 +142,7 @@ namespace TVRename
             return (false, 0, 0, 0);
         }
 
-        private void WarnPathTooLong([NotNull] ItemMissing me, [NotNull] FileInfo dce, [NotNull] Exception e, bool matched)
+        private void WarnPathTooLong([NotNull] ShowItemMissing me, [NotNull] FileInfo dce, [NotNull] Exception e, bool matched)
         {
             int season = me.MissingEpisode.AppropriateSeasonNumber;
             int epnum = me.MissingEpisode.AppropriateEpNum;
@@ -161,7 +160,7 @@ namespace TVRename
             t += matched ? ", matched.  " : ", no match.  ";
             if (matched)
             {
-                t += "Show: " + me.MissingEpisode.TheSeries.Name + ", Season " + season + ", Ep " + epnum + ".  ";
+                t += "Show: " + me.MissingEpisode.TheCachedSeries.Name + ", Season " + season + ", Ep " + epnum + ".  ";
                 t += "To: " + me.TheFileNoExt;
             }
 
@@ -169,7 +168,7 @@ namespace TVRename
         }
 
         [NotNull]
-        private static ItemMissing UpdateMissingItem([NotNull] ItemMissing me, [NotNull] FileInfo dce, int epF, int maxEp, int seasF)
+        private static ShowItemMissing UpdateMissingItem([NotNull] ShowItemMissing me, [NotNull] FileInfo dce, int epF, int maxEp, int seasF)
         {
             ShowRule sr = new ShowRule
             {
@@ -199,7 +198,7 @@ namespace TVRename
                 }
             }
 
-            return new ItemMissing(newPE, me.TargetFolder);
+            return new ShowItemMissing(newPE, me.TargetFolder);
         }
 
         private static bool FindExistingActionFor([NotNull] ItemList addTo,[NotNull] FileSystemInfo fi)
@@ -392,7 +391,7 @@ namespace TVRename
             return actionlist.CopyMoveRename.Any(cmAction => cmAction.SameSource(newItem));
         }
 
-        protected void ProcessMissingItem(TVDoc.ScanSettings settings, ItemList newList, ItemList toRemove, ItemMissing me, ItemList thisRound, [NotNull] List<FileInfo> matchedFiles,bool useFullPath)
+        protected void ProcessMissingItem(TVDoc.ScanSettings settings, ItemList newList, ItemList toRemove, ShowItemMissing me, ItemList thisRound, [NotNull] List<FileInfo> matchedFiles,bool useFullPath)
         {
             if (matchedFiles.Count == 1)
             {
@@ -476,7 +475,7 @@ namespace TVRename
         private bool OtherActionsMatch(FileInfo matchedFile, Item me, TVDoc.ScanSettings settings,bool useFullPath)
         //This is used to check whether the selected file may match any other files we are looking for
         {
-            foreach (ItemMissing testMissingAction in ActionList.Missing.ToList())
+            foreach (ShowItemMissing testMissingAction in ActionList.MissingEpisodes.ToList())
             {
                 if (testMissingAction.SameAs(me))
                 {

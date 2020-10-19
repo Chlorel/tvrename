@@ -7,6 +7,7 @@
 //
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -133,7 +134,28 @@ namespace TVRename
             return -1;
         }
 
+        public static bool IsImportant(this DirectoryInfo info)
+        {
+            if (info.Name.Equals("subs", StringComparison.OrdinalIgnoreCase)) return false;
+            if (info.Name.Equals("subtitles", StringComparison.OrdinalIgnoreCase)) return false;
+            if (info.Name.Equals("subfiles", StringComparison.OrdinalIgnoreCase)) return false;
+            if (info.Name.Equals(".actors", StringComparison.OrdinalIgnoreCase)) return false;
+            if (info.Name.Equals("actors", StringComparison.OrdinalIgnoreCase)) return false;
+            if (info.Name.Equals("sample", StringComparison.OrdinalIgnoreCase)) return false;
+            if (info.Name.Equals(".AppleDouble", StringComparison.OrdinalIgnoreCase)) return false;
+            if (info.Name.Equals("art", StringComparison.CurrentCultureIgnoreCase)) return false;
+            return true;
+        }
+
+        public static bool IsSampleFile([NotNull] this FileInfo fi) => Helpers.Contains(fi.FullName, "sample", StringComparison.OrdinalIgnoreCase) &&
+                                                                         fi.Length / (1024 * 1024) < TVSettings.Instance.SampleFileMaxSizeMB;
+
+        public static bool IsDeletedStubFile([NotNull] this FileInfo fi) =>
+            (fi.Name.StartsWith("-.", StringComparison.Ordinal) || fi.Name.StartsWith("._", StringComparison.Ordinal)) && fi.Length / 1024 < 10;
+
         public static bool IsMovieFile([NotNull] this FileInfo file) => TVSettings.Instance.FileHasUsefulExtension(file, false);
+
+        public static bool IsMovieFile([NotNull] this string filename) => TVSettings.Instance.FileHasUsefulExtension(filename, false);
 
         public static (bool found,string extension)  IsLanguageSpecificSubtitle(this FileInfo file)
         {
@@ -435,6 +457,54 @@ namespace TVRename
 
         [NotNull]
         public static FileInfo FileInFolder([NotNull] string dir, string fn) => new FileInfo(dir.EnsureEndsWithSeparator()+ fn);
+    public static void RemoveDirectory([NotNull] string folderName)
+        {
+            try
+            {
+                Logger.Info($"Removing {folderName} as part of the library clean up");
+                foreach (string file in Directory.GetFiles(folderName))
+                {
+                    Logger.Info($"    Folder contains {file}");
+                }
+
+                Logger.Info($"Recycling {folderName}");
+                Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(folderName,
+                    Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
+                    Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+            }
+            catch (FileReadOnlyException)
+            {
+                Logger.Warn($"Could not recycle {folderName} as we got a FileReadOnlyException");
+            }
+            catch (DirectoryReadOnlyException)
+            {
+                Logger.Warn($"Could not recycle {folderName} as we got a DirectoryReadOnlyException");
+            }
+            catch (UnauthorizedAccessException)
+            {
+                Logger.Warn($"Could not recycle {folderName} as we got a UnauthorizedAccessException");
+            }
+            catch (System.IO.PathTooLongException)
+            {
+                Logger.Warn($"Could not recycle {folderName} as we got a PathTooLongException");
+            }
+            catch (System.IO.DirectoryNotFoundException)
+            {
+                Logger.Info($"Could not recycle {folderName} as we got a DirectoryNotFoundException");
+            }
+            catch (DirectoryNotEmptyException)
+            {
+                Logger.Warn($"Could not recycle {folderName} as we got a DirectoryNotEmptyException");
+            }
+            catch (OperationCanceledException)
+            {
+                Logger.Info($"Could not recycle {folderName} as we got a OperationCanceledException");
+            }
+            catch (System.IO.IOException i)
+            {
+                Logger.Warn($"Could not find {folderName} as we got a OperationCanceledException: {i.Message}");
+            }
+        }
 
         [NotNull]
         public static FileInfo FileInFolder([NotNull] DirectoryInfo di, string fn) => FileInFolder(di.FullName, fn);
@@ -484,14 +554,12 @@ namespace TVRename
                 return true; // move on
             }
 
-            if (TVSettings.Instance.IgnoreSamples &&
-                Helpers.Contains(fi.FullName, "sample", StringComparison.OrdinalIgnoreCase) &&
-                fi.Length / (1024 * 1024) < TVSettings.Instance.SampleFileMaxSizeMB)
+            if (TVSettings.Instance.IgnoreSamples && fi.IsSampleFile())
             {
                 return true;
             }
 
-            if (fi.Name.StartsWith("-.", StringComparison.Ordinal) && fi.Length / 1024 < 10)
+            if (fi.IsDeletedStubFile())
             {
                 return true;
             }
@@ -517,6 +585,68 @@ namespace TVRename
             }
 
             return true;
+        }
+
+        // see https://kodi.wiki/view/Naming_video_files/Movies#Split_Video_Files
+        static List<string> ending = new List<string> { "part", "cd", "dvd", "pt", "disk", "disc" };
+
+        public static bool IsDoublePartMovie(FileInfo f1, FileInfo f2)
+        {
+            return ending.Any(end => HasEnding(f1, f2, end));
+        }
+
+        private static bool HasEnding(FileInfo f1, FileInfo f2, string part)
+        {
+            if (f1.FileNameNoExt().EndsWith(part + "1", true, CultureInfo.CurrentCulture) &&
+                f2.FileNameNoExt().EndsWith(part + "2", true, CultureInfo.CurrentCulture))
+            {
+                return true;
+            }
+            if (f1.FileNameNoExt().EndsWith(part + "2", true, CultureInfo.CurrentCulture) &&
+                f2.FileNameNoExt().EndsWith(part + "1", true, CultureInfo.CurrentCulture))
+            {
+                return true;
+            }
+            if (f1.FileNameNoExt().EndsWith(part + ".1", true, CultureInfo.CurrentCulture) &&
+                f2.FileNameNoExt().EndsWith(part + ".2", true, CultureInfo.CurrentCulture))
+            {
+                return true;
+            }
+            if (f1.FileNameNoExt().EndsWith(part + ".2", true, CultureInfo.CurrentCulture) &&
+                f2.FileNameNoExt().EndsWith(part + ".1", true, CultureInfo.CurrentCulture))
+            {
+                return true;
+            }
+            if (f1.FileNameNoExt().EndsWith(part + " 1", true, CultureInfo.CurrentCulture) &&
+                f2.FileNameNoExt().EndsWith(part + " 2", true, CultureInfo.CurrentCulture))
+            {
+                return true;
+            }
+            if (f1.FileNameNoExt().EndsWith(part + " 2", true, CultureInfo.CurrentCulture) &&
+                f2.FileNameNoExt().EndsWith(part + " 1", true, CultureInfo.CurrentCulture))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        public static string FileNameNoExt(this FileInfo f) => f.Name.RemoveAfter(f.Extension);
+
+        private static readonly Regex[] MovieMultiPartRegex = new Regex[]
+        {
+            new Regex(@"(?<base>.*)[ _.-]+(cd|dvd|p(?:ar)?t|dis[ck])[ _.-]*(?<part>[0-9]|(A-D))", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"(?<base>.*)[ ._-]*(?<part>|(A-D))$", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+        };
+        public static string MovieFileNameBase(this FileInfo movieFile)
+        {
+            string longbase = movieFile.FileNameNoExt();
+            foreach (Match x in MovieMultiPartRegex.Select(tets => tets.Match(longbase)).Where(x => x.Success))
+            {
+                return x.Groups["base"].Value;
+            }
+
+            return longbase;
         }
     }
 }

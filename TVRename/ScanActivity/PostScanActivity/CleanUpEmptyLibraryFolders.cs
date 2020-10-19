@@ -1,12 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using Alphaleonis.Win32.Filesystem;
 using JetBrains.Annotations;
-using Microsoft.VisualBasic.FileIO;
 using Directory = Alphaleonis.Win32.Filesystem.Directory;
-using FileInfo = Alphaleonis.Win32.Filesystem.FileInfo;
 
 namespace TVRename
 {
@@ -20,11 +17,11 @@ namespace TVRename
 
         protected override void DoCheck(SetProgressDelegate progress)
         {
-            IEnumerable<ShowItem> libraryShows = MDoc.Library.Shows.ToList();
+            IEnumerable<ShowConfiguration> libraryShows = MDoc.TvLibrary.Shows.ToList();
             int totalRecords = libraryShows.Count();
             int n = 0;
 
-            foreach (ShowItem si in libraryShows)
+            foreach (ShowConfiguration si in libraryShows)
             {
                 UpdateStatus(n++, totalRecords, si.ShowName);
 
@@ -39,59 +36,9 @@ namespace TVRename
         {
             if (CanRemove(folderName))
             {
-                RemoveDirectory(folderName);
+                FileHelper.RemoveDirectory(folderName);
             }
         }
-
-        private static void RemoveDirectory([NotNull] string folderName)
-        {
-            try
-            {
-                LOGGER.Info($"Removing {folderName} as part of the library clean up");
-                foreach (string file in Directory.GetFiles(folderName))
-                {
-                    LOGGER.Info($"    Folder contains {file}");
-                }
-
-                LOGGER.Info($"Recycling {folderName}");
-                FileSystem.DeleteDirectory(folderName,
-                    UIOption.OnlyErrorDialogs,
-                    RecycleOption.SendToRecycleBin);
-            }
-            catch (FileReadOnlyException)
-            {
-                LOGGER.Warn($"Could not recycle {folderName} as we got a FileReadOnlyException");
-            }
-            catch (DirectoryReadOnlyException)
-            {
-                LOGGER.Warn($"Could not recycle {folderName} as we got a DirectoryReadOnlyException");
-            }
-            catch (UnauthorizedAccessException)
-            {
-                LOGGER.Warn($"Could not recycle {folderName} as we got a UnauthorizedAccessException");
-            }
-            catch (PathTooLongException)
-            {
-                LOGGER.Warn($"Could not recycle {folderName} as we got a PathTooLongException");
-            }
-            catch (DirectoryNotFoundException)
-            {
-                LOGGER.Info($"Could not recycle {folderName} as we got a DirectoryNotFoundException");
-            }
-            catch (DirectoryNotEmptyException)
-            {
-                LOGGER.Warn($"Could not recycle {folderName} as we got a DirectoryNotEmptyException");
-            }
-            catch (OperationCanceledException)
-            {
-                LOGGER.Info($"Could not recycle {folderName} as we got a OperationCanceledException");
-            }
-            catch (IOException i)
-            {
-                LOGGER.Warn($"Could not find {folderName} as we got a OperationCanceledException: {i.Message}");
-            }
-        }
-
         private static bool CanRemove(string folderName)
         {
             if (!Directory.Exists(folderName))
@@ -107,13 +54,16 @@ namespace TVRename
                     return true;
                 }
 
-                bool containsMovieFiles = Directory.GetFiles(folderName).ToList().Select(s => new FileInfo(s))
-                    .Any(info => info.IsMovieFile());
+                bool containsMovieFiles = Directory.GetFiles(folderName).Any(s => s.IsMovieFile());
 
                 if (!containsMovieFiles)
                 {
                     return true;
                 }
+            }
+            catch (ArgumentException a)
+            {
+                LOGGER.Warn($"Could not determine whether {folderName} can be removed as we got as ArgumentException {a.Message}");
             }
             catch (FileReadOnlyException)
             {
@@ -127,11 +77,11 @@ namespace TVRename
             {
                 LOGGER.Warn($"Could not find {folderName} as we got a UnauthorizedAccessException");
             }
-            catch (PathTooLongException)
+            catch (System.IO.PathTooLongException)
             {
                 LOGGER.Warn($"Could not find {folderName} as we got a PathTooLongException");
             }
-            catch (DirectoryNotFoundException)
+            catch (System.IO.DirectoryNotFoundException)
             {
                 LOGGER.Info($"Could not find {folderName} as we got a DirectoryNotFoundException");
             }
@@ -143,7 +93,7 @@ namespace TVRename
             {
                 LOGGER.Info($"Could not find {folderName} as we got a OperationCanceledException");
             }
-            catch (IOException i)
+            catch (System.IO.IOException i)
             {
                 LOGGER.Warn($"Could not find {folderName} as we got a OperationCanceledException: {i.Message}");
             }

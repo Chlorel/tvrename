@@ -6,6 +6,7 @@
 // Copyright (c) TV Rename. This code is released under GPLv3 https://github.com/TV-Rename/tvrename/blob/master/LICENSE.md
 // 
 
+using System.IO;
 using System.Linq;
 
 namespace TVRename
@@ -25,6 +26,7 @@ namespace TVRename
     /// </summary>
     public partial class CopyMoveProgress : Form
     {
+        private const int MAX_PROGRESS_BAR = 1000;
         private readonly ActionEngine mDoc;
         private readonly ActionQueue[] mToDo;
 
@@ -46,7 +48,7 @@ namespace TVRename
 
             if (x > 100)
             {
-                return 1000;
+                return 100;
             }
 
             return (int)Math.Round(x);
@@ -57,9 +59,9 @@ namespace TVRename
             txtFile.Text = Normalise(file) + "% Done";
             txtTotal.Text = Normalise(group) + "% Done";
 
-            // progress bars go 0 to 1000            
-            pbFile.Value = 10*Normalise(file);
-            pbGroup.Value = 10*Normalise(group);
+            // progress bars go 0 to MAX_PROGRESS_BAR            
+            pbFile.Value = MAX_PROGRESS_BAR / 100 * Normalise(file);
+            pbGroup.Value = MAX_PROGRESS_BAR / 100 * Normalise(group);
             pbFile.Update();
             pbGroup.Update();
             txtFile.Update();
@@ -80,31 +82,23 @@ namespace TVRename
             long totalWork = 0;
             lvProgress.Items.Clear();
 
-            foreach (ActionQueue aq in mToDo)
+            foreach (Action action in mToDo.Where(aq => aq.Actions.Count != 0).SelectMany(aq => aq.Actions))
             {
-                if (aq.Actions.Count == 0)
+                if (!action.Outcome.Done)
                 {
-                    continue;
+                    allDone = false;
                 }
 
-                foreach (Action action in aq.Actions)
+                long size = action.SizeOfWork;
+                workDone += (long) (size * action.PercentDone / 100);
+                totalWork += action.SizeOfWork;
+
+                if (!action.Outcome.Done)
                 {
-                    if (!action.Outcome.Done)
-                    {
-                        allDone = false;
-                    }
+                    ListViewItem lvi = new ListViewItem(action.Name);
+                    lvi.SubItems.Add(action.ProgressText);
 
-                    long size = action.SizeOfWork;
-                    workDone += (long) (size * action.PercentDone / 100);
-                    totalWork += action.SizeOfWork;
-
-                    if (!action.Outcome.Done)
-                    {
-                        ListViewItem lvi = new ListViewItem(action.Name);
-                        lvi.SubItems.Add(action.ProgressText);
-
-                        lvProgress.Items.Add(lvi);
-                    }
+                    lvProgress.Items.Add(lvi);
                 }
             }
 
@@ -115,7 +109,14 @@ namespace TVRename
 
             if (top >= 0)
             {
-                lvProgress.TopItem = lvProgress.Items[top];
+                try
+                {
+                    lvProgress.TopItem = lvProgress.Items[top];
+                }
+                catch (NullReferenceException)
+                {
+                    //Ignore this as we're done
+                }
             }
 
             lvProgress.EndUpdate();
@@ -181,11 +182,18 @@ namespace TVRename
                     di = null;
                 }
 
-                if (di != null)
+                try
                 {
-                    int pct = (int)(1000 * di.TotalFreeSpace / di.TotalSize);
-                    diskValue = 1000 - pct;
-                    diskText = di.TotalFreeSpace.GBMB(1) + " free";
+                    if (di != null)
+                    {
+                        (diskValue,diskText) = DiskValue(di.TotalFreeSpace, di.TotalSize);
+                    }
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
+                catch (IOException)
+                {
                 }
             }
 
@@ -193,16 +201,24 @@ namespace TVRename
             if (toUncRoot != null)
             {
                 FileSystemProperties driveStats = FileHelper.GetProperties(toUncRoot.ToString());
-                if (driveStats.AvailableBytes != null && driveStats.TotalBytes.HasValue)
+                long? availableBytes = driveStats.AvailableBytes;
+                long? totalBytes = driveStats.TotalBytes;
+                if (availableBytes.HasValue && totalBytes.HasValue)
                 {
-                    int pct = (int)(1000 * driveStats.AvailableBytes / driveStats.TotalBytes);
-                    diskValue = 1000 - pct;
-                    diskText = (driveStats.AvailableBytes??0).GBMB(1) + " free";
+                    (diskValue, diskText) = DiskValue(availableBytes.Value,totalBytes.Value);
                 }
             }
             
             pbDiskSpace.Value = diskValue;
             txtDiskSpace.Text = diskText;
+        }
+
+        private static (int value, string diskText) DiskValue(long diTotalFreeSpace, long totalSize)
+        {
+            int pct = (int) (MAX_PROGRESS_BAR * diTotalFreeSpace / totalSize);
+            int diskValue = MAX_PROGRESS_BAR - pct;
+            string diskText = diTotalFreeSpace.GBMB(1) + " free";
+            return (diskValue,diskText);
         }
 
         private ActionCopyMoveRename? GetActiveCmAction()

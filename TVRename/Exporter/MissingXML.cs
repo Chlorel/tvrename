@@ -41,12 +41,12 @@ namespace TVRename
                 writer.WriteAttributeToXml("Version", "2.1");
                 writer.WriteStartElement("MissingItems");
 
-                foreach (ItemMissing missing in TheActionList.Missing.ToList())
+                foreach (var missing in TheActionList.MissingEpisodes.ToList())
                 {
                     writer.WriteStartElement("MissingItem");
 
                     writer.WriteElement("id", missing.MissingEpisode.Show.TvdbCode);
-                    writer.WriteElement("title", missing.MissingEpisode.TheSeries.Name);
+                    writer.WriteElement("title", missing.MissingEpisode.TheCachedSeries.Name);
                     writer.WriteElement("season", Helpers.Pad(missing.MissingEpisode.AppropriateSeasonNumber));
                     writer.WriteElement("episode", Helpers.Pad(missing.MissingEpisode.AppropriateEpNum));
                     writer.WriteElement("episodeName", missing.MissingEpisode.Name);

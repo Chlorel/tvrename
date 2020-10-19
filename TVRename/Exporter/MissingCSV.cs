@@ -18,14 +18,16 @@ namespace TVRename
             {
                 file.WriteLine("Show Name,Season,Episode,Episode Name,Air Date,Folder,Nice Name,thetvdb.com Code");
 
-                foreach (ItemMissing im in TheActionList.Missing.ToList())
+                foreach (var im in TheActionList.MissingEpisodes.ToList())
                 {
                     ProcessedEpisode pe = im.MissingEpisode;
                     DateTime? dt = pe.GetAirDateDt(true);
                     file.WriteLine(
-                        $"\"{pe.TheSeries.Name}\",{pe.AppropriateSeasonNumber},{pe.EpNumsAsString()},\"{pe.Name}\",{dt:G},\"{im.TargetFolder}\",\"{im.Filename}\",{pe.SeriesId}");
+                        $"\"{pe.TheCachedSeries.Name}\",{pe.AppropriateSeasonNumber},{pe.EpNumsAsString()},\"{pe.Name}\",{dt:G},\"{im.TargetFolder}\",\"{im.Filename}\",{pe.SeriesId}");
                 }
             }
         }
     }
+
+    // ReSharper disable once InconsistentNaming
 }

@@ -17,12 +17,12 @@ namespace TVRename
     {
         private readonly int snum;
 
-        public ActionMede8erViewXML(FileInfo nfo, ShowItem si) : base(nfo, si)
+        public ActionMede8erViewXML(FileInfo nfo, ShowConfiguration si) : base(nfo, si)
         {
             snum = -1;
         }
 
-        public ActionMede8erViewXML(FileInfo nfo, ShowItem si, int snum) : base(nfo, si)
+        public ActionMede8erViewXML(FileInfo nfo, ShowConfiguration si, int snum) : base(nfo, si)
         {
             this.snum = snum;
         }
@@ -65,11 +65,14 @@ namespace TVRename
             return o is ActionMede8erViewXML xml && xml.Where == Where;
         }
 
-        public override int CompareTo(object o)
+        public override int CompareTo(object? o)
         {
-            ActionMede8erViewXML nfo = o as ActionMede8erViewXML;
+            if (o is null || !(o is ActionMede8erViewXML nfo))
+            {
+                return -1;
+            }
 
-            return string.Compare(Where.FullName, nfo?.Where.FullName, StringComparison.Ordinal);
+            return string.Compare(Where.FullName, nfo.Where.FullName, StringComparison.Ordinal);
         }
 
         #endregion
@@ -77,7 +80,7 @@ namespace TVRename
         #region Item Members
 
         public override string SeriesName => SelectedShow.ShowName;
-        public override string SeasonNumber => snum > 0 ? snum.ToString() : "";
+        public override string SeasonNumber => snum > 0 ? snum.ToString() : string.Empty;
         public override string EpisodeString => string.Empty;
         public override string AirDateString => string.Empty;
 

@@ -31,7 +31,7 @@ namespace TVRename
             int c = ActionList.Missing.Count + 2;
             int n = 1;
             UpdateStatus(n, c, "Searching torrent queue...");
-            foreach (ItemMissing action in ActionList.Missing.ToList())
+            foreach (ShowItemMissing action in ActionList.MissingEpisodes.ToList())
             {
                 if (settings.Token.IsCancellationRequested)
                 {
@@ -48,7 +48,7 @@ namespace TVRename
                         continue;
                     }
 
-                    //do any of the possible names for the series match the filename?
+                    //do any of the possible names for the cachedSeries match the filename?
                     bool matched = action.MissingEpisode.Show.NameMatch(file,true);
 
                     if (!matched)

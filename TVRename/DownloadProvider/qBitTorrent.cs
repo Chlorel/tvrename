@@ -49,11 +49,17 @@ namespace TVRename
 
             try
             {
-                settingsString = JsonHelper.Obtain(GetApiUrl(qBitTorrentAPIPath.settings));
-                downloadsString = JsonHelper.Obtain(GetApiUrl(qBitTorrentAPIPath.torrents));
+                settingsString = HttpHelper.Obtain(GetApiUrl(qBitTorrentAPIPath.settings));
+                downloadsString = HttpHelper.Obtain(GetApiUrl(qBitTorrentAPIPath.torrents));
 
                 JToken settings = JToken.Parse(settingsString);
                 JArray currentDownloads = JArray.Parse(downloadsString);
+
+                if (!currentDownloads.HasValues && settings.HasValues)
+                {
+                    Logger.Info($"No Downloads available from qBitTorrent: {currentDownloads}");
+                    return new List<TorrentEntry>();
+                }
 
                 if (!currentDownloads.HasValues || !settings.HasValues)
                 {
@@ -92,7 +98,7 @@ namespace TVRename
                 (string hashCode, string torrentName, bool completed) = ExtractTorrentDetails(torrent);
 
                 string url = GetApiUrl(qBitTorrentAPIPath.torrentDetails) + hashCode;
-                torrentDetailsString = JsonHelper.Obtain(url);
+                torrentDetailsString = HttpHelper.Obtain(url);
                 JArray torrentDetails = JArray.Parse(torrentDetailsString);
 
                 if (!torrentDetails.Children().Any())

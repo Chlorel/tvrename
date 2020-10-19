@@ -12,14 +12,14 @@ namespace TVRename
 
         protected override string ActivityName() => "Checked All Folders Exist";
 
-        protected override void Check(ShowItem si, DirFilesCache dfc, TVDoc.ScanSettings settings)
+        protected override void Check(ShowConfiguration si, DirFilesCache dfc, TVDoc.ScanSettings settings)
         {
             if (!si.DoMissingCheck && !si.DoRename)
             {
                 return; // skip
             }
 
-            Dictionary<int, List<string>> flocs = si.AllProposedFolderLocations();
+            Dictionary<int, SafeList<string>> flocs = si.AllProposedFolderLocations();
 
             List<string> ignoredLocations = new List<string>();
 
@@ -43,7 +43,7 @@ namespace TVRename
                     continue;
                 }
 
-                List<string> folders = new List<string>();
+                SafeList<string> folders = new SafeList<string>();
 
                 if (flocs.ContainsKey(snum))
                 {
@@ -98,7 +98,7 @@ namespace TVRename
             return true;
         }
 
-        private void CreateSeasonFolders(ShowItem si, int snum, [NotNull] IEnumerable<string> folders,
+        private void CreateSeasonFolders(ShowConfiguration si, int snum, [NotNull] IEnumerable<string> folders,
             ICollection<string> ignoredLocations, IDialogParent owner)
         {
             foreach (string folderExists in folders)
@@ -107,7 +107,7 @@ namespace TVRename
             } // for each folder
         }
 
-        private void CreateSeasonFolder(ShowItem si, int snum, ICollection<string> ignoredLocations, string proposedFolderName,IDialogParent owner)
+        private void CreateSeasonFolder(ShowConfiguration si, int snum, ICollection<string> ignoredLocations, string proposedFolderName,IDialogParent owner)
         {
             string folder = proposedFolderName;
 
@@ -203,7 +203,7 @@ namespace TVRename
             } while (goAgain);
         }
 
-        private  bool  UpdateDirectory(ShowItem si, int snum, string folder)
+        private  bool  UpdateDirectory(ShowConfiguration si, int snum, string folder)
         {
             DirectoryInfo di = new DirectoryInfo(folder);
             bool goAgain = !di.Exists;

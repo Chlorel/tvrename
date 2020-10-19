@@ -55,7 +55,7 @@ namespace TVRename
                         writer.WriteLine($"originalAirDate : {Episode.FirstAired.Value:yyyy-MM-dd}T00:00:00Z");
                     }
 
-                    writer.WriteLine($"callsign : {Episode.Show.TheSeries()?.Network}");
+                    writer.WriteLine($"callsign : {Episode.Show.CachedShow?.Network}");
 
                     WriteEntries(writer, "vDirector", Episode.EpisodeDirector);
                     WriteEntries(writer, "vWriter", Episode.Writer);
@@ -102,16 +102,24 @@ namespace TVRename
             return o is ActionPyTivoMeta meta && meta.Where == Where;
         }
 
-        public override int CompareTo(object obj)
+        public override int CompareTo(object? obj)
         {
-            ActionPyTivoMeta nfo = obj as ActionPyTivoMeta;
+            if (obj is null || !(obj is ActionPyTivoMeta nfo))
+            {
+                return -1;
+            }
+
+            if (Episode is null && nfo.Episode is null)
+            {
+                return string.Compare(Where.FullName, nfo.Where.FullName, StringComparison.Ordinal);
+            }
 
             if (Episode is null)
             {
                 return 1;
             }
 
-            if (nfo?.Episode is null)
+            if (nfo.Episode is null)
             {
                 return -1;
             }

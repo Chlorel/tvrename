@@ -7,6 +7,7 @@
 // 
 
 using System;
+using System.Collections.Generic;
 using System.Windows.Forms;
 using Alphaleonis.Win32.Filesystem;
 
@@ -16,13 +17,14 @@ namespace TVRename.Forms.ShowPreferences
     {
         public string? DirectoryFullPath;
 
-        public QuickLocateForm(string hint)
+        public QuickLocateForm(string hint, MediaConfiguration.MediaType t)
         {
             InitializeComponent();
 
             cbDirectory.SuspendLayout();
             cbDirectory.Items.Clear();
-            foreach (string folder in TVSettings.Instance.LibraryFolders)
+            List<string> folders = (t == MediaConfiguration.MediaType.movie ?  TVSettings.Instance.LibraryFolders : TVSettings.Instance.MovieLibraryFolders);
+            foreach (string folder in folders)
             {
                 cbDirectory.Items.Add(folder.TrimEnd(Path.DirectorySeparatorChar.ToString()));
             }
@@ -34,9 +36,9 @@ namespace TVRename.Forms.ShowPreferences
 
         private void buttonOK_Click(object sender, EventArgs e)
         {
-              SetDirectory();
-                DialogResult = DialogResult.OK;
-                Close();
+             SetDirectory();
+             DialogResult = DialogResult.OK;
+             Close();
         }
 
         private void SetDirectory()

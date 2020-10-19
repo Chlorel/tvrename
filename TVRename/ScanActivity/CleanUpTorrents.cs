@@ -5,7 +5,7 @@ using JetBrains.Annotations;
 
 namespace TVRename
 {
-    class CleanUpTorrents : ScanActivity
+    internal class CleanUpTorrents : ScanActivity
     {
         private readonly List<IDownloadProvider> sources;
         private ProcessedEpisode? lastFoundEpisode;
@@ -18,7 +18,7 @@ namespace TVRename
         protected override string CheckName() => "Cleaned up completed TV Torrents";
         public override bool Active() => TVSettings.Instance.RemoveCompletedTorrents;
 
-        protected override void DoCheck(SetProgressDelegate prog, ICollection<ShowItem> showList, TVDoc.ScanSettings settings)
+        protected override void DoCheck(SetProgressDelegate prog, TVDoc.ScanSettings settings)
         {
             DirFilesCache dfc = new DirFilesCache();
             foreach (IDownloadProvider source in sources)
@@ -87,7 +87,7 @@ namespace TVRename
 
         private List<ProcessedEpisode>? MatchEpisodes(FileInfo droppedFile)
         {
-            ShowItem? bestShow = FinderHelper.FindBestMatchingShow(droppedFile, MDoc.Library.Shows);
+            ShowConfiguration? bestShow = FinderHelper.FindBestMatchingShow(droppedFile, MDoc.TvLibrary.Shows);
 
             if (bestShow is null)
             {
@@ -100,9 +100,16 @@ namespace TVRename
                 return null;
             }
 
-            ProcessedEpisode episode = bestShow.GetEpisode(seasonNum, episodeNum);
+            try
+            {
+                ProcessedEpisode episode = bestShow.GetEpisode(seasonNum, episodeNum);
 
-            return new List<ProcessedEpisode>() {episode};
+                return new List<ProcessedEpisode>() {episode};
+            }
+            catch (ShowConfiguration.EpisodeNotFoundException)
+            {
+                return null;
+            }
         }
     }
 }

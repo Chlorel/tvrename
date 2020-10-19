@@ -15,8 +15,6 @@ namespace TVRename
         public override string Produces => whereFile.FullName;
         public override string ProgressText => whereFile.Name;
         public override IgnoreItem Ignore => new IgnoreItem(whereFile.FullName);
-        public override string SeriesName => Episode != null ? Episode.Show.ShowName :string.Empty;
-        public override string SeasonNumber => Episode != null ? Episode.AppropriateSeasonNumber.ToString() : string.Empty;
         public override string? DestinationFolder => whereFile.DirectoryName;
         public override string? DestinationFile => whereFile.Name;
         public override string? TargetFolder => whereFile.DirectoryName;
@@ -59,16 +57,19 @@ namespace TVRename
             }
         }
 
-        public override int CompareTo(object o)
+        public override int CompareTo(object? o)
         {
-            ActionDateTouchEpisode nfo = o as ActionDateTouchEpisode;
+            if (o is null || !(o is ActionDateTouchEpisode nfo))
+            {
+                return -1;
+            }
 
             if (Episode is null)
             {
                 return 1;
             }
 
-            if (nfo?.Episode is null)
+            if (nfo.Episode is null)
             {
                 return -1;
             }

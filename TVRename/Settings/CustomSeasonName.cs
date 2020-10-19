@@ -31,7 +31,8 @@ namespace TVRename
                                                             "S{SeasonNumber}",
                                                             "S{SeasonNumber:2}",
                                                             "{ShowName} - Season {SeasonNumber:2}",
-                                                            "{StartYear}-{EndYear}"
+                                                            "{StartYear}-{EndYear}",
+                                                            "Season {SeasonNumber:2} - {SeasonName}"
                                                         };
 
         internal static readonly List<string> TAGS = new List<string>
@@ -45,7 +46,8 @@ namespace TVRename
             "{SeasonNumber:2}",
             "{StartYear}",
             "{EndYear}",
-            "{ShowImdb}"
+            "{ShowImdb}",
+            "{SeasonName}"
         };
 
         [NotNull]
@@ -73,6 +75,8 @@ namespace TVRename
                 showname = Uri.EscapeDataString(showname);
             }
 
+            string seasonName = s.Show.CachedShow?.Season(s.SeasonNumber)?.SeasonName;
+
             name = name.ReplaceInsensitive("{ShowName}", showname);
             name = name.ReplaceInsensitive("{ShowNameInitial}", showname.Initial().ToLower());
             name = name.ReplaceInsensitive("{ShowNameLower}", s.Show.ShowName.ToLower().Replace(' ', '-').RemoveCharactersFrom("()[]{}&$:"));
@@ -80,9 +84,10 @@ namespace TVRename
             name = name.ReplaceInsensitive("{Season:2}", s.SeasonNumber.ToString("00"));
             name = name.ReplaceInsensitive("{SeasonNumber}", s.SeasonIndex.ToString());
             name = name.ReplaceInsensitive("{SeasonNumber:2}", s.SeasonIndex.ToString("00"));
+            name = name.ReplaceInsensitive("{SeasonName}", seasonName??string.Empty);
             name = name.ReplaceInsensitive("{StartYear}", s.MinYear().ToString());
             name = name.ReplaceInsensitive("{EndYear}", s.MaxYear().ToString());
-            name = name.ReplaceInsensitive("{ShowImdb}", s.Show.TheSeries()?.Imdb??string.Empty);
+            name = name.ReplaceInsensitive("{ShowImdb}", s.Show.CachedShow?.Imdb??string.Empty);
 
             return TVSettings.DirectoryFriendly(name.Trim());
         }
@@ -102,4 +107,95 @@ namespace TVRename
             return name.Trim();
         }
     }
+
+    public static class CustomMovieName
+    {
+        public static string DefaultStyle() => Presets[0];
+
+        private static readonly List<string> Presets = new List<string>
+                                                        {
+                                                            "{ShowName} ({Year})",
+                                                            "{ShowName}"
+                                                        };
+
+        internal static readonly List<string> TAGS = new List<string>
+        {
+            "{ShowName}",
+            "{ShowNameInitial}",
+            "{ShowNameLower}",
+            "{Year}",
+            "{ContentRating}",
+            "{Imdb}",
+        };
+
+        [NotNull]
+        public static List<string> ExamplePresets(MovieConfiguration s)
+        {
+            return Presets.Select(example => NameFor(s, example)).ToList();
+        }
+
+        [NotNull]
+        public static string NameFor(MovieConfiguration? m, string styleString) => NameFor(m, styleString, false);
+
+        public static string NameFor(MovieConfiguration m, string styleString, string? extension)
+        {
+            string r = NameFor(m, styleString);
+
+            if (string.IsNullOrEmpty(extension))
+            {
+                return r;
+            }
+
+            bool needsSpacer = !extension.StartsWith(".", StringComparison.Ordinal);
+
+            if (needsSpacer)
+            {
+                return r + "." + extension;
+            }
+
+            return r + extension;
+        }
+
+        [NotNull]
+        public static string NameFor(MovieConfiguration? m, string styleString, bool urlEncode)
+        {
+            string name = styleString;
+
+            if (m?.ShowName is null)
+            {
+                return string.Empty;
+            }
+
+            string showname = m.ShowName;
+            if (urlEncode)
+            {
+                showname = Uri.EscapeDataString(showname);
+            }
+
+            name = name.ReplaceInsensitive("{ShowName}", showname);
+            name = name.ReplaceInsensitive("{ShowNameInitial}", showname.Initial().ToLower());
+            name = name.ReplaceInsensitive("{ShowNameLower}", showname.ToLower().Replace(' ', '-').RemoveCharactersFrom("()[]{}&$:"));
+            name = name.ReplaceInsensitive("{ContentRating}", m.CachedMovie?.ContentRating) ;
+            name = name.ReplaceInsensitive("{Year}", m.CachedMovie?.Year.ToString() );
+            name = name.ReplaceInsensitive("{Imdb}", m.CachedMovie?.Imdb );
+
+            return TVSettings.DirectoryFriendly(name.Trim());
+        }
+
+        [NotNull]
+        public static string GetTextFromPattern(string styleString)
+        {
+            string name = styleString;
+
+            foreach (string tag in TAGS)
+            {
+                name = name.ReplaceInsensitive(tag, string.Empty);
+            }
+            name = name.ReplaceInsensitive("-", string.Empty);
+            name = name.ReplaceInsensitive("/", string.Empty);
+            name = name.ReplaceInsensitive("\\", string.Empty);
+            return name.Trim();
+        }
+    }
+
 }

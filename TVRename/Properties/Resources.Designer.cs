@@ -213,6 +213,27 @@ namespace TVRename.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap blue_square_2_d537fb228cf3ded904ef09b136fe3fec72548ebc1fea3fbbd1ad9e36364db38b {
+            get {
+                object obj = ResourceManager.GetObject("blue_square_2-d537fb228cf3ded904ef09b136fe3fec72548ebc1fea3fbbd1ad9e36364db38b", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap blue_square_2_d537fb228cf3ded904ef09b136fe3fec72548ebc1fea3fbbd1ad9e36364db38b__1_ {
+            get {
+                object obj = ResourceManager.GetObject("blue_square_2-d537fb228cf3ded904ef09b136fe3fec72548ebc1fea3fbbd1ad9e36364db38b (1" +
+                        ")", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         internal static System.Drawing.Bitmap CheckBoxSmall {
             get {
                 object obj = ResourceManager.GetObject("CheckBoxSmall", resourceCulture);
@@ -266,6 +287,16 @@ namespace TVRename.Properties {
         internal static System.Drawing.Bitmap DoSmall {
             get {
                 object obj = ResourceManager.GetObject("DoSmall", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap download {
+            get {
+                object obj = ResourceManager.GetObject("download", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
@@ -517,6 +548,15 @@ namespace TVRename.Properties {
             get {
                 object obj = ResourceManager.GetObject("SettingsSmall", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to [Spoilers Hidden].
+        /// </summary>
+        internal static string Spoilers_Hidden_Text {
+            get {
+                return ResourceManager.GetString("Spoilers_Hidden_Text", resourceCulture);
             }
         }
         

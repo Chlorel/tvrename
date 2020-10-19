@@ -13,19 +13,35 @@ namespace TVRename
     using System;
     using Alphaleonis.Win32.Filesystem;
 
-    public class ItemMissing : Item
+    public abstract class ItemMissing : Item
     {
-        public readonly string TheFileNoExt;
-        public readonly string Filename;
+        public string TheFileNoExt;
+        public string Filename;
+        protected string Folder;
 
-        public ItemMissing([NotNull] ProcessedEpisode pe, [NotNull] string whereItShouldBeFolder)
+
+        public override string DestinationFile => Filename;
+        public override string ScanListViewGroup => "lvgActionMissing";
+
+        public override string DestinationFolder => Folder;
+        public override string TargetFolder => new FileInfo(TheFileNoExt).DirectoryName;
+
+        public override int IconNumber => 1;
+
+        public abstract bool DoRename { get; }
+        public override IgnoreItem? Ignore => GenerateIgnore(TheFileNoExt);
+
+    }
+
+    public class ShowItemMissing : ItemMissing
+    {
+        public ShowItemMissing([NotNull] ProcessedEpisode pe, [NotNull] string whereItShouldBeFolder)
         {
             Episode = pe;
             Filename = TVSettings.Instance.FilenameFriendly(TVSettings.Instance.NamingStyle.NameFor(pe, null, whereItShouldBeFolder.Length));
             TheFileNoExt = whereItShouldBeFolder + System.IO.Path.DirectorySeparatorChar + Filename;
-            DestinationFolder = whereItShouldBeFolder;
+            Folder = whereItShouldBeFolder;
         }
-
         #region Item Members
 
         public ProcessedEpisode MissingEpisode =>Episode ?? throw new InvalidOperationException();
@@ -35,11 +51,12 @@ namespace TVRename
             return o is ItemMissing missing && string.CompareOrdinal(missing.TheFileNoExt, TheFileNoExt) == 0;
         }
 
+       
         public override string Name => "Missing Episode";
 
         public override int CompareTo(object? o)
         {
-            if (o is null || !(o is ItemMissing miss))
+            if (o is null || !(o is ShowItemMissing miss))
             {
                 return -1;
             }
@@ -59,24 +76,53 @@ namespace TVRename
 
         #endregion
 
-        #region Item Members
-
-        public override IgnoreItem? Ignore => GenerateIgnore(TheFileNoExt);
-
-        public override string DestinationFolder { get; }
-
-        public override string DestinationFile => Filename;
-        public override string ScanListViewGroup => "lvgActionMissing";
-
-        public override string TargetFolder => new FileInfo(TheFileNoExt).DirectoryName;
-
-        public override int IconNumber => 1;
-
-        #endregion
 
         public void AddComment(string p0)
         {
             ErrorText += p0;
         }
+
+        public override bool DoRename => Episode?.Show.DoRename ?? true;
     }
+
+    public class MovieItemMissing : ItemMissing
+    {
+        public MovieItemMissing([NotNull] MovieConfiguration movie, [NotNull] string whereItShouldBeFolder)
+        {
+            Episode = null;
+            Filename = TVSettings.Instance.FilenameFriendly(CustomMovieName.NameFor(movie,TVSettings.Instance.MovieFilenameFormat));
+            TheFileNoExt = whereItShouldBeFolder + System.IO.Path.DirectorySeparatorChar + Filename;
+            Folder = whereItShouldBeFolder;
+            Movie = movie;
+        }
+        #region Item Members
+
+
+        public override bool SameAs(Item o)
+        {
+            return o is MovieItemMissing missing && string.CompareOrdinal(missing.TheFileNoExt, TheFileNoExt) == 0;
+        }
+
+        public override string Name => "Missing Movie";
+
+        public override int CompareTo(object? o)
+        {
+            if (o is null || !(o is MovieItemMissing miss))
+            {
+                return -1;
+            }
+
+            return String.Compare(TheFileNoExt, miss.TheFileNoExt, StringComparison.Ordinal);
+        }
+
+        #endregion
+
+        #region Item Members
+
+        public MovieConfiguration MovieConfig => Movie ?? throw new InvalidOperationException();
+        #endregion
+
+        public override bool DoRename => MovieConfig.DoRename;
+    }
+
 }

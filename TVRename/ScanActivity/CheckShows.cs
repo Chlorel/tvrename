@@ -7,7 +7,6 @@
 // 
 
 using System;
-using System.Collections.Generic;
 using System.Linq;
 
 namespace TVRename
@@ -18,9 +17,8 @@ namespace TVRename
 
         protected override string CheckName() => "Looked in the library to find missing files";
 
-        protected override void DoCheck(SetProgressDelegate prog, ICollection<ShowItem> showList, TVDoc.ScanSettings settings)
+        protected override void DoCheck(SetProgressDelegate prog, TVDoc.ScanSettings settings)
         {
-            MDoc.TheActionList.Clear();
 
             if (TVSettings.Instance.RenameCheck)
             {
@@ -32,18 +30,19 @@ namespace TVRename
                 MDoc.Stats().MissingChecksDone++;
             }
 
-            if (settings.Type == TVSettings.ScanType.Full)
+            DirFilesCache dfc = new DirFilesCache();
+
+            var showList = settings.Shows;
+
+            if (settings.Type == TVSettings.ScanType.Full  && showList.Count>0)
             {
                 // only do episode count if we're doing all shows and seasons
                 MDoc.CurrentStats.NsNumberOfEpisodes = 0;
-                showList = MDoc.Library.Values;
             }
-
-            DirFilesCache dfc = new DirFilesCache();
 
             int c = 0;
             UpdateStatus(c,showList.Count, "Checking shows");
-            foreach (ShowItem si in showList.OrderBy(item => item.ShowName ))
+            foreach (ShowConfiguration si in showList.OrderBy(item => item.ShowName ))
             {
                 UpdateStatus(c++ ,showList.Count, si.ShowName);
                 if (settings.Token.IsCancellationRequested)
@@ -67,6 +66,32 @@ namespace TVRename
                     LOGGER.Error(e,$"Failed to scan {si.ShowName}. Please double check settings for this show: {si.TvdbCode}: {si.AutoAddFolderBase}");
                 }
             } // for each show
+
+            c = 0;
+            UpdateStatus(c, settings.Movies.Count, "Checking shows");
+            foreach (MovieConfiguration si in settings.Movies.OrderBy(item => item.ShowName))
+            {
+                UpdateStatus(c++, settings.Movies.Count, si.ShowName);
+                if (settings.Token.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                LOGGER.Info("Rename and missing check: " + si.ShowName);
+                try
+                {
+                    new CheckAllMovieFoldersExist(MDoc).CheckIfActive(si, dfc, settings);
+                    new RenameAndMissingMovieCheck(MDoc).CheckIfActive(si, dfc, settings);
+                }
+                catch (TVRenameOperationInterruptedException)
+                {
+                    throw;
+                }
+                catch (Exception e)
+                {
+                    LOGGER.Error(e, $"Failed to scan {si.ShowName}. Please double check settings for this movie: {si.Code}: {si}");
+                }
+            } // for each movie
 
             MDoc.RemoveIgnored();
         }

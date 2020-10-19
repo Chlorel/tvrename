@@ -10,6 +10,7 @@ using JetBrains.Annotations;
 using Newtonsoft.Json.Linq;
 using NLog;
 using System.IO;
+using System.Net.Cache;
 
 namespace TVRename
 {
@@ -148,6 +149,27 @@ namespace TVRename
             Logger.Trace("Returned {0}", result);
             return result;
         }
+
+        [NotNull]
+        public static string Obtain([NotNull] string url)
+        {
+            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+
+            using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
+            using (Stream stream = response.GetResponseStream())
+            {
+                if (stream == null)
+                {
+                    return string.Empty;
+                }
+
+                using (StreamReader reader = new StreamReader(stream))
+                {
+                    return reader.ReadToEnd();
+                }
+            }
+        }
+
         public static void LogWebException([NotNull] this Logger l,string message, [NotNull] WebException wex)
         {
             if (wex.IsUnimportant())
@@ -158,6 +180,11 @@ namespace TVRename
             {
                 l.Error(message + " " + wex.LoggableDetails());
             }
+        }
+
+        public static void LogIoException([NotNull] this Logger l, string message, [NotNull] IOException wex)
+        {
+            l.Warn(message + " " + wex.LoggableDetails());
         }
 
         public static void LogHttpRequestException([NotNull] this Logger l, string message, [NotNull] HttpRequestException wex)
@@ -172,7 +199,7 @@ namespace TVRename
             }
         }
 
-        public static bool IsUnimportant([NotNull] this WebException ex)
+        private static bool IsUnimportant([NotNull] this WebException ex)
         {
             switch (ex.Status)
             {
@@ -194,7 +221,7 @@ namespace TVRename
             }
         }
 
-        public static bool IsUnimportant([NotNull] this HttpRequestException ex)
+        private static bool IsUnimportant([NotNull] this HttpRequestException ex)
         {
             if (ex.InnerException is WebException wex)
             {
@@ -224,10 +251,21 @@ namespace TVRename
 
             if (forceReload)
             {
-                wc.CachePolicy = new System.Net.Cache.RequestCachePolicy(System.Net.Cache.RequestCacheLevel.Reload);
+                wc.CachePolicy = new RequestCachePolicy(RequestCacheLevel.Reload);
             }
 
             return wc.DownloadData(url);
+        }
+
+        public static string LoggableDetails([NotNull] this IOException ex)
+        {
+            StringBuilder s = new StringBuilder();
+            s.Append($"IOException obtained. {ex.Message}");
+            if (ex.InnerException != null)
+            {
+                s.Append($". Further details: {ex.InnerException.Message}");
+            }
+            return s.ToString();
         }
 
         [NotNull]
@@ -311,7 +349,7 @@ namespace TVRename
             StringBuilder sb = new StringBuilder();
             sb.Append("?");
 
-            foreach (KeyValuePair<string,string>  item in parameters)
+            foreach (KeyValuePair<string, string> item in parameters)
             {
                 sb.Append($"{item.Key}={WebUtility.UrlEncode(item.Value)}&");
             }

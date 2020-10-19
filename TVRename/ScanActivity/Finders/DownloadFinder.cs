@@ -21,7 +21,7 @@ namespace TVRename
         protected static bool RssMatch([NotNull] RSSItem rss, [NotNull] ProcessedEpisode pe)
         {
             string simpleShowName = Helpers.SimplifyName(pe.Show.ShowName);
-            string simpleSeriesName = Helpers.SimplifyName(pe.TheSeries.Name);
+            string simpleSeriesName = Helpers.SimplifyName(pe.TheCachedSeries.Name);
 
             if (!FileHelper.SimplifyAndCheckFilename(rss.ShowName, simpleShowName, true, false) &&
                 !(
@@ -43,6 +43,13 @@ namespace TVRename
             }
 
             return true;
+        }
+
+        protected static bool RssMatch([NotNull] RSSItem rss, [NotNull] MovieConfiguration pe)
+        {
+            string simpleShowName = Helpers.SimplifyName(pe.ShowName);
+
+            return FileHelper.SimplifyAndCheckFilename(rss.ShowName, simpleShowName, true, false);
         }
 
         [NotNull]
@@ -76,8 +83,11 @@ namespace TVRename
                         !testActionRssTwo.SourceName.ContainsOneOf(preferredTerms))
                     {
                         duplicateActionRss.Add(testActionRssTwo);
-                        LOGGER.Info(
-                            $"Removing {testActionRssTwo.Produces} as it is not as good a match as {testActionRssOne.Produces}");
+                        if (TVSettings.Instance.DetailedRSSJSONLogging)
+                        {
+                            LOGGER.Info(
+                                $"Removing {testActionRssTwo.Produces} as it is not as good a match as {testActionRssOne.Produces}");
+                        }
                     }
                 }
             }

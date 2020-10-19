@@ -24,7 +24,7 @@ namespace TVRename
 
         protected abstract Finder.FinderDisplayType CurrentType();
 
-        protected override void DoCheck(SetProgressDelegate prog, ICollection<ShowItem> showList, TVDoc.ScanSettings settings)
+        protected override void DoCheck(SetProgressDelegate prog, TVDoc.ScanSettings settings)
         {
             // have a look around for any missing episodes
             List < Finder > appropriateFinders =  finders.Where(f => f.DisplayType() == CurrentType() && f.Active()).ToList();
@@ -48,9 +48,7 @@ namespace TVRename
                 currentMatchingFinderId++;
                 int startPos = 100 * (currentMatchingFinderId - 1) / totalMatchingFinders;
                 int endPos = 100 * currentMatchingFinderId / totalMatchingFinders;
-                f.Check(prog,startPos, endPos, showList, settings);
-
-                MDoc.RemoveIgnored();
+                f.Check(prog,startPos, endPos, settings);
             }
         }
 
