@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Xml;
 using JetBrains.Annotations;
+using DirectoryInfo = Alphaleonis.Win32.Filesystem.DirectoryInfo;
 using FileInfo = Alphaleonis.Win32.Filesystem.FileInfo;
 
 namespace TVRename
@@ -13,7 +14,8 @@ namespace TVRename
 
     public class PossibleNewMovie
     {
-        public readonly FileInfo MovieFile;
+        public readonly string MovieStub;
+        public readonly DirectoryInfo Directory;
 
         // ReSharper disable once InconsistentNaming
         public int? TMDBCode;
@@ -33,10 +35,11 @@ namespace TVRename
 
         public PossibleNewMovie(FileInfo possibleMovieFile, bool andGuess,bool showErrorMsgBox)
         {
-            MovieFile = possibleMovieFile;
+            MovieStub = possibleMovieFile.MovieFileNameBase();
+            Directory = possibleMovieFile.Directory;
 
-            (string directoryRefinedHint, int? directoryPossibleYear) = GuessShowName(possibleMovieFile.Directory.Name);
-            (string fileRefinedHint, int? filePossibleYear) = GuessShowName(possibleMovieFile.RemoveExtension());
+            (string? directoryRefinedHint, int? directoryPossibleYear) = GuessShowName(possibleMovieFile.Directory.Name);
+            (string? fileRefinedHint, int? filePossibleYear) = GuessShowName(possibleMovieFile.MovieFileNameBase());
 
             RefinedHint = directoryRefinedHint ?? fileRefinedHint;
             PossibleYear = directoryPossibleYear ?? filePossibleYear;
@@ -116,7 +119,7 @@ namespace TVRename
 
         private CachedMovieInfo? ParseHints(bool showErrorMsgBox)
         {
-            var mat = Regex.Match(RefinedHint.Trim(), @"\s(\d{4})$");
+            Match mat = Regex.Match(RefinedHint.Trim(), @"\s(\d{4})$");
             if (mat.Success)
             {
                 int newPossibleYear = mat.Groups[1].Value.ToInt(0);
@@ -155,10 +158,7 @@ namespace TVRename
                 try
                 {
                     CachedMovieInfo series = TMDB.LocalCache.Instance.GetMovieAndDownload(tmdbId.Value, showErrorMsgBox);
-                    if (series != null)
-                    {
-                        return tmdbId.Value;
-                    }
+                    return tmdbId.Value;
                 }
                 catch (ShowNotFoundException)
                 {
@@ -184,12 +184,12 @@ namespace TVRename
 
         private string? FindShowCode(string simpleIdCode, string uniqueIdCode)
         {
-            List<string> possibleFilenames = new List<string> { $"{MovieFile.RemoveExtension()}.nfo", $"{MovieFile.RemoveExtension()}.xml" };
+            List<string> possibleFilenames = new List<string> { $"{MovieStub}.nfo", $"{MovieStub}.xml" };
             foreach (string fileName in possibleFilenames)
             {
                 try
                 {
-                    IEnumerable<FileInfo> files = MovieFile.Directory.EnumerateFiles(fileName).ToList();
+                    IEnumerable<FileInfo> files = Directory.EnumerateFiles(fileName).ToList();
                     if (files.Any())
                     {
                         foreach (string x in files.Select(info => FindShowCode(info, simpleIdCode, uniqueIdCode))
@@ -225,7 +225,7 @@ namespace TVRename
         {
             try
             {
-                using (var streamReader = file.OpenText())
+                using (System.IO.StreamReader? streamReader = file.OpenText())
                 {
                     using (XmlReader reader = XmlReader.Create(streamReader))
                     {
@@ -281,12 +281,12 @@ namespace TVRename
             List<string> removeCrapAfterTerms =
                 new List<string> { "1080p", "720p","dvdrip","webrip","brrip","r5","BDrip","limited","dvdscr","unrated","tv","bluray","hdrip","3d","xvid","r6rip" };
 
-            foreach (var removeCrapAfterTerm in removeCrapAfterTerms)
+            foreach (string? removeCrapAfterTerm in removeCrapAfterTerms)
             {
                 if (refinedHint.Contains(removeCrapAfterTerm))
                 {
                     string pattern2 = @"(?:^|\s|$)" + Regex.Escape(removeCrapAfterTerm) + @"(?:^|\s|$)";
-                    var match = Regex.Match(refinedHint, pattern2);
+                    Match match = Regex.Match(refinedHint, pattern2);
                     if (match.Success)
                     {
                         refinedHint = refinedHint.RemoveAfter(removeCrapAfterTerm);
@@ -295,7 +295,7 @@ namespace TVRename
             }
 
             const string PATTERN = @"\s(\d{4})$";
-            var m = Regex.Match(refinedHint.Trim(), PATTERN);
+            Match m = Regex.Match(refinedHint.Trim(), PATTERN);
             if (m.Success)
             {
                 //Seems like we have a year in the date

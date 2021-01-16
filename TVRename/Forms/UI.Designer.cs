@@ -63,8 +63,11 @@ namespace TVRename
             this.preferencesToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.ignoreListToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.filenameTemplateEditorToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.movieSearchEnginesToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.searchEnginesToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.filenameProcessorsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.toolStripSeparator20 = new System.Windows.Forms.ToolStripSeparator();
+            this.settingsCheckToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.toolsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.flushCacheToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.flushImageCacheToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -83,16 +86,15 @@ namespace TVRename
             this.showSummaryToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.movieCollectionSummaryLogToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.actorsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.toolStripSeparator18 = new System.Windows.Forms.ToolStripSeparator();
-            this.movieRecommendationsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.tvRecommendationsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.betaToolsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.timezoneInconsistencyLOGToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.episodeFileQualitySummaryLogToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripSeparator19 = new System.Windows.Forms.ToolStripSeparator();
             this.accuracyCheckLogToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.tMDBAccuracyCheckLogToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.settingsCheckToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.toolStripSeparator21 = new System.Windows.Forms.ToolStripSeparator();
+            this.movieRecommendationsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.tvRecommendationsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.helpToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.quickstartGuideToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.visitWebsiteToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -114,10 +116,10 @@ namespace TVRename
             this.btnMovieDelete = new System.Windows.Forms.ToolStripButton();
             this.toolStripSeparator15 = new System.Windows.Forms.ToolStripSeparator();
             this.btnMovieRefresh = new System.Windows.Forms.ToolStripButton();
+            this.tsbScanMovies = new System.Windows.Forms.ToolStripButton();
             this.btnMovieFilter = new System.Windows.Forms.ToolStripButton();
             this.toolStripSeparator16 = new System.Windows.Forms.ToolStripSeparator();
             this.tsbMyMoviesContextMenu = new System.Windows.Forms.ToolStripButton();
-            this.tsbScanMovies = new System.Windows.Forms.ToolStripButton();
             this.splitContainer2 = new System.Windows.Forms.SplitContainer();
             this.movieTree = new System.Windows.Forms.TreeView();
             this.filterMoviesTextbox = new System.Windows.Forms.TextBox();
@@ -242,7 +244,6 @@ namespace TVRename
             this.columnHeader34 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnHeader1 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnHeader35 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
-            this.movieSearchEnginesToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menuStrip1.SuspendLayout();
             this.tabControl1.SuspendLayout();
             this.tbMyMovies.SuspendLayout();
@@ -340,7 +341,9 @@ namespace TVRename
             this.filenameTemplateEditorToolStripMenuItem,
             this.movieSearchEnginesToolStripMenuItem,
             this.searchEnginesToolStripMenuItem,
-            this.filenameProcessorsToolStripMenuItem});
+            this.filenameProcessorsToolStripMenuItem,
+            this.toolStripSeparator20,
+            this.settingsCheckToolStripMenuItem});
             this.optionsToolStripMenuItem.Name = "optionsToolStripMenuItem";
             this.optionsToolStripMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.O)));
             this.optionsToolStripMenuItem.Size = new System.Drawing.Size(61, 20);
@@ -396,6 +399,14 @@ namespace TVRename
             this.filenameTemplateEditorToolStripMenuItem.Text = "&Filename Template Editor";
             this.filenameTemplateEditorToolStripMenuItem.Click += new System.EventHandler(this.filenameTemplateEditorToolStripMenuItem_Click);
             // 
+            // movieSearchEnginesToolStripMenuItem
+            // 
+            this.movieSearchEnginesToolStripMenuItem.Image = global::TVRename.Properties.Resources.SearchWebHS;
+            this.movieSearchEnginesToolStripMenuItem.Name = "movieSearchEnginesToolStripMenuItem";
+            this.movieSearchEnginesToolStripMenuItem.Size = new System.Drawing.Size(254, 22);
+            this.movieSearchEnginesToolStripMenuItem.Text = "Movie &Search Engines";
+            this.movieSearchEnginesToolStripMenuItem.Click += new System.EventHandler(this.movieSearchEnginesToolStripMenuItem_Click);
+            // 
             // searchEnginesToolStripMenuItem
             // 
             this.searchEnginesToolStripMenuItem.Image = global::TVRename.Properties.Resources.SearchWebHS;
@@ -410,6 +421,18 @@ namespace TVRename
             this.filenameProcessorsToolStripMenuItem.Size = new System.Drawing.Size(254, 22);
             this.filenameProcessorsToolStripMenuItem.Text = "File&name Processors";
             this.filenameProcessorsToolStripMenuItem.Click += new System.EventHandler(this.filenameProcessorsToolStripMenuItem_Click);
+            // 
+            // toolStripSeparator20
+            // 
+            this.toolStripSeparator20.Name = "toolStripSeparator20";
+            this.toolStripSeparator20.Size = new System.Drawing.Size(251, 6);
+            // 
+            // settingsCheckToolStripMenuItem
+            // 
+            this.settingsCheckToolStripMenuItem.Name = "settingsCheckToolStripMenuItem";
+            this.settingsCheckToolStripMenuItem.Size = new System.Drawing.Size(254, 22);
+            this.settingsCheckToolStripMenuItem.Text = "Settings Check";
+            this.settingsCheckToolStripMenuItem.Click += new System.EventHandler(this.settingsCheckToolStripMenuItem_Click);
             // 
             // toolsToolStripMenuItem
             // 
@@ -512,10 +535,7 @@ namespace TVRename
             this.toolStripSeparator5,
             this.showSummaryToolStripMenuItem,
             this.movieCollectionSummaryLogToolStripMenuItem,
-            this.actorsToolStripMenuItem,
-            this.toolStripSeparator18,
-            this.movieRecommendationsToolStripMenuItem,
-            this.tvRecommendationsToolStripMenuItem});
+            this.actorsToolStripMenuItem});
             this.viewToolStripMenuItem.Name = "viewToolStripMenuItem";
             this.viewToolStripMenuItem.Size = new System.Drawing.Size(44, 20);
             this.viewToolStripMenuItem.Text = "View";
@@ -537,7 +557,7 @@ namespace TVRename
             // 
             this.showSummaryToolStripMenuItem.Name = "showSummaryToolStripMenuItem";
             this.showSummaryToolStripMenuItem.Size = new System.Drawing.Size(227, 22);
-            this.showSummaryToolStripMenuItem.Text = "Show Summary...";
+            this.showSummaryToolStripMenuItem.Text = "TV Show Summary...";
             this.showSummaryToolStripMenuItem.Click += new System.EventHandler(this.showSummaryToolStripMenuItem_Click);
             // 
             // movieCollectionSummaryLogToolStripMenuItem
@@ -555,25 +575,6 @@ namespace TVRename
             this.actorsToolStripMenuItem.Text = "TV &Actors Grid...";
             this.actorsToolStripMenuItem.Click += new System.EventHandler(this.actorsToolStripMenuItem_Click);
             // 
-            // toolStripSeparator18
-            // 
-            this.toolStripSeparator18.Name = "toolStripSeparator18";
-            this.toolStripSeparator18.Size = new System.Drawing.Size(224, 6);
-            // 
-            // movieRecommendationsToolStripMenuItem
-            // 
-            this.movieRecommendationsToolStripMenuItem.Name = "movieRecommendationsToolStripMenuItem";
-            this.movieRecommendationsToolStripMenuItem.Size = new System.Drawing.Size(227, 22);
-            this.movieRecommendationsToolStripMenuItem.Text = "Movie Recommendations...";
-            this.movieRecommendationsToolStripMenuItem.Click += new System.EventHandler(this.movieRecommendationsToolStripMenuItem_Click);
-            // 
-            // tvRecommendationsToolStripMenuItem
-            // 
-            this.tvRecommendationsToolStripMenuItem.Name = "tvRecommendationsToolStripMenuItem";
-            this.tvRecommendationsToolStripMenuItem.Size = new System.Drawing.Size(227, 22);
-            this.tvRecommendationsToolStripMenuItem.Text = "TV Recommendations...";
-            this.tvRecommendationsToolStripMenuItem.Click += new System.EventHandler(this.recommendationsToolStripMenuItem_Click);
-            // 
             // betaToolsToolStripMenuItem
             // 
             this.betaToolsToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
@@ -582,7 +583,9 @@ namespace TVRename
             this.toolStripSeparator19,
             this.accuracyCheckLogToolStripMenuItem,
             this.tMDBAccuracyCheckLogToolStripMenuItem,
-            this.settingsCheckToolStripMenuItem});
+            this.toolStripSeparator21,
+            this.movieRecommendationsToolStripMenuItem,
+            this.tvRecommendationsToolStripMenuItem});
             this.betaToolsToolStripMenuItem.Name = "betaToolsToolStripMenuItem";
             this.betaToolsToolStripMenuItem.Size = new System.Drawing.Size(42, 20);
             this.betaToolsToolStripMenuItem.Text = "Beta";
@@ -620,12 +623,24 @@ namespace TVRename
             this.tMDBAccuracyCheckLogToolStripMenuItem.Text = "TMDB Accuracy Check (Log)";
             this.tMDBAccuracyCheckLogToolStripMenuItem.Click += new System.EventHandler(this.tMDBAccuracyCheckLogToolStripMenuItem_Click);
             // 
-            // settingsCheckToolStripMenuItem
+            // toolStripSeparator21
             // 
-            this.settingsCheckToolStripMenuItem.Name = "settingsCheckToolStripMenuItem";
-            this.settingsCheckToolStripMenuItem.Size = new System.Drawing.Size(262, 22);
-            this.settingsCheckToolStripMenuItem.Text = "SettingsCheck";
-            this.settingsCheckToolStripMenuItem.Click += new System.EventHandler(this.settingsCheckToolStripMenuItem_Click);
+            this.toolStripSeparator21.Name = "toolStripSeparator21";
+            this.toolStripSeparator21.Size = new System.Drawing.Size(259, 6);
+            // 
+            // movieRecommendationsToolStripMenuItem
+            // 
+            this.movieRecommendationsToolStripMenuItem.Name = "movieRecommendationsToolStripMenuItem";
+            this.movieRecommendationsToolStripMenuItem.Size = new System.Drawing.Size(262, 22);
+            this.movieRecommendationsToolStripMenuItem.Text = "Movie Recommendations...";
+            this.movieRecommendationsToolStripMenuItem.Click += new System.EventHandler(this.movieRecommendationsToolStripMenuItem_Click);
+            // 
+            // tvRecommendationsToolStripMenuItem
+            // 
+            this.tvRecommendationsToolStripMenuItem.Name = "tvRecommendationsToolStripMenuItem";
+            this.tvRecommendationsToolStripMenuItem.Size = new System.Drawing.Size(262, 22);
+            this.tvRecommendationsToolStripMenuItem.Text = "TV Recommendations...";
+            this.tvRecommendationsToolStripMenuItem.Click += new System.EventHandler(this.recommendationsToolStripMenuItem_Click);
             // 
             // helpToolStripMenuItem
             // 
@@ -831,6 +846,17 @@ namespace TVRename
             this.btnMovieRefresh.Text = "&Refresh";
             this.btnMovieRefresh.Click += new System.EventHandler(this.btnMovieRefresh_Click);
             // 
+            // tsbScanMovies
+            // 
+            this.tsbScanMovies.Font = new System.Drawing.Font("Segoe UI", 9.75F);
+            this.tsbScanMovies.Image = global::TVRename.Properties.Resources._322497_321;
+            this.tsbScanMovies.ImageScaling = System.Windows.Forms.ToolStripItemImageScaling.None;
+            this.tsbScanMovies.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.tsbScanMovies.Name = "tsbScanMovies";
+            this.tsbScanMovies.Size = new System.Drawing.Size(117, 36);
+            this.tsbScanMovies.Text = "Scan Movies";
+            this.tsbScanMovies.Click += new System.EventHandler(this.toolStripButton1_Click_1);
+            // 
             // btnMovieFilter
             // 
             this.btnMovieFilter.Font = new System.Drawing.Font("Segoe UI", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
@@ -856,17 +882,6 @@ namespace TVRename
             this.tsbMyMoviesContextMenu.Size = new System.Drawing.Size(119, 36);
             this.tsbMyMoviesContextMenu.Text = "Context Menu";
             this.tsbMyMoviesContextMenu.Click += new System.EventHandler(this.tsbMyMoviesContextMenu_Click);
-            // 
-            // tsbScanMovies
-            // 
-            this.tsbScanMovies.Font = new System.Drawing.Font("Segoe UI", 9.75F);
-            this.tsbScanMovies.Image = global::TVRename.Properties.Resources._322497_321;
-            this.tsbScanMovies.ImageScaling = System.Windows.Forms.ToolStripItemImageScaling.None;
-            this.tsbScanMovies.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.tsbScanMovies.Name = "tsbScanMovies";
-            this.tsbScanMovies.Size = new System.Drawing.Size(117, 36);
-            this.tsbScanMovies.Text = "Scan Movies";
-            this.tsbScanMovies.Click += new System.EventHandler(this.toolStripButton1_Click_1);
             // 
             // splitContainer2
             // 
@@ -2136,14 +2151,6 @@ namespace TVRename
             this.columnHeader35.Text = "Episode Name";
             this.columnHeader35.Width = 360;
             // 
-            // movieSearchEnginesToolStripMenuItem
-            // 
-            this.movieSearchEnginesToolStripMenuItem.Image = global::TVRename.Properties.Resources.SearchWebHS;
-            this.movieSearchEnginesToolStripMenuItem.Name = "movieSearchEnginesToolStripMenuItem";
-            this.movieSearchEnginesToolStripMenuItem.Size = new System.Drawing.Size(254, 22);
-            this.movieSearchEnginesToolStripMenuItem.Text = "Movie &Search Engines";
-            this.movieSearchEnginesToolStripMenuItem.Click += new System.EventHandler(this.movieSearchEnginesToolStripMenuItem_Click);
-            // 
             // UI
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -2398,14 +2405,15 @@ namespace TVRename
         private ToolStripSeparator toolStripSeparator17;
         private ToolStripMenuItem bulkAddMoviesToolStripMenuItem;
         private ToolStripMenuItem tMDBAccuracyCheckLogToolStripMenuItem;
-        private ToolStripMenuItem tvRecommendationsToolStripMenuItem;
         private ToolStripMenuItem duplicateMoviesToolStripMenuItem;
         private ToolStripMenuItem movieCollectionSummaryLogToolStripMenuItem;
-        private ToolStripSeparator toolStripSeparator18;
-        private ToolStripMenuItem movieRecommendationsToolStripMenuItem;
         private ToolStripSeparator toolStripSeparator19;
-        private ToolStripMenuItem settingsCheckToolStripMenuItem;
         private ToolStripButton tsbScanMovies;
         private ToolStripMenuItem movieSearchEnginesToolStripMenuItem;
+        private ToolStripSeparator toolStripSeparator20;
+        private ToolStripMenuItem settingsCheckToolStripMenuItem;
+        private ToolStripSeparator toolStripSeparator21;
+        private ToolStripMenuItem movieRecommendationsToolStripMenuItem;
+        private ToolStripMenuItem tvRecommendationsToolStripMenuItem;
     }
 }

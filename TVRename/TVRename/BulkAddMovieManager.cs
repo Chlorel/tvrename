@@ -50,14 +50,14 @@ namespace TVRename
             return null;
         }
 
-        public (bool finished, DirectoryInfo[] subDirs) CheckFolderForMovies([NotNull] DirectoryInfo di2, bool andGuess, bool fullLogging, bool showErrorMsgBox)
+        public (bool finished, DirectoryInfo[]? subDirs) CheckFolderForMovies([NotNull] DirectoryInfo di2, bool andGuess, bool fullLogging, bool showErrorMsgBox)
         {
             CurrentPhaseDirectory++;
             try
             {
                 // ..and not already a folder for one of our shows
                 string theFolder = di2.FullName.ToLower();
-                foreach (var si in mDoc.FilmLibrary.Movies)
+                foreach (MovieConfiguration? si in mDoc.FilmLibrary.Movies)
                 {
                     if (RejectFolderIfIncludedInShow(fullLogging, si, theFolder))
                     {
@@ -90,13 +90,21 @@ namespace TVRename
                 {
                     return (false, subDirectories);
                 }
+                if (!films.Any())
+                {
+                    Logger.Warn($"Checked {di2.FullName} and it had no movie files.");
+                    if (!di2.GetFiles().Any() && !di2.GetDirectories().Any())
+                    {
+                        di2.Delete(false);
+                    }
+                }
 
                 foreach (FileInfo newFilm in films)
                 {
                     // ....its good!
                     Logger.Info("Adding {0} as a new folder", theFolder);
                     PossibleNewMovie ai = new PossibleNewMovie(newFilm, andGuess, showErrorMsgBox);
-                    AddItems.Add(ai);
+                    AddItems.AddIfNew(ai);
                 }
 
                 return (false, subDirectories);
@@ -144,7 +152,10 @@ namespace TVRename
         private void CheckFolderForShows([NotNull] DirectoryInfo di, CancellationToken token, BackgroundWorker bw, bool fullLogging, bool showErrorMsgBox)
         {
             int percentComplete = (int)(100.0 / CurrentPhaseTotal * ((1.0 * CurrentPhase) + (1.0 * CurrentPhaseDirectory / CurrentPhaseTotalDirectory)));
-
+            if (percentComplete > 100)
+            {
+                percentComplete = 100;
+            }
             bw.ReportProgress(percentComplete,di.Name);
             if (!di.Exists)
             {
@@ -167,7 +178,7 @@ namespace TVRename
                 return;
             }
 
-            (bool finished, DirectoryInfo[] subDirs) = CheckFolderForMovies(di, false, fullLogging, showErrorMsgBox);
+            (bool finished, DirectoryInfo[]? subDirs) = CheckFolderForMovies(di, false, fullLogging, showErrorMsgBox);
 
             if (finished)
             {
@@ -207,9 +218,8 @@ namespace TVRename
                 return;
             }
 
-            string matchingRoot = TVSettings.Instance.MovieLibraryFolders.FirstOrDefault(s =>  ai.MovieFile.Directory.FullName.IsSubfolderOf(s));
+            string? matchingRoot = TVSettings.Instance.MovieLibraryFolders.FirstOrDefault(s =>  ai.Directory.FullName.IsSubfolderOf(s));
             bool isInLibraryFolderFileFinder = matchingRoot.HasValue();
-
 
             // see if there is a matching show item
             MovieConfiguration found = mDoc.FilmLibrary.GetMovie(ai);
@@ -221,11 +231,14 @@ namespace TVRename
 
             //We are updating an existing record
 
-            bool inDefaultPath = ai.MovieFile.Directory.Name.Equals(
-                CustomMovieName.NameFor(found, TVSettings.Instance.MovieFolderFormat),
+            string targetDirectoryName = CustomMovieName.NameFor(found, TVSettings.Instance.MovieFolderFormat);
+            bool inDefaultPath = ai.Directory.Name.Equals(
+                targetDirectoryName,
                 StringComparison.CurrentCultureIgnoreCase);
 
-            if (inDefaultPath && isInLibraryFolderFileFinder)
+            bool existingLocationIsDefaultToo = found.UseAutomaticFolders && found.AutomaticFolderRoot.In(TVSettings.Instance.MovieLibraryFolders.ToArray());
+
+            if (inDefaultPath && isInLibraryFolderFileFinder && !existingLocationIsDefaultToo)
             {
                 found.UseAutomaticFolders = true;
                 found.UseCustomFolderNameFormat = false;
@@ -236,16 +249,16 @@ namespace TVRename
 
             //we have an existing record that we need to add manual folders to
 
-            if (isInLibraryFolderFileFinder)
+            if (isInLibraryFolderFileFinder && !found.AutomaticFolderRoot.HasValue())
             {
                 //Probably in the library
                 found.AutomaticFolderRoot = matchingRoot!;
             }
 
             found.UseManualLocations = true;
-            if (!found.ManualLocations.Contains(ai.MovieFile.Directory.FullName))
+            if (!found.ManualLocations.Contains(ai.Directory.FullName))
             {
-                found.ManualLocations.Add(ai.MovieFile.Directory.FullName);
+                found.ManualLocations.Add(ai.Directory.FullName);
             }
         }
 
@@ -258,7 +271,7 @@ namespace TVRename
 
             mDoc.Stats().AutoAddedMovies++;
 
-            bool inDefaultPath = ai.MovieFile.Directory.Name.Equals(
+            bool inDefaultPath = ai.Directory.Name.Equals(
                 CustomMovieName.NameFor(found, TVSettings.Instance.MovieFolderFormat),
                 StringComparison.CurrentCultureIgnoreCase);
 
@@ -279,7 +292,7 @@ namespace TVRename
             found.UseAutomaticFolders = false;
             found.UseCustomFolderNameFormat = false;
             found.UseManualLocations = true;
-            found.ManualLocations.Add(ai.MovieFile.Directory.FullName);
+            found.ManualLocations.Add(ai.Directory.FullName);
         }
 
         public void CheckFolders(CancellationToken token,BackgroundWorker bw,  bool detailedLogging, bool showErrorMsgBox)
@@ -306,7 +319,11 @@ namespace TVRename
                 CurrentPhaseTotalDirectory = 1;
 
                 DirectoryInfo di = new DirectoryInfo(folder);
-
+                if (TVSettings.Instance.LibraryFolders.Contains(folder))
+                {
+                    Logger.Warn($"Not loading {folder} as it is both a movie folder and a tv folder");
+                    continue;
+                }
                 CheckFolderForShows(di, token,bw, detailedLogging, showErrorMsgBox);
 
                 if (token.IsCancellationRequested)

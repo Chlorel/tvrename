@@ -174,6 +174,7 @@ namespace TVRename
             string tvLink = string.IsNullOrWhiteSpace(ser.SeriesId) ? string.Empty : $"http://www.tv.com/show/{ser.SeriesId}/summary.html";
             string imdbLink = string.IsNullOrWhiteSpace(ser.Imdb) ? string.Empty : $"http://www.imdb.com/title/{ser.Imdb}";
             string mazeLink = ser.TvMazeCode <=0 ? string.Empty : ser.WebUrl;
+            string tmdbLink = "http://google.com"; //TODO FIX THIS
 
             string urlFilename = includeDirectoryLinks
                 ? Uri.EscapeDataString(si.GetBestFolderLocationToOpen())
@@ -203,6 +204,7 @@ namespace TVRename
 			         {CreateButton(tvdbLink, "TVDB.com", "View on TVDB")}
 			         {CreateButton(imdbLink, "IMDB.com", "View on IMDB")}
                      {CreateButton(mazeLink, "TVmaze.com", "View on TVmaze")}
+                     {CreateButton(tmdbLink, "TMDB.com", "View on TMDB")}
 			         {CreateButton(tvLink, "TV.com", "View on TV.com")}
 			         {CreateButton(ser.OfficialUrl, "Official Site", "View on Official Site")}
 			        </div>
@@ -229,7 +231,6 @@ namespace TVRename
                 return;
             }
 
-            string horizontalBanner = "";//CreateHorizontalBannerHtml(ser);
             string poster = CreatePosterHtml(ser);
             string yearRange = ser.Year?.ToString() ?? "";
             string stars = StarRating(ser.SiteRating / 2);
@@ -237,7 +238,7 @@ namespace TVRename
             string siteRating = ser.SiteRating > 0 ? ser.SiteRating + "/10" : "";
             string runTimeHtml = string.IsNullOrWhiteSpace(ser.Runtime) ? string.Empty : $"<br/> {ser.Runtime} min";
             string actorLinks = ser.GetActors().Select(ActorLinkHtml).ToCsv();
-            string tvdbLink = "";//TheTVDB.API.WebsiteShowUrl(si);
+            string tvdbLink = ser.TvdbCode>0?TheTVDB.API.WebsiteShowUrl(ser.TvdbCode):string.Empty;
 
             string tvLink = string.IsNullOrWhiteSpace(ser.SeriesId) ? string.Empty : $"http://www.tv.com/show/{ser.SeriesId}/summary.html";
             string imdbLink = string.IsNullOrWhiteSpace(ser.Imdb) ? string.Empty : $"http://www.imdb.com/title/{ser.Imdb}";
@@ -253,9 +254,6 @@ namespace TVRename
 
 
             sb.AppendLine($@"<div class=""card card-body"" style=""background-color:{backgroundColour.HexColour()}"">
-                <div class=""text-center"">
-	             {horizontalBanner}
-                </div>
                   <div class=""row"">
                    <div class=""col-md-4"">
                     {poster}
@@ -342,7 +340,7 @@ namespace TVRename
                 case TVDoc.ProviderType.TMDB:
                     if (si.TmdbCode > 0)
                     {
-                        return $"https://www.themoviedb.org/movie/{si.TmdbCode}/edit?active_nav_item=primary_facts";
+                        return $"https://www.themoviedb.org/tv/{si.TmdbCode}/edit?active_nav_item=primary_facts";
                     }
 
                     return null;
@@ -350,7 +348,7 @@ namespace TVRename
                 case TVDoc.ProviderType.TVmaze:
                     if (si.TVmazeCode > 0)
                     {
-                        return $"https://www.themoviedb.org/movie/{s.SeasonId}/edit?active_nav_item=primary_facts";
+                        return $"https://www.themoviedb.org/tv/{s.SeasonId}/edit?active_nav_item=primary_facts";
                     }
 
                     return null;
@@ -410,7 +408,7 @@ namespace TVRename
                 case TVDoc.ProviderType.TMDB:
                     if (si.TmdbCode > 0)
                     {
-                        return $"https://www.themoviedb.org/movie/{si.TmdbCode}/edit?active_nav_item=primary_facts";
+                        return $"https://www.themoviedb.org/tv/{si.TmdbCode}/edit?active_nav_item=primary_facts";
                     }
 
                     return null;
@@ -575,9 +573,9 @@ namespace TVRename
                 return string.Empty;
             }
 
-            string url = ei.Show.Provider == TVDoc.ProviderType.TVmaze
-                ? ei.Filename
-                : TheTVDB.API.GetImageURL(ei.Filename);
+            string url = ei.Show.Provider == TVDoc.ProviderType.TheTVDB
+                ? TheTVDB.API.GetImageURL(ei.Filename)
+                : ei.Filename;
 
             if (url.HasValue()) 
             {
@@ -987,9 +985,8 @@ namespace TVRename
 
             if (TVSettings.Instance.NeedToDownloadBannerFile())
             {
-                //TODO - fix this with real images
-                body += ImageSection("Series Banner", 758, 140, string.Empty, si.Provider);
                 body += ImageSection("Series Poster", 350, 500, si.CachedMovie?.PosterUrl, si.Provider);
+                body += ImageSection("Series Fanart", 758, 140, si.CachedMovie?.FanartUrl, si.Provider);
             }
             else
             {

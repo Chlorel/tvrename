@@ -76,6 +76,7 @@ namespace TVRename
         private bool treeExpandCollapseToggle = true;
 
         private ProcessedEpisode? switchToWhenOpenMyShows;
+        private MovieConfiguration? switchToWhenOpenMyMovies;
 
         private readonly ListViewColumnSorter lvwScheduleColumnSorter;
 
@@ -253,6 +254,11 @@ namespace TVRename
         private static object GroupSeasonKeyDelegate(object rowObject)
         {
             Item ep = (Item) rowObject;
+            if (ep.Movie != null)
+            {
+                return PostpendTheIfNeeded(ep.Movie.ShowName);
+            }
+
             if (ep.SeasonNumber.HasValue())
             {
                 return $"{ep.SeriesName} - Season {ep.SeasonNumber}";
@@ -335,7 +341,7 @@ namespace TVRename
         {
             switch ((string) groupKey)
             {
-                case "A-Mising":
+                case "A-Missing":
                     return HeaderName("Missing", mDoc.TheActionList.Missing.Count);
 
                 case "H-UpdateFiles":
@@ -386,7 +392,7 @@ namespace TVRename
             Item i = (Item) rowObject;
             return i.ScanListViewGroup switch
             {
-                "lvgActionMissing" => "A-Mising",
+                "lvgActionMissing" => "A-Missing",
                 "lvgActionMeta" => "H-UpdateFiles",
                 "lvgUpdateFileDates" => "I-UpdateFileDates",
                 "lvgDownloading" => "J-Downloading",
@@ -439,7 +445,7 @@ namespace TVRename
         private void ScanAndAction(TVSettings.ScanType type)
         {
             UiScan(null,null,true,type,MediaConfiguration.MediaType.both);
-            ActionAction(true,true);
+            ActionAction(true,true, false);
         }
 
         private static void UpdateSplashStatus([NotNull] TVRenameSplash splashScreen, string text)
@@ -521,7 +527,7 @@ namespace TVRename
 
             if (a.DoAll)
             {
-                ActionAction(true, UNATTENDED);
+                ActionAction(true, UNATTENDED,true);
             }
 
             if (a.Save)
@@ -553,14 +559,35 @@ namespace TVRename
 
         private void UpdateSearchButtons()
         {
-            string name = TVDoc.GetSearchers().CurrentSearch.Name;
-            bool enabled = name.HasValue();
+            Searchers searchers = GetUsedSearchers();
+            string name = searchers.CurrentSearch.Name;
+            bool enabled = name.HasValue() && searchers.Count>0;
+
+            btnScheduleBTSearch.Enabled = enabled;
+            btnScheduleBTSearch.Text = UseCustom(lvWhenToWatch) ? "Search" : name;
 
             btnActionBTSearch.Enabled = enabled;
-            btnScheduleBTSearch.Enabled = enabled;
-
-            btnScheduleBTSearch.Text = UseCustom(lvWhenToWatch) ? "Search" : name;
             btnActionBTSearch.Text = UseCustomObject(olvAction) ? "Search" : name;
+        }
+
+        private Searchers GetUsedSearchers()
+        {
+            bool usingScanResults = tabControl1.SelectedTab == tbAllInOne;
+            bool haveTvSelected = !usingScanResults || GetSelectedObjectType(olvAction) == MediaConfiguration.MediaType.tv;
+
+            Searchers searchers = haveTvSelected ? TVDoc.GetSearchers() : TVDoc.GetMovieSearchers();
+            return searchers;
+        }
+
+        private MediaConfiguration.MediaType GetSelectedObjectType(ObjectListView list)
+        {
+            if (list.SelectedObjects.Count == list.SelectedObjects.OfType<MovieItemMissing>().Count())
+                return MediaConfiguration.MediaType.movie;
+
+            if (list.SelectedObjects.Count == list.SelectedObjects.OfType<ShowItemMissing>().Count())
+                return MediaConfiguration.MediaType.tv;
+
+            return MediaConfiguration.MediaType.both;
         }
 
         private void visitWebsiteToolStripMenuItem_Click(object sender, EventArgs eventArgs) =>
@@ -570,27 +597,8 @@ namespace TVRename
 
         private static bool UseCustomObject([NotNull] ObjectListView view)
         {
-            foreach (object rowObject in view.SelectedObjects)
-            {
-                if (!(rowObject is ProcessedEpisode pe))
-                {
-                    continue;
-                }
-
-                if (!pe.Show.UseCustomSearchUrl)
-                {
-                    continue;
-                }
-
-                if (string.IsNullOrWhiteSpace(pe.Show.CustomSearchUrl))
-                {
-                    continue;
-                }
-
-                return true;
-            }
-
-            return false;
+            return view.SelectedObjects.OfType<ProcessedEpisode>().Any(episode =>
+                episode.Show.UseCustomSearchUrl && episode.Show.CustomSearchUrl.HasValue());
         }
 
         private static bool UseCustom([NotNull] ListView view)
@@ -645,7 +653,7 @@ namespace TVRename
                 BGDownloadTimer.Start();
             }
 
-            UpdateTimer.Start();
+            TriggerAppUpdateCheck();
 
             quickTimer.Start();
 
@@ -653,6 +661,27 @@ namespace TVRename
             {
                 RunAutoScan("Startup Scan");
             }
+        }
+
+        private void TriggerAppUpdateCheck()
+        {
+            var updateCheckType = TVSettings.Instance.UpdateCheckType;
+            if (updateCheckType != TVSettings.UpdateCheckMode.Off)
+            {
+                var checkUpdate = true;
+                if (updateCheckType == TVSettings.UpdateCheckMode.Interval)
+                {
+                    var lastUpdate = mDoc.CurrentAppState.UpdateCheck.LastUpdate;
+                    var interval = TVSettings.Instance.UpdateCheckInterval;
+                    checkUpdate = lastUpdate >= interval;
+                }
+
+                if (checkUpdate)
+                {
+                    UpdateTimer.Start();
+                }
+            }
+
         }
 
         private static void SetupFilterButton(TextBox textBox, EventHandler handler)
@@ -732,7 +761,7 @@ namespace TVRename
 
             DialogResult res = MessageBox.Show(
                 "Are you sure you want to remove all " +
-                "locally stored TheTVDB information?  This information will have to be downloaded again.  You " +
+                "locally stored TheTVDB, TMDB and TV Maze information?  This information will have to be downloaded again.  You " +
                 "can force the refresh of a single show by holding down the \"Control\" key while clicking on " +
                 "the \"Refresh\" button in the \"My Shows\" tab.",
                 "Force Refresh All", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
@@ -741,6 +770,7 @@ namespace TVRename
             {
                 TheTVDB.LocalCache.Instance.ForgetEverything();
                 TVmaze.LocalCache.Instance.ForgetEverything();
+                TMDB.LocalCache.Instance.ForgetEverything();
                 FillMyShows();
                 FillMyMovies();
                 FillEpGuideHtml();
@@ -849,8 +879,8 @@ namespace TVRename
 
         private void SetLocation([NotNull] XElement x)
         {
-            XAttribute valueX = x.Attribute("X");
-            XAttribute valueY = x.Attribute("Y");
+            XAttribute? valueX = x.Attribute("X");
+            XAttribute? valueY = x.Attribute("Y");
 
             if (valueX is null)
             {
@@ -869,8 +899,8 @@ namespace TVRename
 
         private void SetSize([NotNull] XElement x)
         {
-            XAttribute valueX = x.Attribute("Width");
-            XAttribute valueY = x.Attribute("Height");
+            XAttribute? valueX = x.Attribute("Width");
+            XAttribute? valueY = x.Attribute("Height");
 
             if (valueX is null)
             {
@@ -1019,11 +1049,12 @@ namespace TVRename
             }
         }
 
-        private static void ChooseSiteMenu([NotNull] ToolStripSplitButton btn)
+        private void ChooseSiteMenu([NotNull] ToolStripSplitButton btn)
         {
             btn.DropDownItems.Clear();
+            Searchers searchers = GetUsedSearchers();
 
-            foreach (SearchEngine search in TVDoc.GetSearchers().Where(engine => engine.Name.HasValue()))
+            foreach (SearchEngine search in searchers.Where(engine => engine.Name.HasValue()))
             {
                 ToolStripMenuItem tsi = new ToolStripMenuItem(search.Name) {Tag = search};
                 tsi.Font = new Font(tsi.Font.FontFamily,9,FontStyle.Regular);
@@ -1397,7 +1428,15 @@ namespace TVRename
 
         private void menuSearchSites_ItemClicked(object sender, [NotNull] ToolStripItemClickedEventArgs e)
         {
-            mDoc.SetSearcher((SearchEngine) e.ClickedItem.Tag);
+            if (GetUsedSearchers() == TVDoc.GetMovieSearchers())
+            {
+                mDoc.SetMovieSearcher((SearchEngine) e.ClickedItem.Tag);
+            }
+            else
+            {
+                mDoc.SetSearcher((SearchEngine)e.ClickedItem.Tag);
+            }
+
             UpdateSearchButtons();
         }
 
@@ -1789,6 +1828,16 @@ namespace TVRename
             SelectSeason(ep.AppropriateProcessedSeason);
         }
 
+        public void GotoMovieFor([NotNull] MovieConfiguration mc, bool changeTab)
+        {
+            if (changeTab)
+            {
+                tabControl1.SelectTab(tbMyMovies);
+            }
+
+            SelectMovie(mc);
+        }
+
         private void RightClickOnMyShows(ShowConfiguration si, Point pt)
         {
             BuildRightClickMenu(pt,null, new List<ShowConfiguration> { si },null);
@@ -1813,9 +1862,9 @@ namespace TVRename
             BuildRightClickMenu(pt, ep,sis, ep?.AppropriateProcessedSeason);
         }
 
-        private void MenuGuideAndTvdb(bool addSep, ProcessedEpisode? ep, List<ShowConfiguration>? sis, ProcessedSeason? seas)
+        private void MenuGuideAndTvdb(bool addSep, ProcessedEpisode? ep, List<ShowConfiguration?>? sis, ProcessedSeason? seas)
         {
-            if (sis is null || sis.Count != 1)
+            if (sis is null || sis.Count != 1 || sis[0]==null)
             {
                 return; // nothing or multiple selected
             }
@@ -1838,7 +1887,7 @@ namespace TVRename
             }
             else if (seas != null)
             {
-                AddRcMenuItem("Episode Guide", (sender, args) => GotoEpguideFor(si, true));
+                AddRcMenuItem("Episode Guide", (sender, args) => GotoEpguideFor(seas.Show, true));
                 string label = seas.Show.Provider == TVDoc.ProviderType.TVmaze
                     ? "Visit Tv Maze..."
                     : "Visit thetvdb.com";
@@ -2042,19 +2091,24 @@ namespace TVRename
 
             List<string> added = new List<string>();
 
+            AddRcMenuItem("Force Refresh", (sender, args) => ForceMovieRefresh(si, false));
+            AddRcMenuItem("Update Images", (sender, args) => UpdateImages(new List<MovieConfiguration>{si}));
 
-            //todo - Add more Right click options
+            showRightClickMenu.Items.Add(new ToolStripSeparator());
 
-            string scanText = "Scan \"" + si.ShowName + "\"";
+            AddRcMenuItem("Edit Movie", (sender, args) => EditMovie(si));
+            AddRcMenuItem("Delete Movie", (sender, args) => DeleteMovie(si));
 
-            AddRcMenuItem(scanText, (sender, args) =>
+            showRightClickMenu.Items.Add(new ToolStripSeparator());
+
+            AddRcMenuItem($"Scan \"{si.ShowName}\"", (sender, args) =>
             {
                 UiScan(null, new List<MovieConfiguration> {si}, false, TVSettings.ScanType.SingleShow,
                     MediaConfiguration.MediaType.movie);
 
                 tabControl1.SelectTab(tbAllInOne);
             });
-
+            
             if (si.Locations.Any())
             {
                 AddFolders(si.Locations, added);
@@ -2176,6 +2230,10 @@ namespace TVRename
             else if (tabControl1.SelectedTab == tbAllInOne)
             {
                 BtnSearch_ButtonClick(null, null);
+            }
+            else if (tabControl1.SelectedTab == tbMyMovies)
+            {
+                ForceMovieRefresh(false);
             }
             else
             {
@@ -2351,9 +2409,19 @@ namespace TVRename
             Task<ServerRelease> tuv = VersionUpdater.CheckForUpdatesAsync();
             ServerRelease result = await tuv.ConfigureAwait(false);
 
-            uiDisp.Invoke(() => NotifyUpdates(result, false,mDoc.Args.Unattended ||mDoc.Args.Hide));
+            mDoc.CurrentAppState.UpdateCheck.LastUpdateCheckUtc = DateTime.UtcNow;
+            try
+            {
+                mDoc.CurrentAppState.SaveToDefaultFile();
+            }
+            catch(Exception ex)
+            {
+                Logger.Warn(ex, "Could not save app state file after update check!");
+            }
+
+            uiDisp.Invoke(() => NotifyUpdates(result, false, mDoc.Args.Unattended || mDoc.Args.Hide));
         }
-        
+
         private void BGDownloadTimer_Tick(object sender, EventArgs e)
         {
             if (IsBusy)
@@ -2437,6 +2505,17 @@ namespace TVRename
                 }
 
                 UpdateMyShowsButtonStatus();
+            }
+            if (tabControl1.SelectedTab == tbMyMovies)
+            {
+                if (switchToWhenOpenMyMovies != null && TVSettings.Instance.AutoSelectShowInMyShows)
+                {
+                    GotoMovieFor(switchToWhenOpenMyMovies, false);
+                    switchToWhenOpenMyMovies = null; //disable switching to this movie again
+                    //FillEpGuideHtml();
+                }
+
+                UpdateMyMoviesButtonStatus();
             }
         }
 
@@ -2683,6 +2762,8 @@ namespace TVRename
             {
                 case TVDoc.ProviderType.TVmaze:
                     return TreeNodeToShowItem(n)?.TVmazeCode == si.TVmazeCode;
+                case TVDoc.ProviderType.TMDB:
+                    return TreeNodeToShowItem(n)?.TmdbCode == si.TmdbCode;
                 case TVDoc.ProviderType.TheTVDB:
                     return TreeNodeToShowItem(n)?.TvdbCode == si.TvdbCode;
                 default:
@@ -3032,6 +3113,23 @@ namespace TVRename
             FillActionList(false);
         }
 
+        private void UpdateImages(IReadOnlyCollection<MovieConfiguration>? sis)
+        {
+            if (sis == null)
+            {
+                return;
+            }
+
+            foreach (MovieConfiguration si in sis)
+            {
+                //update images for the showitem
+                mDoc.ForceUpdateImages(si);
+            }
+
+            tabControl1.SelectTab(tbAllInOne);
+            FillActionList(false);
+        }
+
         private void bnMyShowsRefresh_Click(object? sender, EventArgs? e)
         {
             if (ModifierKeys == Keys.Control)
@@ -3269,19 +3367,16 @@ namespace TVRename
         }
 
         [NotNull]
-        private static string GetFolderForShow(ShowConfiguration? currentShow)
+        private static string GetFolderForShow(MediaConfiguration? currentShow)
         {
             if (currentShow is null)
             {
                 return string.Empty;
             }
 
-            foreach (var folder in currentShow.AllExistngFolderLocations().Values.SelectMany(list => list))
+            foreach (string folder in currentShow.AllExistngFolderLocations().Values.SelectMany(list => list).Where(folder => !string.IsNullOrEmpty(folder) && Directory.Exists(folder)))
             {
-                    if (!string.IsNullOrEmpty(folder) && Directory.Exists(folder))
-                    {
-                        return folder;
-                    }
+                return folder;
             }
 
             return string.Empty;
@@ -3394,7 +3489,8 @@ namespace TVRename
             {
                 case TVDoc.ProviderType.TVmaze:
                     return "TV Maze";
-
+                case TVDoc.ProviderType.TMDB:
+                    return "TMDB";
                 case TVDoc.ProviderType.TheTVDB:
                     return "The TVDB";
 
@@ -3454,7 +3550,19 @@ namespace TVRename
             {
                 mDoc.TheActionList.NotifyUpdated();
                 olvAction.RebuildColumns();
-                SetCheckboxes();
+                internalCheckChange = true;
+                //olvAction.ItemCheck -= olvAction_ItemCheck;
+                olvAction.BeginUpdate();
+                if (mDoc.TheActionList.Actions.Count <100)
+                {
+                    //TODO WE SHOULD DO THIS ALL THE TIME
+                    olvAction.CheckObjects(mDoc.TheActionList.Actions);
+                }
+                internalCheckChange = false;
+                //olvAction.ItemCheck += olvAction_ItemCheck;
+                UpdateActionCheckboxes();
+                olvAction.EndUpdate();
+                //SetCheckboxes();
             }
             olvAction.RestoreState(oldState);
             olvAction.EndUpdate();
@@ -3469,16 +3577,23 @@ namespace TVRename
         [NotNull]
         private static string HeaderName(string name, int number, long filesize) => $"{name} ({PrettyPrint(number)}, {filesize.GBMB(1)})";
 
-        private void bnActionAction_Click(object sender, EventArgs e) => ActionAction(true,false);
+        private void bnActionAction_Click(object sender, EventArgs e) => ActionAction(true,false, false);
 
-        private void ActionAction(bool checkedNotSelected, bool unattended)
+        private void ActionAction(bool checkedNotSelected, bool unattended, bool doAll)
         {
             mDoc.PreventAutoScan("Action Selected Items");
-            ItemList lvr = checkedNotSelected
-                ? GetCheckedItems()
-                : GetSelectedItems();
+            if (doAll)
+            {
+                mDoc.DoAllActions(this);
+            }
+            else
+            {
+                ItemList lvr = checkedNotSelected
+                    ? GetCheckedItems()
+                    : GetSelectedItems();
 
-            mDoc.DoActions(lvr,this);
+                mDoc.DoActions(lvr, this);
+            }
 
             FillActionList(true);
             RefreshWTW(false,unattended);
@@ -3510,7 +3625,7 @@ namespace TVRename
 
             ItemList lvr = GetSelectedItems();
 
-            Item action = (Item)olvAction.FocusedObject;
+            Item? action = (Item)olvAction.FocusedObject;
 
             if (action?.Episode != null && lvr.Count == 1)
             {
@@ -3519,7 +3634,16 @@ namespace TVRename
                 {
                     return;
                 }
-                GenerateActionRightClickMenu(pt, lvr, action.Episode.Show, action.Episode);
+                GenerateActionRightClickMenu(pt, lvr, action.Episode.Show, action.Episode, null);
+            }
+            else if (action?.Movie != null && lvr.Count == 1)
+            {
+                switchToWhenOpenMyMovies = action.Movie;
+                if (e.Button != MouseButtons.Right)
+                {
+                    return;
+                }
+                GenerateActionRightClickMenu(pt, lvr, null,null, action.Movie);
             }
             else
             {
@@ -3527,10 +3651,10 @@ namespace TVRename
                 {
                     return;
                 }
-                GenerateActionRightClickMenu(pt, lvr, null,null);
+                GenerateActionRightClickMenu(pt, lvr, null,null,null);
             }
         }
-        private void GenerateActionRightClickMenu(Point pt, [NotNull] ItemList lvr, ShowConfiguration? si, ProcessedEpisode? episode)
+        private void GenerateActionRightClickMenu(Point pt, [NotNull] ItemList lvr, ShowConfiguration? si, ProcessedEpisode? episode, MovieConfiguration? movie)
         { 
             if (lvr.Count == 0)
             {
@@ -3544,7 +3668,7 @@ namespace TVRename
             // Action related items
             if (lvr.Count > lvr.Missing.ToList().Count) // not just missing selected
             {
-                AddRcMenuItem("Action Selected", (sender, args) => ActionAction(false, false)); 
+                AddRcMenuItem("Action Selected", (sender, args) => ActionAction(false, false,false)); 
             }
 
             AddRcMenuItem("Ignore Selected", (sender, args) => IgnoreSelected());
@@ -3561,13 +3685,18 @@ namespace TVRename
                     MenuSearchFor(episode);
                 }
 
+                if (movie != null)
+                {
+                    MenuSearchFor(movie);
+                }
+
                 if (lvr.Count == 1) // only one selected
                 {
                     AddRcMenuItem("Browse For...", (sender, args) => BrowseForMissingItem((ItemMissing)lvr[0]));
                 }
             }
 
-            if (lvr.CopyMove.Count > 0||lvr.DownloadTorrents.Count>0)
+            if (lvr.CopyMove.Count > 0||lvr.DownloadTorrents.Count>0||lvr.Downloading.Count>0)
             {
                 showRightClickMenu.Items.Add(new ToolStripSeparator());
                 AddRcMenuItem("Revert to Missing", (sender, args) => Revert());
@@ -3604,6 +3733,37 @@ namespace TVRename
                 }
                 ToolStripMenuItem tssi = new ToolStripMenuItem("Jackett Search");
                 tssi.Click += (s, ev) => { JackettFinder.SearchForEpisode(ep); };
+                tsi.DropDownItems.Add(tssi);
+            }
+
+            showRightClickMenu.Items.Add(tsi);
+        }
+
+        private void MenuSearchFor(MovieConfiguration ep)
+        {
+            showRightClickMenu.Items.Add(new ToolStripSeparator());
+
+            ToolStripMenuItem tsi = new ToolStripMenuItem("Search");
+            tsi.Click += (s, ev) => { TVDoc.SearchForMovie(ep); };
+
+            foreach (SearchEngine se in TVDoc.GetMovieSearchers())
+            {
+                if (se.Name.HasValue())
+                {
+                    ToolStripMenuItem tssi = new ToolStripMenuItem(se.Name);
+                    tssi.Click += (s, ev) => { TVDoc.SearchForMovie(se, ep); };
+                    tsi.DropDownItems.Add(tssi);
+                }
+            }
+
+            if (TVSettings.Instance.SearchJackett || TVSettings.Instance.SearchJackettButton)
+            {
+                if (TVDoc.GetMovieSearchers().Any())
+                {
+                    tsi.DropDownItems.Add(new ToolStripSeparator());
+                }
+                ToolStripMenuItem tssi = new ToolStripMenuItem("Jackett Search");
+                tssi.Click += (s, ev) => { JackettFinder.SearchForMovie(ep); };
                 tsi.DropDownItems.Add(tssi);
             }
 
@@ -3710,7 +3870,7 @@ namespace TVRename
             }
 
             //Needed to de-selct any un action able items
-            Item action = (Item)olvAction.GetModelObject(e.Index);
+            Item? action = (Item)olvAction.GetModelObject(e.Index);
             if (action != null && !(action is Action))
             {
                 e.NewValue = CheckState.Unchecked;
@@ -3730,6 +3890,10 @@ namespace TVRename
                     {
                         TVDoc.SearchForEpisode(miss.Episode);
                     }
+                    if (miss.Movie != null)
+                    {
+                        TVDoc.SearchForMovie(miss.Movie);
+                    }
                 }
                 else
                 {
@@ -3745,6 +3909,10 @@ namespace TVRename
                 if (i?.Episode != null)
                 {
                     TVDoc.SearchForEpisode(i.Episode);
+                }
+                if (i?.Movie != null)
+                {
+                    TVDoc.SearchForMovie(i.Movie);
                 }
             }
         }
@@ -3859,12 +4027,15 @@ namespace TVRename
             }
 
             UpdateNotification unForm = new UpdateNotification(update);
-            unForm.ShowDialog(this);
-            if (unForm.DialogResult == DialogResult.Abort)
+            if (!TVSettings.Instance.SuppressUpdateAvailablePopup)
             {
-                Logger.Info("Downloading New Release and Quiting");
-                //We need to quit!
-                Close();
+                unForm.ShowDialog(this);
+                if (unForm.DialogResult == DialogResult.Abort)
+                {
+                    Logger.Info("Downloading New Release and Quiting");
+                    //We need to quit!
+                    Close();
+                }
             }
             btnUpdateAvailable.Visible = true;
         }
@@ -4085,17 +4256,14 @@ namespace TVRename
             CheckState cs = menuItem.CheckState;
 
             internalCheckChange = true;
-            
-            foreach (Item i in olvAction.Objects.OfType<Item>().Where(isValid))
+
+            if (cs == CheckState.Checked)
             {
-                if (cs == CheckState.Checked)
-                {
-                    olvAction.CheckObject(i);
-                }
-                else
-                {
-                    olvAction.UncheckObject(i);
-                }
+                olvAction.CheckObjects(olvAction.Objects.OfType<Item>().Where(isValid).ToList());
+            }
+            else
+            {
+                olvAction.UncheckObjects(olvAction.Objects.OfType<Item>().Where(isValid).ToList());
             }
 
             internalCheckChange = false;
@@ -4171,7 +4339,7 @@ namespace TVRename
             const int INDENT = 15;
 
             //GetIcon
-            Image icon = tabCtrl.ImageList.Images[tabPage.ImageKey];
+            Image? icon = tabCtrl.ImageList.Images[tabPage.ImageKey];
             if (icon is null)
             {
                 return;
@@ -4496,15 +4664,19 @@ namespace TVRename
 
             ItemList lvr = GetSelectedItems();
 
-            Item action = (Item)olvAction.FocusedObject;
+            Item? action = (Item)olvAction.FocusedObject;
 
             if (action?.Episode != null && lvr.Count == 1)
             {
-                GenerateActionRightClickMenu(pt, lvr, action.Episode.Show, action.Episode);
+                GenerateActionRightClickMenu(pt, lvr, action.Episode.Show, action.Episode, null);
+            }
+            else if (action?.Movie != null && lvr.Count == 1)
+            {
+                GenerateActionRightClickMenu(pt, lvr, null,null,action.Movie);
             }
             else
             {
-                GenerateActionRightClickMenu(pt, lvr, null, null);
+                GenerateActionRightClickMenu(pt, lvr, null, null, null);
             }
         }
 
@@ -4691,8 +4863,8 @@ namespace TVRename
 
         private void recommendationsToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            RecommendationView form = new RecommendationView(mDoc, this, mDoc.FilmLibrary.Movies.Take(50));
-            //RecommendationView form = new RecommendationView(mDoc, this, MediaConfiguration.MediaType.movie); todo - revert
+            //RecommendationView form = new RecommendationView(mDoc, this, mDoc.TvLibrary.Shows.Take(50));
+            RecommendationView form = new RecommendationView(mDoc, this, MediaConfiguration.MediaType.tv);
             form.ShowDialog(this);
 
         }
@@ -4705,8 +4877,8 @@ namespace TVRename
 
         private void movieRecommendationsToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            RecommendationView form = new RecommendationView(mDoc, this, mDoc.TvLibrary.Shows.Take(50));
-            //RecommendationView form = new RecommendationView(mDoc, this, MediaConfiguration.MediaType.tv); todo - revert
+            //RecommendationView form = new RecommendationView(mDoc, this, mDoc.FilmLibrary.Movies.Take(50));
+            RecommendationView form = new RecommendationView(mDoc, this, MediaConfiguration.MediaType.movie); 
             form.ShowDialog(this);
         }
 
@@ -4729,6 +4901,7 @@ namespace TVRename
         private void toolStripButton1_Click_1(object sender, EventArgs e)
         {
             UiScan(null, null, false, TVSettings.ScanType.Full, MediaConfiguration.MediaType.movie);
+            tabControl1.SelectTab(tbAllInOne);
         }
 
         private void movieSearchEnginesToolStripMenuItem_Click(object sender, EventArgs e)

@@ -28,12 +28,12 @@ namespace TVRename
         {
             if (string.IsNullOrEmpty(TVSettings.Instance.SABAPIKey) || string.IsNullOrEmpty(TVSettings.Instance.SABHostPort))
             {
-                LOGGER.Info("Searching SABnzxdb Feeds is cancelled as the key and host/port are notprovided in Preferences.");
+                LOGGER.Warn("Searching SABnzbd Feeds is cancelled as the key and host/port are not provided in Preferences.");
                 return;
             }
 
             // get list of files being downloaded by SABnzbd
-            XElement x = GetSabDownload(TVSettings.Instance.SABAPIKey,TVSettings.Instance.SABHostPort);
+            XElement x = GetSabDownload(TVSettings.Instance.SABHostPort, TVSettings.Instance.SABAPIKey);
 
             if (x is null)
             {
@@ -59,7 +59,7 @@ namespace TVRename
                     continue;
                 }
 
-                string simpleShowName = Helpers.SimplifyName(action.Episode.Show.ShowName);
+                string simpleShowName = action.Episode.Show.ShowName.CompareName();
 
                 if (string.IsNullOrWhiteSpace(simpleShowName))
                 {
@@ -69,7 +69,7 @@ namespace TVRename
                 foreach (QueueSlotsSlot te in x.Descendants("slots").Select(slot => CreateQueueSlotsSlot(slot, simpleShowName, action)).Where(te => !(te is null)))
                 {
                     toRemove.Add(action);
-                    newList.Add(new ItemDownloading(te, action.Episode, action.TheFileNoExt, DownloadApp.SABnzbd));
+                    newList.Add(new ItemDownloading(te, action.Episode, action.TheFileNoExt, DownloadApp.SABnzbd,action));
                     break;
                 }
             }

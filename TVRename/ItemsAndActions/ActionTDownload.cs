@@ -23,8 +23,9 @@ namespace TVRename
         public readonly int Seeders;
         // ReSharper disable once NotAccessedField.Global - Used as a property in the Choose Download Grid
         public readonly string UpstreamSource;
+        private readonly ItemDownloading becomes;
 
-        public ActionTDownload(string name, long sizeBytes,int seeders, string url, string toWhereNoExt, ProcessedEpisode? pe,ItemMissing me, string upstreamSource)
+        public ActionTDownload(string name, long sizeBytes,int seeders, string url, string toWhereNoExt, ProcessedEpisode? pe,ItemMissing me, string upstreamSource, ItemDownloading becomes)
         {
             Episode = pe;
             SourceName = name;
@@ -34,19 +35,22 @@ namespace TVRename
             UndoItemMissing = me;
             this.sizeBytes = sizeBytes;
             Seeders = seeders;
+            this.becomes = becomes;
         }
 
-        public ActionTDownload([NotNull] RSSItem rss, string theFileNoExt, ProcessedEpisode? pe, ItemMissing me)
+        public ActionTDownload([NotNull] RSSItem rss, ItemMissing me,ItemDownloading becomes)
         {
             SourceName = rss.Title;
             url = rss.URL;
-            this.theFileNoExt = theFileNoExt;
+            theFileNoExt = me.TheFileNoExt;
             UpstreamSource = rss.UpstreamSource;
-            Episode = pe;
+            Episode = me.Episode;
+            Movie = me.Movie;
             UndoItemMissing = me;
             Seeders = rss.Seeders;
             sizeBytes = rss.Bytes;
             UpstreamSource = rss.UpstreamSource;
+            this.becomes = becomes;
         }
 
         #region Action Members
@@ -55,6 +59,8 @@ namespace TVRename
         public override string Name => "Get Torrent";
         public override long SizeOfWork => 1000000;
         public override string Produces => url;
+
+        public override Item Becomes() => becomes;
 
         public override ActionOutcome Go( TVRenameStats stats)
         {

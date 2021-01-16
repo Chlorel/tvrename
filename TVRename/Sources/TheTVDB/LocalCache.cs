@@ -71,7 +71,11 @@ namespace TVRename.TheTVDB
                 {
                     lock (SyncRoot)
                     {
-                        InternalInstance ??= new LocalCache();
+                        // ReSharper disable once ConvertIfStatementToNullCoalescingAssignment
+                        if (InternalInstance is null)
+                        {
+                            InternalInstance = new LocalCache();
+                        }
                     }
                 }
 
@@ -238,7 +242,7 @@ namespace TVRename.TheTVDB
             LOGGER.Info($"Forget everything, so we assume we have updates until {LatestUpdateTime}");
         }
 
-        public void ForgetShow(int tvdb, int tvmaze, bool makePlaceholder, bool useCustomLanguage, string? customLanguageCode)
+        public void ForgetShow(int tvdb, int tvmaze, int tmdb, bool makePlaceholder, bool useCustomLanguage, string? customLanguageCode)
         {
             lock (SERIES_LOCK)
             {
@@ -250,11 +254,11 @@ namespace TVRename.TheTVDB
                     {
                         if (useCustomLanguage && customLanguageCode.HasValue())
                         {
-                            AddPlaceholderSeries(tvdb, tvmaze, customLanguageCode!);
+                            AddPlaceholderSeries(tvdb, tvmaze,tmdb, customLanguageCode!);
                         }
                         else
                         {
-                            AddPlaceholderSeries(tvdb, tvmaze);
+                            AddPlaceholderSeries(tvdb, tvmaze,tmdb);
                         }
 
                         forceReloadOn.TryAdd(tvdb, tvdb);
@@ -351,7 +355,7 @@ namespace TVRename.TheTVDB
         }
 
         private void AddPlaceholderSeries([NotNull] SeriesSpecifier ss)
-            => AddPlaceholderSeries(ss.TvdbSeriesId, ss.TvMazeSeriesId, ss.CustomLanguageCode);
+            => AddPlaceholderSeries(ss.TvdbSeriesId, ss.TvMazeSeriesId, ss.TmdbId,ss.CustomLanguageCode);
 
         public bool GetUpdates(bool showErrorMsgBox, CancellationToken cts, IEnumerable<SeriesSpecifier> ss)
         {
@@ -1600,14 +1604,14 @@ namespace TVRename.TheTVDB
             return $"S{ep.AiredSeasonNumber:00}E{ep.AiredEpNum:00}";
         }
 
-        private void AddPlaceholderSeries(int tvdb, int tvmaze)
+        private void AddPlaceholderSeries(int tvdb, int tvmaze,int tmdb)
         {
-            Series[tvdb] = new CachedSeriesInfo(tvdb, tvmaze) { Dirty = true };
+            Series[tvdb] = new CachedSeriesInfo(tvdb, tvmaze,tmdb) { Dirty = true };
         }
 
-        private void AddPlaceholderSeries(int tvdb, int tvmaze, string customLanguageCode)
+        private void AddPlaceholderSeries(int tvdb, int tvmaze, int tmdb, string customLanguageCode)
         {
-            Series[tvdb] = new CachedSeriesInfo(tvdb, tvmaze, customLanguageCode) { Dirty = true };
+            Series[tvdb] = new CachedSeriesInfo(tvdb, tvmaze,tmdb, customLanguageCode) { Dirty = true };
         }
 
         public bool EnsureUpdated(SeriesSpecifier seriesd, bool bannersToo, bool showErrorMsgBox)
@@ -1665,7 +1669,7 @@ namespace TVRename.TheTVDB
             return ok;
         }
 
-        public void Search(string text, bool showErrorMsgBox)
+        public override void Search(string text, bool showErrorMsgBox)
         {
             if (!IsConnected && !Connect(showErrorMsgBox))
             {
@@ -1871,7 +1875,7 @@ namespace TVRename.TheTVDB
         {
             lock (SERIES_LOCK)
             {
-                CachePersistor.SaveCache(Series, CacheFile, LatestUpdateTime.LastSuccessfulServerUpdateTimecode());
+                CachePersistor.SaveCache(Series,Movies, CacheFile, LatestUpdateTime.LastSuccessfulServerUpdateTimecode());
             }
         }
 

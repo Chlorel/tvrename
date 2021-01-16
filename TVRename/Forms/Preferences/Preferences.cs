@@ -367,6 +367,10 @@ namespace TVRename
             s.JackettAPIKey = txtJackettAPIKey.Text;
 
             s.RemoveDownloadDirectoriesFiles = cbCleanUpDownloadDir.Checked;
+            s.RemoveDownloadDirectoriesFilesMatchMovies = cbCleanUpDownloadDirMovies.Checked;
+            s.RemoveDownloadDirectoriesFilesMatchMoviesLengthCheck = cbCleanUpDownloadDirMoviesLength.Checked;
+            int.TryParse(tbCleanUpDownloadDirMoviesLength.Text, out s.RemoveDownloadDirectoriesFilesMatchMoviesLengthCheckLength);
+
             s.DeleteShowFromDisk = cbDeleteShowFromDisk.Checked;
             s.DoBulkAddInScan = cbScanIncludesBulkAdd.Checked;
             s.IgnoreAllSpecials = chkIgnoreAllSpecials.Checked;
@@ -444,13 +448,37 @@ namespace TVRename
             s.DefMovieDoMissingCheck = cbDefMovieDoMissing.Checked;
             s.DefMovieUseutomaticFolders = cbDefMovieAutoFolders.Checked;
             s.DefMovieUseDefaultLocation = cbDefMovieUseDefLocation.Checked;
-            s.DefMovieDefaultLocation = cmbDefMovieLocation.SelectedText;
+            s.DefMovieDefaultLocation = (string)cmbDefMovieLocation.SelectedItem;
             s.DefaultMovieProvider = MovieProviderMode();
 
             s.TMDBLanguage= cbTMDBLanguages.SelectedText;
             s.TMDBRegion = cbTMDBRegions.SelectedText;
             s.TMDBPercentDirty = tbTMDBPercentDirty.Text.ToPercent(20);
             s.IncludeMoviesQuickRecent = chkIncludeMoviesQuickRecent.Checked;
+
+            UpdateAppUpdateSettings(s);
+        }
+
+        private void UpdateAppUpdateSettings(TVSettings s)
+        {
+            s.UpdateCheckType = GetUpdateCheckTypeFromUi();
+            if (cboUpdateCheckInterval.SelectedValue != null)
+            {
+                s.UpdateCheckInterval = (TimeSpan)cboUpdateCheckInterval.SelectedValue;
+            }
+            s.SuppressUpdateAvailablePopup = chkNoPopupOnUpdate.Checked;
+        }
+
+        private TVSettings.UpdateCheckMode GetUpdateCheckTypeFromUi()
+        {
+            if (chkUpdateCheckEnabled.Checked)
+            {
+                return optUpdateCheckAlways.Checked
+                    ? TVSettings.UpdateCheckMode.Everytime
+                    : TVSettings.UpdateCheckMode.Interval;
+            }
+
+            return TVSettings.UpdateCheckMode.Off;
         }
 
         private static TVSettings.DuplicateActionOutcome ConvertToDupActEnum([NotNull] ComboBox p0)
@@ -696,7 +724,7 @@ namespace TVRename
             ReplacementsGrid[r, 1] = new SourceGrid.Cells.Cell(to, typeof(string));
             ReplacementsGrid[r, 2] = new SourceGrid.Cells.CheckBox(null, ins);
             if (!string.IsNullOrEmpty(from) &&
-                TVSettings.CompulsoryReplacements().IndexOf(from, StringComparison.Ordinal) != -1)
+                TVSettings.CompulsoryReplacements().IndexOf(from!, StringComparison.Ordinal) != -1)
             {
                 ReplacementsGrid[r, 0].Editor.EnableEdit = false;
                 ReplacementsGrid[r, 0].View = roModel;
@@ -922,6 +950,10 @@ namespace TVRename
             SetDropdownValue(domainUpDown1, s.periodCheckHours);
             SetDropdownValue(domainUpDown2, s.periodUpdateCacheHours);
             cbCleanUpDownloadDir.Checked = s.RemoveDownloadDirectoriesFiles;
+            cbCleanUpDownloadDirMovies.Checked= s.RemoveDownloadDirectoriesFilesMatchMovies;
+            cbCleanUpDownloadDirMoviesLength.Checked= s.RemoveDownloadDirectoriesFilesMatchMoviesLengthCheck;
+            tbCleanUpDownloadDirMoviesLength.Text= s.RemoveDownloadDirectoriesFilesMatchMoviesLengthCheckLength.ToString();
+
             cbDeleteShowFromDisk.Checked = s.DeleteShowFromDisk;
             cbCopyFutureDatedEps.Checked = s.CopyFutureDatedEpsFromSearchFolders;
             chkShareCriticalLogs.Checked = s.ShareLogs;
@@ -1023,9 +1055,73 @@ namespace TVRename
 
             FillTreeViewColoringShowStatusTypeCombobox();
 
+            SetupAppUpdateTabPageContent(s);
+
             EnableDisable();
         }
-        
+
+        private void SetupAppUpdateTabPageContent(TVSettings settings)
+        {
+            FillUpdateIntervals();
+            TriggerControlEventsForInitialState();
+
+            cboUpdateCheckInterval.SelectedValue = settings.UpdateCheckInterval;
+            chkNoPopupOnUpdate.Checked = settings.SuppressUpdateAvailablePopup;
+            SetUpdateCheckToTypeToUi(settings.UpdateCheckType);
+
+            void TriggerControlEventsForInitialState()
+            {
+                // These seem redundant but they are there to cycle the control events and get the controls into the correct enabled state
+                // The order of the statements additionally serves the purpose to set the default UI state
+                optUpdateCheckInterval.Checked = true;
+                optUpdateCheckAlways.Checked = true;
+                chkUpdateCheckEnabled.Checked = false;
+                chkUpdateCheckEnabled.Checked = true;
+            }
+        }
+
+        private void SetUpdateCheckToTypeToUi(TVSettings.UpdateCheckMode updateCheckMode)
+        {
+            switch (updateCheckMode)
+            {
+                case TVSettings.UpdateCheckMode.Off:
+                    chkUpdateCheckEnabled.Checked = false;
+                    break;
+                case TVSettings.UpdateCheckMode.Everytime:
+                    chkUpdateCheckEnabled.Checked = true;
+                    optUpdateCheckAlways.Checked = true;
+                    break;
+                case TVSettings.UpdateCheckMode.Interval:
+                    chkUpdateCheckEnabled.Checked = true;
+                    optUpdateCheckInterval.Checked = true;
+                    break;
+            }
+        }
+
+        private void FillUpdateIntervals()
+        {
+            cboUpdateCheckInterval.DisplayMember = nameof(UpdateCheckInterval.Text);
+            cboUpdateCheckInterval.ValueMember = nameof(UpdateCheckInterval.Interval);
+            cboUpdateCheckInterval.DataSource = new UpdateCheckInterval[]
+            {
+                new UpdateCheckInterval { Text = "1 Hour", Interval = TimeSpan.FromHours(1) },
+                new UpdateCheckInterval { Text = "12 Hours", Interval = TimeSpan.FromHours(12) },
+                new UpdateCheckInterval { Text = "1 Day", Interval = TimeSpan.FromHours(24) },
+                new UpdateCheckInterval { Text = "1 Week", Interval = TimeSpan.FromDays(7) },
+                new UpdateCheckInterval { Text = "2 Week", Interval = TimeSpan.FromDays(7 * 2) },
+                new UpdateCheckInterval { Text = "30 Days", Interval = TimeSpan.FromDays(30) },
+                new UpdateCheckInterval { Text = "90 Days", Interval = TimeSpan.FromDays(90) },
+
+            };
+        }
+
+        private class UpdateCheckInterval
+        {
+            public string Text { get; set; }
+
+            public TimeSpan Interval { get; set; }
+        }
+
         private void PopulateFromEnums([NotNull] TVSettings s)
         {
             cbKeepTogetherMode.Text = ConvertEnum(s.keepTogetherMode);
@@ -2118,6 +2214,16 @@ namespace TVRename
             cntfw = new CustomNameTagsFloatingWindow(t);
             cntfw.Show(this);
             Focus();
+        }
+
+        private void chkUpdateCheckEnabled_CheckedChanged(object sender, EventArgs e)
+        {
+            grpUpdateIntervalOption.Enabled = chkUpdateCheckEnabled.Checked;
+        }
+
+        private void updateCheckOption_CheckedChanged(object sender, EventArgs e)
+        {
+            cboUpdateCheckInterval.Enabled = optUpdateCheckInterval.Checked;
         }
     }
 }

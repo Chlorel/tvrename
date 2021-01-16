@@ -130,6 +130,10 @@ namespace TVRename
                     TvdbCode = code;
                     break;
 
+                case TVDoc.ProviderType.TMDB:
+                    TmdbCode = code;
+                    break;
+
                 default:
                     throw new ArgumentOutOfRangeException(nameof(type), type, null);
             }
@@ -314,6 +318,7 @@ namespace TVRename
             CustomShowName = xmlSettings.ExtractString("CustomShowName");
             TvdbCode = xmlSettings.ExtractInt("TVDBID",-1);
             TVmazeCode = xmlSettings.ExtractInt("TVMAZEID", -1);
+            TmdbCode = xmlSettings.ExtractInt("TMDBID", -1);
             CountSpecials = xmlSettings.ExtractBool("CountSpecials",false);
             ShowNextAirdate = xmlSettings.ExtractBool("ShowNextAirdate",true);
             AutoAddFolderBase = xmlSettings.ExtractString("FolderBase");
@@ -403,7 +408,7 @@ namespace TVRename
         {
             foreach (XElement rulesSet in xmlSettings.Descendants("Rules"))
             {
-                XAttribute value = rulesSet.Attribute("SeasonNumber");
+                XAttribute? value = rulesSet.Attribute("SeasonNumber");
                 if (value is null)
                 {
                     continue;
@@ -423,7 +428,7 @@ namespace TVRename
         {
             foreach (XElement seasonFolder in xmlSettings.Descendants("SeasonFolders"))
             {
-                XAttribute value = seasonFolder.Attribute("SeasonNumber");
+                XAttribute? value = seasonFolder.Attribute("SeasonNumber");
                 if (value is null)
                 {
                     continue;
@@ -447,11 +452,24 @@ namespace TVRename
 
         protected override MediaType GetMediaType() => MediaType.tv;
 
-        protected override MediaCache LocalCache() => Provider== TVDoc.ProviderType.TVmaze ? (MediaCache) TVmaze.LocalCache.Instance : TheTVDB.LocalCache.Instance;
+        protected override MediaCache LocalCache()
+        {
+            return Provider switch
+            {
+                TVDoc.ProviderType.TVmaze => TVmaze.LocalCache.Instance,
+                TVDoc.ProviderType.TMDB => TMDB.LocalCache.Instance,
+                TVDoc.ProviderType.libraryDefault => TheTVDB.LocalCache.Instance,
+                TVDoc.ProviderType.TheTVDB => TheTVDB.LocalCache.Instance,
+                _ => TheTVDB.LocalCache.Instance
+            };
+        }
 
-        
-
-        private int Code => Provider == TVDoc.ProviderType.TVmaze ? TVmazeCode:TvdbCode;
+        private int Code => Provider switch
+        {
+            TVDoc.ProviderType.TVmaze => TVmazeCode,
+            TVDoc.ProviderType.TMDB => TmdbCode,
+            _ => TvdbCode
+        };
 
         public enum ShowAirStatus
         {
@@ -599,6 +617,7 @@ namespace TVRename
                         return TVSettings.Instance.DefaultProvider;
                     case TVDoc.ProviderType.TVmaze:
                     case TVDoc.ProviderType.TheTVDB:
+                    case TVDoc.ProviderType.TMDB:
                         return ConfigurationProvider;
                     default:
                         throw new ArgumentOutOfRangeException();
@@ -684,6 +703,7 @@ namespace TVRename
             writer.WriteElement("ShowNextAirdate",ShowNextAirdate);
             writer.WriteElement("TVDBID",TvdbCode);
             writer.WriteElement("TVMAZEID", TVmazeCode);
+            writer.WriteElement("TMDBID", TmdbCode );
             writer.WriteElement("FolderBase", AutoAddFolderBase);
             writer.WriteElement("DoRename",DoRename);
             writer.WriteElement("DoMissingCheck",DoMissingCheck);
@@ -1088,21 +1108,21 @@ namespace TVRename
         {
             List<string> possibles = new List<string>();
 
-            string simplifiedShowName = Helpers.SimplifyName(ShowName);
+            string simplifiedShowName = ShowName.CompareName();
             if (simplifiedShowName != "") { possibles.Add(simplifiedShowName); }
 
             //Check the custom show name too
             if (UseCustomShowName)
             {
-                string simplifiedCustomShowName = Helpers.SimplifyName(CustomShowName);
+                string simplifiedCustomShowName = CustomShowName.CompareName();
                 if (simplifiedCustomShowName != "") { possibles.Add(simplifiedCustomShowName); }
             }
 
             //Also add the aliases provided
-            possibles.AddNullableRange(AliasNames.Select(Helpers.SimplifyName));
+            possibles.AddNullableRange(AliasNames.Select(s=>s.CompareName()).Where(s => s.HasValue()).Where(s=>s.Length>2));
 
             //Also use the aliases from theTVDB
-            possibles.AddNullableRange(CachedData?.GetAliases().Select(Helpers.SimplifyName));
+            possibles.AddNullableRange(CachedData?.GetAliases().Select(s => s.CompareName()).Where(s => s.HasValue()).Where(s => s.Length > 2));
 
             return possibles;
         }
@@ -1139,14 +1159,17 @@ namespace TVRename
 
         public bool NameMatch(string text)
         {
-            return GetSimplifiedPossibleShowNames().Any(name => FileHelper.SimplifyAndCheckFilename(text, name));
+            return GetSimplifiedPossibleShowNames().Any(name => FileHelper.SimplifyAndCheckFilename(text.CompareName(), name,false,false));
         }
 
         public bool NameMatchFilters(string text)
         {
-            return GetSimplifiedPossibleShowNames().Any(name => name.Contains(Helpers.SimplifyName(text), StringComparison.OrdinalIgnoreCase));
+            return GetSimplifiedPossibleShowNames().Any(name => name.Contains(text.CompareName(), StringComparison.OrdinalIgnoreCase));
         }
-
-
+        public int LengthNameMatch(FileInfo file, bool useFullPath)
+        {
+            string filename = useFullPath ? file.FullName : file.Name;
+            return GetSimplifiedPossibleShowNames().Select(name => FileHelper.SimplifyAndCheckFilenameLength(filename.CompareName(), name, false, false)).Max();
+        }
     }
 }

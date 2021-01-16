@@ -7,6 +7,7 @@
 // 
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace TVRename
@@ -32,7 +33,7 @@ namespace TVRename
 
             DirFilesCache dfc = new DirFilesCache();
 
-            var showList = settings.Shows;
+            List<ShowConfiguration> showList = settings.Shows;
 
             if (settings.Type == TVSettings.ScanType.Full  && showList.Count>0)
             {
@@ -68,7 +69,7 @@ namespace TVRename
             } // for each show
 
             c = 0;
-            UpdateStatus(c, settings.Movies.Count, "Checking shows");
+            UpdateStatus(c, settings.Movies.Count, "Checking movies");
             foreach (MovieConfiguration si in settings.Movies.OrderBy(item => item.ShowName))
             {
                 UpdateStatus(c++, settings.Movies.Count, si.ShowName);

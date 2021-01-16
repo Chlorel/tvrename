@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using JetBrains.Annotations;
 
 namespace TVRename
@@ -9,7 +9,7 @@ namespace TVRename
 
         public override bool Check() => Movie.UseCustomFolderNameFormat;
 
-        public override string Explain() => $"{MediaName} does not use the standard Folder naming format {TVSettings.Instance.MovieFolderFormat}, it uses {Movie.CustomFolderNameFormat}";
+        public override string Explain() => $"This Movie does not use the standard Folder naming format {TVSettings.Instance.MovieFolderFormat}, it uses {Movie.CustomFolderNameFormat}";
 
         protected override void FixInternal()
         {
@@ -18,5 +18,6 @@ namespace TVRename
         }
 
         public override string CheckName => "[Movie] Use Custom Folder Name Format";
+
     }
 }

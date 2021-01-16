@@ -41,7 +41,11 @@ namespace TVRename
                 {
                     lock (syncRoot)
                     {
-                        instance ??= new TVSettings();
+                        // ReSharper disable once ConvertIfStatementToNullCoalescingAssignment
+                        if (instance is null)
+                        {
+                            instance = new TVSettings();
+                        }
                     }
                 }
 
@@ -111,6 +115,13 @@ namespace TVRename
             All,
             AllBut,
             Just
+        }
+
+        public enum UpdateCheckMode
+        {
+            Off,
+            Everytime,
+            Interval
         }
 
         public List<string> LibraryFolders;
@@ -315,6 +326,9 @@ namespace TVRename
         [NotNull]
         public static string SpecialsListViewName => "Special";
 
+        public MovieConfiguration.MovieFolderFormat DefMovieFolderFormat =>
+            MovieConfiguration.MovieFolderFormat.singleDirectorySingleFile; //TODO fix this  //{ get; internal set; }
+
         public bool AutoSaveOnExit = false;
 
         public DuplicateActionOutcome UnattendedMultiActionOutcome = DuplicateActionOutcome.IgnoreAll;
@@ -347,6 +361,9 @@ namespace TVRename
         public string uTorrentPath;
         public bool MonitorFolders = false;
         public bool RemoveDownloadDirectoriesFiles = false;
+        public bool RemoveDownloadDirectoriesFilesMatchMovies = false;
+        public bool RemoveDownloadDirectoriesFilesMatchMoviesLengthCheck = false;
+        public int RemoveDownloadDirectoriesFilesMatchMoviesLengthCheckLength = 8;
         public bool DeleteShowFromDisk = true;
 
         public ShowStatusColoringTypeList ShowStatusColors = new ShowStatusColoringTypeList();
@@ -387,9 +404,12 @@ namespace TVRename
         public bool DefMovieDoMissingCheck = true;
         public bool DefMovieUseutomaticFolders = true;
         public bool DefMovieUseDefaultLocation = true;
+        public bool SuppressUpdateAvailablePopup = false;
+        public UpdateCheckMode UpdateCheckType = UpdateCheckMode.Everytime;
+        internal TimeSpan UpdateCheckInterval = TimeSpan.FromDays(1);
+
         public string? DefMovieDefaultLocation;
         public TVDoc.ProviderType DefaultMovieProvider = TVDoc.ProviderType.TMDB;
-
 
         private TVSettings()
         {
@@ -555,6 +575,9 @@ namespace TVRename
             writer.WriteElement("PeriodicScanHours", periodCheckHours);
             writer.WriteElement("PeriodicUpdateCacheHours", periodUpdateCacheHours);
             writer.WriteElement("RemoveDownloadDirectoriesFiles", RemoveDownloadDirectoriesFiles);
+            writer.WriteElement("RemoveDownloadDirectoriesFilesMatchMovies", RemoveDownloadDirectoriesFilesMatchMovies);
+            writer.WriteElement("RemoveDownloadDirectoriesFilesMatchMoviesLengthCheck", RemoveDownloadDirectoriesFilesMatchMoviesLengthCheck);
+            writer.WriteElement("RemoveDownloadDirectoriesFilesMatchMoviesLengthCheckLength", RemoveDownloadDirectoriesFilesMatchMoviesLengthCheckLength);
             writer.WriteElement("DoBulkAddInScan", DoBulkAddInScan);
             writer.WriteElement("DeleteShowFromDisk", DeleteShowFromDisk);
             writer.WriteElement("SABAPIKey", SABAPIKey);
@@ -646,6 +669,8 @@ namespace TVRename
             writer.WriteElement("TMDBPercentDirty", TMDBPercentDirty);
             writer.WriteElement("IncludeMoviesQuickRecent", IncludeMoviesQuickRecent);
 
+            WriteAppUpdateElement(writer);
+
             TheSearchers.WriteXml(writer, "TheSearchers");
             TheMovieSearchers.WriteXml(writer, "TheMovieSearchers");
             WriteReplacements(writer);
@@ -655,6 +680,15 @@ namespace TVRename
             WriteFilters(writer);
 
             writer.WriteEndElement(); // settings
+        }
+
+        private void WriteAppUpdateElement(XmlWriter writer)
+        {
+            writer.WriteStartElement("AppUpdate");
+            writer.WriteElement("Mode", (int)UpdateCheckType);
+            writer.WriteElement("Interval", UpdateCheckInterval.ToString());
+            writer.WriteElement("SuppressPopup", SuppressUpdateAvailablePopup);
+            writer.WriteEndElement();
         }
 
         private void WriteReplacements([NotNull] XmlWriter writer)
@@ -707,7 +741,6 @@ namespace TVRename
             }
 
             writer.WriteEndElement(); //ShowFilters
-
 
             writer.WriteStartElement("MovieFilters");
 
@@ -1006,7 +1039,7 @@ namespace TVRename
 
             string url = TheMovieSearchers.CurrentSearch.Url;
 
-            return !url.HasValue() ? string.Empty : CustomMovieName.NameFor(mov, url, true);
+            return !url.HasValue() ? string.Empty : CustomMovieName.NameFor(mov, url, true,false);
         }
 
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
@@ -1421,6 +1454,9 @@ namespace TVRename
             periodCheckHours = xmlSettings.ExtractInt("PeriodicScanHours",1);
             periodUpdateCacheHours = xmlSettings.ExtractInt("PeriodicUpdateCacheHours", 1);
             RemoveDownloadDirectoriesFiles = xmlSettings.ExtractBool("RemoveDownloadDirectoriesFiles",false);
+            RemoveDownloadDirectoriesFilesMatchMovies = xmlSettings.ExtractBool("RemoveDownloadDirectoriesFilesMatchMovies", false);
+            RemoveDownloadDirectoriesFilesMatchMoviesLengthCheck = xmlSettings.ExtractBool("RemoveDownloadDirectoriesFilesMatchMoviesLengthCheck", false);
+            RemoveDownloadDirectoriesFilesMatchMoviesLengthCheckLength = xmlSettings.ExtractInt("RemoveDownloadDirectoriesFilesMatchMoviesLengthCheckLength", 8);
             DoBulkAddInScan = xmlSettings.ExtractBool("DoBulkAddInScan",false);
             DeleteShowFromDisk = xmlSettings.ExtractBool("DeleteShowFromDisk",true);
             EpJPGs = xmlSettings.ExtractBool("EpJPGs",false);
@@ -1503,10 +1539,23 @@ namespace TVRename
             TheSearchers = new Searchers(xmlSettings.Descendants("TheSearchers").FirstOrDefault(),MediaConfiguration.MediaType.tv);
             TheMovieSearchers = new Searchers(xmlSettings.Descendants("TheMovieSearchers").FirstOrDefault(),MediaConfiguration.MediaType.movie);
 
+            UpdateAppUpdateSettings(xmlSettings);
+
             UpdateReplacements(xmlSettings);
             UpdateRegExs(xmlSettings);
             UpdateShowStatus(xmlSettings);
             UpdateFiters(xmlSettings);
+        }
+
+        private void UpdateAppUpdateSettings(XElement xmlSettings)
+        {
+            var subElement = xmlSettings.Element("AppUpdate");
+            if (subElement != null)
+            {
+                UpdateCheckInterval = TimeSpan.Parse(subElement.ExtractString("Interval", TimeSpan.FromHours(1).ToString()));
+                UpdateCheckType = (UpdateCheckMode)Enum.Parse(typeof(UpdateCheckMode), subElement.ExtractString("Mode", ((int)UpdateCheckMode.Everytime).ToString()));
+                SuppressUpdateAvailablePopup = subElement.ExtractBool("SuppressPopup", false);
+            }
         }
 
         private void UpdateFiters([NotNull] XElement xmlSettings)
@@ -1571,7 +1620,6 @@ namespace TVRename
             {
                 MovieFilter.Genres.Add(rep.Value);
             }
-
 
             if (SeasonFolderFormat == string.Empty)
             {

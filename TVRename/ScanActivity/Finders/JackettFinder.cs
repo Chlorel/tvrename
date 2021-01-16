@@ -30,7 +30,7 @@ namespace TVRename
                 return;
             }
 
-            if (settings.Type ==TVSettings.ScanType.Full && TVSettings.Instance.StopJackettSearchOnFullScan)
+            if (settings.Type ==TVSettings.ScanType.Full && TVSettings.Instance.StopJackettSearchOnFullScan && settings.Shows.Any())
             {
                 LOGGER.Info("Searching Jackett is cancelled as this is a full scan");
                 return;
@@ -53,9 +53,9 @@ namespace TVRename
 
                     UpdateStatus(n++, c, action.Filename);
 
-                    if (action is ShowItemMissing)
+                    if (action is ShowItemMissing showItemMissing)
                     {
-                        FindMissingEpisode((ShowItemMissing)action, toRemove, newItems);
+                        FindMissingEpisode(showItemMissing, toRemove, newItems);
                     }
                     else
                     {
@@ -95,7 +95,9 @@ namespace TVRename
                     LOGGER.Info(
                         $"Adding {rss.URL} from RSS feed as it appears to be match for {processedEpisode.Show.ShowName} S{processedEpisode.AppropriateSeasonNumber}E{processedEpisode.AppropriateEpNum}");
                 }
-                newItemsForThisMissingEpisode.Add(new ActionTDownload(rss, action.TheFileNoExt, processedEpisode, action));
+
+                ItemDownloading becomes = new ItemDownloading(new FutureTorrentEntry(rss.URL, action.TheFileNoExt), action.MissingEpisode, action.TheFileNoExt, DownloadingFinder.DownloadApp.qBitTorrent, action);
+                newItemsForThisMissingEpisode.Add(new ActionTDownload(rss, action, becomes));
                 toRemove.Add(action);
             }
 
@@ -122,7 +124,8 @@ namespace TVRename
                     LOGGER.Info(
                         $"Adding {rss.URL} from RSS feed as it appears to be match for {action.MovieConfig.ShowName}");
                 }
-                newItemsForThisMissingEpisode.Add(new ActionTDownload(rss, action.TheFileNoExt, null, action));
+                ItemDownloading becomes = new ItemDownloading(new FutureTorrentEntry(rss.URL, action.TheFileNoExt), action.MovieConfig, action.TheFileNoExt, DownloadingFinder.DownloadApp.qBitTorrent, action);
+                newItemsForThisMissingEpisode.Add(new ActionTDownload(rss, action,becomes));
                 toRemove.Add(action);
             }
 
@@ -141,7 +144,7 @@ namespace TVRename
             string allIndexer = TVSettings.Instance.JackettIndexer;
             string apikey = TVSettings.Instance.JackettAPIKey;
             const string FORMAT = "{ShowName}";
-            string text = CustomMovieName.NameFor(actionMovieConfig,FORMAT);
+            string? text = WebUtility.UrlEncode(CustomMovieName.NameFor(actionMovieConfig,FORMAT));
             return
                 $"http://{serverName}:{serverPort}{allIndexer}/api?t=movie&q={text}&apikey={apikey}";
         }
@@ -162,7 +165,7 @@ namespace TVRename
             string serverPort = TVSettings.Instance.JackettPort;
             string allIndexer = TVSettings.Instance.JackettIndexer;
             string apikey = TVSettings.Instance.JackettAPIKey;
-            string simpleShowName = Helpers.SimplifyName(processedEpisode.Show.ShowName);
+            string? simpleShowName = WebUtility.UrlEncode(processedEpisode.Show.ShowName.CompareName());
 
             return
                 $"http://{serverName}:{serverPort}{allIndexer}/api?t=tvsearch&q={simpleShowName}&tvdbid={processedEpisode.Show.TvdbCode}&season={processedEpisode.AppropriateSeasonNumber}&ep={processedEpisode.AppropriateEpNum}&apikey={apikey}";
@@ -175,7 +178,7 @@ namespace TVRename
             string allIndexer = TVSettings.Instance.JackettIndexer;
             string apikey = TVSettings.Instance.JackettAPIKey;
             const string FORMAT = "{ShowName} S{Season:2}E{Episode}[-E{Episode2}]";
-            string text = CustomEpisodeName.NameForNoExt(episode, FORMAT, false);
+            string? text = WebUtility.UrlEncode(CustomEpisodeName.NameForNoExt(episode, FORMAT, false));
             return
                 $"http://{serverName}:{serverPort}{allIndexer}/api?t=tvsearch&q={text}&apikey={apikey}";
         }
@@ -186,7 +189,7 @@ namespace TVRename
             string serverPort = TVSettings.Instance.JackettPort;
             const string FORMAT = "{ShowName} S{Season:2}E{Episode}[-E{Episode2}]";
 
-            string url = $"http://{serverName}:{serverPort}/UI/Dashboard#search={CustomEpisodeName.NameForNoExt(episode,FORMAT,false)}";
+            string url = $"http://{serverName}:{serverPort}/UI/Dashboard#search={WebUtility.UrlEncode(CustomEpisodeName.NameForNoExt(episode,FORMAT,false))}&tracker=&category=";
 
             Helpers.OpenUrl(url);
         }
@@ -197,7 +200,7 @@ namespace TVRename
             string serverPort = TVSettings.Instance.JackettPort;
             const string FORMAT = "{ShowName} ({Year})";
 
-            string url = $"http://{serverName}:{serverPort}/UI/Dashboard#search={Uri.EscapeDataString(CustomMovieName.NameFor(mov, FORMAT))}";
+            string url = $"http://{serverName}:{serverPort}/UI/Dashboard#search={WebUtility.UrlEncode(CustomMovieName.NameFor(mov, FORMAT))}&tracker=&category=";
 
             Helpers.OpenUrl(url);
         }

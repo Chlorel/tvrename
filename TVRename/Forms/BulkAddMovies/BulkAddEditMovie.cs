@@ -17,13 +17,13 @@ namespace TVRename
     {
         public int Code;
 
-        private readonly TmdbCodeFinder codeFinderControl;
+        private readonly CombinedCodeFinder codeFinderControl;
 
         public BulkAddEditMovie([NotNull] PossibleNewMovie hint)
         {
             InitializeComponent();
 
-            codeFinderControl = new TmdbCodeFinder("") {Dock = DockStyle.Fill};
+            codeFinderControl = new CombinedCodeFinder("",MediaConfiguration.MediaType.movie,TVDoc.ProviderType.TMDB) {Dock = DockStyle.Fill};
             codeFinderControl.SelectionChanged += CodeChanged;
             codeFinderControl.lvMatches.DoubleClick += MatchDoubleClick;
 
@@ -38,7 +38,7 @@ namespace TVRename
             else
             {
                 codeFinderControl.SetHint(string.IsNullOrWhiteSpace(hint.RefinedHint)
-                    ? hint.MovieFile.Directory.Name
+                    ? hint.Directory.Name
                     : hint.RefinedHint);
             }
             Code = -1;

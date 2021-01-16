@@ -151,9 +151,10 @@ namespace TVRename
             {
                 si.ClearEpisodes();
 
-                CachedSeriesInfo ser = si.Provider == TVDoc.ProviderType.TVmaze
-                    ? TVmaze.LocalCache.Instance.GetSeries(si.TVmazeCode)
-                    : TheTVDB.LocalCache.Instance.GetSeries(si.TvdbCode);
+                CachedSeriesInfo ser =
+                    si.Provider == TVDoc.ProviderType.TVmaze ? TVmaze.LocalCache.Instance.GetSeries(si.TVmazeCode):
+                    si.Provider == TVDoc.ProviderType.TMDB ? TMDB.LocalCache.Instance.GetSeries(si.TmdbCode) :
+                    TheTVDB.LocalCache.Instance.GetSeries(si.TvdbCode);
 
                 if (ser is null)
                 {
@@ -996,6 +997,19 @@ namespace TVRename
         public MovieConfiguration? GetMovie(PossibleNewMovie ai)
         {
             return GetMovie(ai.TMDBCode??0); //todo revisit this when we can have a genuine multisource library
+        }
+
+        public void AddRange(IEnumerable<MovieConfiguration>? addedShows)
+        {
+            if (addedShows is null)
+            {
+                return;
+            }
+
+            foreach (MovieConfiguration show in addedShows)
+            {
+                Add(show);
+            }
         }
     }
 }

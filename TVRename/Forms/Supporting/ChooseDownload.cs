@@ -1,15 +1,14 @@
 using System.Collections.Generic;
 using System.Windows.Forms;
-using JetBrains.Annotations;
 
 namespace TVRename.Forms.Supporting
 {
     public partial class ChooseDownload : Form
     {
-        public ChooseDownload([NotNull] ProcessedEpisode pe, IEnumerable<ActionTDownload> options)
+        public ChooseDownload(ItemMissing im, IEnumerable<ActionTDownload> options)
         {
             InitializeComponent();
-            lblEpisodeName.Text = $"{pe.Show.ShowName} - {pe}";
+            lblEpisodeName.Text = $"{im.Show.ShowName} - {im}";
             olvSize.AspectToStringConverter = delegate (object x) {
                 long sizeBytes = (long)x;
 
@@ -17,6 +16,7 @@ namespace TVRename.Forms.Supporting
             };
             olvChooseDownload.SetObjects(options);
             SetButtonVisiblity();
+            olvChooseDownload.Sort(olvSeeders,SortOrder.Descending);
         }
 
         public ActionTDownload? UserChosenAction
@@ -37,7 +37,12 @@ namespace TVRename.Forms.Supporting
 
         private void BtnOK_Click(object sender, System.EventArgs e)
         {
-            UserChosenAction = (ActionTDownload)olvChooseDownload.SelectedObject;
+            Ok();
+        }
+
+        private void Ok()
+        {
+            UserChosenAction = (ActionTDownload) olvChooseDownload.SelectedObject;
             DialogResult = olvChooseDownload.SelectedObject != null ? DialogResult.OK : DialogResult.Cancel;
         }
 
@@ -45,6 +50,11 @@ namespace TVRename.Forms.Supporting
         {
             DialogResult = DialogResult.Abort;
             Close();
+        }
+
+        private void olvChooseDownload_DoubleClick(object sender, System.EventArgs e)
+        {
+            Ok();
         }
     }
 }

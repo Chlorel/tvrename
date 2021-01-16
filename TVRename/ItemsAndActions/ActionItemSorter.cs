@@ -5,6 +5,9 @@
 // 
 // Copyright (c) TV Rename. This code is released under GPLv3 https://github.com/TV-Rename/tvrename/blob/master/LICENSE.md
 // 
+
+using System;
+
 namespace TVRename
 {
     public class ActionItemSorter : System.Collections.Generic.IComparer<Item>
@@ -21,7 +24,7 @@ namespace TVRename
         private static int TypeNumber(Item a)
         {
             return a switch
-            {
+            { //todo fix this for new types
                 ItemMissing _ => 1,
                 ActionCopyMoveRename _ => 2,
                 ActionTDownload _ => 3,
@@ -37,7 +40,9 @@ namespace TVRename
                 ActionDateTouchEpisode _ => 13,
                 ActionDateTouchSeason _ => 14,
                 ActionDateTouchMedia _ => 15,
-                ActionTRemove _ => 16
+                ActionDateTouchMovie _ => 16,
+                ActionTRemove _ => 17,
+                _ => throw new NotSupportedException()
             };
         }
     }

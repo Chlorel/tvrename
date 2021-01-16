@@ -26,6 +26,7 @@ using Directory = Alphaleonis.Win32.Filesystem.Directory;
 using DirectoryInfo = Alphaleonis.Win32.Filesystem.DirectoryInfo;
 using File = Alphaleonis.Win32.Filesystem.File;
 using FileInfo = Alphaleonis.Win32.Filesystem.FileInfo;
+using TVRename.Settings.AppState;
 
 namespace TVRename
 {
@@ -48,6 +49,7 @@ namespace TVRename
         public readonly MovieLibrary FilmLibrary;
         public readonly CommandLineArgs Args;
         internal readonly TVRenameStats CurrentStats;
+        internal readonly State CurrentAppState;
         public readonly ItemList TheActionList;
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private readonly ActionEngine actionManager;
@@ -103,6 +105,16 @@ namespace TVRename
                 CurrentStats = new TVRenameStats();
                 // not worried if stats loading fails
             }
+
+            try
+            {
+                CurrentAppState = State.LoadFromDefaultFile();
+            }
+            catch(Exception ex)
+            {
+                Logger.Warn(ex, "Could not load app state file.");
+                CurrentAppState = new State();
+            }
             actionManager = new ActionEngine(CurrentStats);
         }
 
@@ -154,6 +166,23 @@ namespace TVRename
                         Logger.Error($"Issue with copy back of ids {show.Name} {show.TvdbCode} {showConfiguration.TVmazeCode} {show.TvMazeCode} ");
                     }
                 }
+
+                foreach (CachedSeriesInfo show in TMDB.LocalCache.Instance.CachedShowData.Values)
+                {
+                    ShowConfiguration showConfiguration = TvLibrary.GetShowItem(show.TvdbCode);
+                    if (showConfiguration is null)
+                    {
+                        continue;
+                    }
+                    if (showConfiguration.TmdbCode == 0 || showConfiguration.TmdbCode == -1)
+                    {
+                        showConfiguration.TmdbCode = show.TmdbCode;
+                    }
+                    if (showConfiguration.TmdbCode != show.TmdbCode)
+                    {
+                        Logger.Error($"Issue with copy back of ids {show.Name}: {showConfiguration.TmdbCode} {show.TmdbCode} ");
+                    }
+                }
             }
         }
 
@@ -173,6 +202,10 @@ namespace TVRename
 
             actionManager.DoActions(theList, !Args.Hide && Environment.UserInteractive,owner);
 
+
+            IEnumerable<Item?> enumerable = TheActionList.Actions.Where(a => a.Outcome.Done && a.Becomes() != null).Select(a => a.Becomes());
+            TheActionList.AddNullableRange(enumerable);
+
             // remove items from master list, unless it had an error
             TheActionList.RemoveAll(x => x is Action action && action.Outcome.Done && !action.Outcome.Error);
 
@@ -183,7 +216,7 @@ namespace TVRename
         // ReSharper disable once InconsistentNaming
         public bool DoDownloadsFG(bool unattended,bool tvrMinimised, UI owner)
         {
-            var shows = TvLibrary.SeriesSpecifiers.Union(FilmLibrary.SeriesSpecifiers).ToList();
+            List<SeriesSpecifier> shows = TvLibrary.SeriesSpecifiers.Union(FilmLibrary.SeriesSpecifiers).ToList();
             bool showProgress = !Args.Hide && Environment.UserInteractive && !tvrMinimised;
             bool showMsgBox = !unattended && !Args.Unattended && !Args.Hide && Environment.UserInteractive;
 
@@ -262,6 +295,26 @@ namespace TVRename
             Helpers.OpenUrl(CustomEpisodeName.NameForNoExt(epi, s.Url, true));
         }
 
+        public static void SearchForMovie(MovieConfiguration? ep)
+        {
+            if (ep is null)
+            {
+                return;
+            }
+
+            Helpers.OpenUrl(TVSettings.Instance.BTMovieSearchURL(ep));
+        }
+
+        public static void SearchForMovie(SearchEngine s, MovieConfiguration? epi)
+        {
+            if (epi is null)
+            {
+                return;
+            }
+
+            Helpers.OpenUrl(CustomMovieName.NameFor(epi, s.Url, true,false));
+        }
+
         public void DoWhenToWatch(bool cachedOnly,bool unattended,bool hidden, UI owner)
         {
             if (!cachedOnly && !DoDownloadsFG(unattended,hidden,owner))
@@ -312,7 +365,7 @@ namespace TVRename
                 writer.WriteEndElement(); // MyShows
 
                 writer.WriteStartElement("MyMovies");
-                foreach (var si in FilmLibrary.Values)
+                foreach (MovieConfiguration? si in FilmLibrary.Values)
                 {
                     si.WriteXmlSettings(writer);
                 }
@@ -536,12 +589,12 @@ namespace TVRename
                 PreventAutoScan("Scan "+st.PrettyPrint());
 
                 //Get the default set of shows defined by the specified type
-                IEnumerable<ShowConfiguration> shows = GetShowList(st, media, passedShows);
+                List<ShowConfiguration> shows = GetShowList(st, media, passedShows).ToList();
                 //Get the default set of shows defined by the specified type
-                IEnumerable<MovieConfiguration> movies = GetMovieList(st,media, passedMovies);
+                List<MovieConfiguration> movies = GetMovieList(st,media, passedMovies).ToList();
 
                 //If still null then return
-                if (shows is null && movies is null) 
+                if (!shows.Any() && !movies.Any()) 
                 {
                     Logger.Warn("No Shows/Movies Provided to Scan");
                     return;
@@ -549,6 +602,7 @@ namespace TVRename
 
                 if (!DoDownloadsFG(unattended,hidden,owner))
                 {
+                    Logger.Warn("Scan stopped as updates failed");
                     return;
                 }
 
@@ -558,26 +612,9 @@ namespace TVRename
 
                 SetupScanUi(hidden);
 
-                actionWork.Start(new ScanSettings(shows?.ToList()??new List<ShowConfiguration>(),movies?.ToList() ??new List<MovieConfiguration>(),unattended,hidden,st,cts.Token,owner));
+                actionWork.Start(new ScanSettings(shows,movies,unattended,hidden,st,cts.Token,owner));
 
-                if (scanProgDlg != null)
-                {
-                    owner.ShowChildDialog(scanProgDlg);
-                    DialogResult ccresult = scanProgDlg.DialogResult;
-
-                    if (ccresult == DialogResult.Cancel)
-                    {
-                        cts.Cancel();
-                    }
-                    else
-                    {
-                        actionWork.Join();
-                    }
-                } 
-                else
-                {
-                    actionWork.Join();
-                }
+                ShowDialogAndWait(owner, cts, actionWork);
 
                 RemoveDuplicateDownloads(unattended,owner);
 
@@ -591,6 +628,28 @@ namespace TVRename
             finally
             {
                 AllowAutoScan();
+            }
+        }
+
+        private void ShowDialogAndWait(UI owner, CancellationTokenSource cts, Thread actionWork)
+        {
+            if (scanProgDlg != null)
+            {
+                owner.ShowChildDialog(scanProgDlg);
+                DialogResult ccresult = scanProgDlg.DialogResult;
+
+                if (ccresult == DialogResult.Cancel)
+                {
+                    cts.Cancel();
+                }
+                else
+                {
+                    actionWork.Join();
+                }
+            }
+            else
+            {
+                actionWork.Join();
             }
         }
 
@@ -625,7 +684,7 @@ namespace TVRename
                 scanProgDlg = new ScanProgress(
                     TVSettings.Instance.DoBulkAddInScan, 
                     TVSettings.Instance.RenameCheck || TVSettings.Instance.MissingCheck,
-                    TVSettings.Instance.RemoveDownloadDirectoriesFiles || TVSettings.Instance.ReplaceWithBetterQuality,
+                    TVSettings.Instance.RemoveDownloadDirectoriesFiles || TVSettings.Instance.RemoveDownloadDirectoriesFilesMatchMovies || TVSettings.Instance.ReplaceWithBetterQuality,
                     localFinders.Active(),
                     downloadFinders.Active(),
                     searchFinders.Active()
@@ -642,38 +701,37 @@ namespace TVRename
             }
         }
 
-        private IEnumerable<ShowConfiguration>? GetShowList(TVSettings.ScanType st,MediaConfiguration.MediaType mt, IEnumerable<ShowConfiguration>? passedShows)
+        private IEnumerable<ShowConfiguration> GetShowList(TVSettings.ScanType st,MediaConfiguration.MediaType mt, IEnumerable<ShowConfiguration>? passedShows)
         {
             if (mt == MediaConfiguration.MediaType.movie)
             {
-                return null;
+                return new List<ShowConfiguration>();
             }
             return st switch
             {
                 TVSettings.ScanType.Full => TvLibrary.GetSortedShowItems(),
                 TVSettings.ScanType.Quick => GetQuickShowsToScan(true, true),
                 TVSettings.ScanType.Recent => TvLibrary.GetRecentShows(),
-                TVSettings.ScanType.SingleShow => passedShows,
-                _ => null
+                TVSettings.ScanType.SingleShow => passedShows ?? new List<ShowConfiguration>(),
+                _ => new List<ShowConfiguration>()
             };
         }
 
-        private IEnumerable<MovieConfiguration>? GetMovieList(TVSettings.ScanType st, MediaConfiguration.MediaType mt, IEnumerable<MovieConfiguration>? passedShows)
+        private IEnumerable<MovieConfiguration> GetMovieList(TVSettings.ScanType st, MediaConfiguration.MediaType mt, IEnumerable<MovieConfiguration>? passedShows)
         {
             if (mt == MediaConfiguration.MediaType.tv)
             {
-                return null;
+                return new List<MovieConfiguration>();
             }
             return st switch
             {
                 TVSettings.ScanType.Full => FilmLibrary.GetSortedMovies(),
-                TVSettings.ScanType.Quick => TVSettings.Instance.IncludeMoviesQuickRecent ? FilmLibrary.GetSortedMovies() : passedShows,
-                TVSettings.ScanType.Recent => TVSettings.Instance.IncludeMoviesQuickRecent ? FilmLibrary.GetSortedMovies() : passedShows,
-                TVSettings.ScanType.SingleShow => passedShows,
-                _ => null
+                TVSettings.ScanType.Quick => GetQuickMoviesToScan( true),
+                TVSettings.ScanType.Recent => TVSettings.Instance.IncludeMoviesQuickRecent ? FilmLibrary.GetSortedMovies() : passedShows ?? new List<MovieConfiguration>(),
+                TVSettings.ScanType.SingleShow => passedShows ?? new List<MovieConfiguration>(),
+                _ => new List<MovieConfiguration>()
             };
         }
-
 
         public void DoAllActions(IDialogParent owner)
         {
@@ -703,6 +761,17 @@ namespace TVRename
                     showsToScan.Add(pe.Show);
                 }
             }
+            return showsToScan;
+        }
+
+        private IEnumerable<MovieConfiguration> GetQuickMoviesToScan(bool doFilesInDownloadDir)
+        {
+            List<MovieConfiguration> showsToScan = new List<MovieConfiguration>();
+            if (doFilesInDownloadDir)
+            {
+                showsToScan = GetMoviesThatHaveDownloads();
+            }
+
             return showsToScan;
         }
 
@@ -799,6 +868,32 @@ namespace TVRename
             RemoveIgnored();
         }
 
+        public void ForceUpdateImages([NotNull] MovieConfiguration si)
+        {
+            TheActionList.Clear();
+            downloadIdentifiers.Reset();
+
+            Logger.Info("*******************************");
+            Logger.Info("Force Update Images: " + si.ShowName);
+
+            // process each folder for each movie...
+            foreach (FileInfo? file in  si.Locations
+                .Select(s => new DirectoryInfo(s))
+                .Where(info => info.Exists)
+                .SelectMany(d => d.GetFiles())
+                .Where(f => f.IsMovieFile())
+                .Distinct()
+                .ToList())
+            {
+                TheActionList.Add(
+                    downloadIdentifiers.ForceUpdateMovie(DownloadIdentifier.DownloadType.downloadImage, si,file));
+
+                SetDirty();
+            } 
+
+            RemoveIgnored();
+        }
+
         private void ScanWorker(object o)
         {
             try
@@ -817,7 +912,7 @@ namespace TVRename
 
                 if (!settings.Unattended && settings.Type != TVSettings.ScanType.SingleShow)
                 {
-                    new FindNewShowsInDownloadFolders(this).Check(scanProgDlg is null ? noProgress : scanProgDlg.AddNewProg, 0, 50,  settings);
+                    new FindNewItemsInDownloadFolders(this).Check(scanProgDlg is null ? noProgress : scanProgDlg.AddNewProg, 0, 50,  settings);
                     new FindNewShowsInLibrary(this).Check(scanProgDlg is null ? noProgress : scanProgDlg.AddNewProg, 50, 100, settings);
                 }
                 
@@ -862,12 +957,10 @@ namespace TVRename
         private void RemoveDuplicateDownloads(bool unattended, IDialogParent owner)
         {
             bool cancelAllFuture = false;
-            foreach (IGrouping<ProcessedEpisode, ActionTDownload> epGroup in TheActionList.DownloadTorrents
-                .GroupBy(item => item.Episode)
+            foreach (IGrouping<ItemMissing, ActionTDownload> epGroup in TheActionList.DownloadTorrents
+                .GroupBy(item => item.UndoItemMissing)
                 .Where(items => items.Count() > 1)
-                .OrderBy(grouping => grouping.Key.Show.ShowName)
-                .ThenBy(g => g.Key.AppropriateSeasonNumber)
-                .ThenBy(g2 => g2.Key.AppropriateEpNum))
+                .OrderBy(grouping => grouping.Key.Show.ShowName))
             {
                 List<ActionTDownload> actions = epGroup.ToList();
 
@@ -1087,6 +1180,113 @@ namespace TVRename
             return showsToScan;
         }
 
+        [NotNull]
+        private List<MovieConfiguration> GetMoviesThatHaveDownloads()
+        {
+            //for each directory in settings directory
+            //for each file in directory
+            //for each saved show (order by recent)
+            //does show match selected file?
+            //if so add cachedSeries to list of cachedSeries scanned
+
+            List<MovieConfiguration> showsToScan = new List<MovieConfiguration>();
+
+            foreach (string dirPath in TVSettings.Instance.DownloadFolders)
+            {
+                if (!Directory.Exists(dirPath))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    string[] x = Directory.GetFiles(dirPath, "*", SearchOption.AllDirectories);
+                    Logger.Info($"Processing {x.Length} files for shows that need to be scanned");
+
+                    foreach (string filePath in x)
+                    {
+                        Logger.Info($"Checking to see whether {filePath} is a file that for a show that need scanning");
+
+                        if (!File.Exists(filePath))
+                        {
+                            continue;
+                        }
+
+                        FileInfo fi = new FileInfo(filePath);
+
+                        if (fi.IgnoreFile())
+                        {
+                            continue;
+                        }
+
+                        foreach (MovieConfiguration si in FilmLibrary.Movies
+                            .Where(si => !showsToScan.Contains(si))
+                            .Where(si => si.NameMatch(fi, TVSettings.Instance.UseFullPathNameToMatchSearchFolders)))
+                        {
+                            showsToScan.Add(si);
+                        }
+                    }
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    Logger.Warn($"Could not access files in {dirPath} {ex.Message}");
+                }
+                catch (DirectoryNotFoundException ex)
+                {
+                    Logger.Warn($"Could not access files in {dirPath} {ex.Message}");
+                }
+                catch (IOException ex)
+                {
+                    Logger.Warn($"Could not access files in {dirPath} {ex.Message}");
+                }
+                catch (NotSupportedException ex)
+                {
+                    Logger.Error($"Please update 'Download Folders' {dirPath} is not supported {ex.Message}");
+                }
+                try
+                {
+                    string[] directories = Directory.GetDirectories(dirPath, "*", SearchOption.AllDirectories);
+                    Logger.Info($"Processing {directories.Length} directories for shows that need to be scanned");
+
+                    foreach (string subDirPath in directories)
+                    {
+                        Logger.Info($"Checking to see whether {subDirPath} has any shows that need scanning");
+
+                        if (!Directory.Exists(subDirPath))
+                        {
+                            continue;
+                        }
+
+                        DirectoryInfo di = new DirectoryInfo(subDirPath);
+
+                        foreach (MovieConfiguration si in FilmLibrary.Values
+                            .Where(si => !showsToScan.Contains(si))
+                            .Where(si => si.NameMatch(di, TVSettings.Instance.UseFullPathNameToMatchSearchFolders)))
+                        {
+                            showsToScan.Add(si);
+                        }
+                    }
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    Logger.Warn($"Could not access sub-directories in {dirPath} {ex.Message}");
+                }
+                catch (DirectoryNotFoundException ex)
+                {
+                    Logger.Warn($"Could not access sub-directories in {dirPath} {ex.Message}");
+                }
+                catch (IOException ex)
+                {
+                    Logger.Warn($"Could not access sub-directories in {dirPath} {ex.Message}");
+                }
+                catch (NotSupportedException ex)
+                {
+                    Logger.Error($"Please update 'Download Folders' {dirPath} is not supported {ex.Message}");
+                }
+            }
+            return showsToScan;
+        }
+
         internal void ForceRefreshShows(IEnumerable<ShowConfiguration>? sis, bool unattended,bool tvrMinimised, UI owner)
         {
             PreventAutoScan("Force Refresh");
@@ -1094,24 +1294,32 @@ namespace TVRename
             {
                 foreach (ShowConfiguration si in sis)
                 {
-                    switch (si.Provider)
-                    {
-                        case ProviderType.TVmaze:
-                            TVmaze.LocalCache.Instance.ForgetShow(si.TvdbCode, si.TVmazeCode, true, si.UseCustomLanguage, si.CustomLanguageCode);
-                            break;
-
-                        case ProviderType.TheTVDB:
-                            TheTVDB.LocalCache.Instance.ForgetShow(si.TvdbCode, si.TVmazeCode,true, si.UseCustomLanguage, si.CustomLanguageCode);
-                            break;
-
-                        default:
-                            throw new ArgumentOutOfRangeException();
-                    }
+                    iTVSource cache = GetCache(si);
+                    cache.ForgetShow(si.TvdbCode, si.TVmazeCode, si.TmdbCode, true, si.UseCustomLanguage, si.CustomLanguageCode);
                 }
             }
 
             DoDownloadsFG(unattended, tvrMinimised,owner);
             AllowAutoScan();
+        }
+
+        private iTVSource GetCache(ShowConfiguration si)
+        {
+            switch (si.Provider)
+            {
+                case ProviderType.TVmaze:
+                    return TVmaze.LocalCache.Instance;
+
+                case ProviderType.TheTVDB:
+                    return TheTVDB.LocalCache.Instance;
+
+                case ProviderType.TMDB:
+                    return TMDB.LocalCache.Instance;
+
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+
         }
 
         internal void ForceRefreshMovies(IEnumerable<MediaConfiguration>? sis, bool unattended, bool tvrMinimised, UI owner)
@@ -1147,6 +1355,30 @@ namespace TVRename
             ForceRefreshShows(showsToUpdate, unattended, hidden,owner);
             DoDownloadsBG();
             AllowAutoScan();
+        }
+
+        private void ReviewAliases()
+        {
+            foreach (MovieConfiguration? mov in FilmLibrary.Movies)
+            {
+                foreach (string? al in mov.AliasNames)
+                {
+                    Logger.Warn($"::{mov.ShowName},{al}");
+                }
+            }
+
+            foreach (MovieConfiguration? mov in FilmLibrary.Movies)
+            {
+                if (mov.CachedMovie?.GetAliases() is null)
+                {
+                    continue;
+                }
+
+                foreach (string? al in mov.CachedMovie?.GetAliases())
+                {
+                    Logger.Warn($"::{mov.ShowName},{al}");
+                }
+            }
         }
 
         // ReSharper disable once InconsistentNaming
@@ -1228,21 +1460,35 @@ namespace TVRename
             FileInfo from = new FileInfo(fileName);
             FileInfo to = FinderHelper.GenerateTargetName(mi, from);
 
-            ProcessedEpisode ep = mi is ShowItemMissing ? ((ShowItemMissing) mi).MissingEpisode : null;
+            // if we're copying/moving a file across, we might also want to make a thumbnail or NFO for it
+            DownloadIdentifiersController di = new DownloadIdentifiersController();
 
-            TheActionList.Add(
-                new ActionCopyMoveRename(
-                    TVSettings.Instance.LeaveOriginals
-                        ? ActionCopyMoveRename.Op.copy
-                        : ActionCopyMoveRename.Op.move, from, to
-                    , ep, true, mi, this));
+            switch (mi)
+            {
+                case ShowItemMissing sim:
+                    TheActionList.Add(
+                        new ActionCopyMoveRename(
+                            TVSettings.Instance.LeaveOriginals
+                                ? ActionCopyMoveRename.Op.copy
+                                : ActionCopyMoveRename.Op.move, from, to
+                            , sim.MissingEpisode, true, mi, this));
+                    TheActionList.Add(di.ProcessEpisode(sim.Episode, to));
+
+                    break;
+                case MovieItemMissing mim:
+                    TheActionList.Add(
+                        new ActionCopyMoveRename(
+                            TVSettings.Instance.LeaveOriginals
+                                ? ActionCopyMoveRename.Op.copy
+                                : ActionCopyMoveRename.Op.move, from, to
+                            , mim.MovieConfig, true, mi, this));
+                    TheActionList.Add(di.ProcessMovie(mim.MovieConfig, to));
+
+                    break;
+            }
 
             // and remove old Missing item
             TheActionList.Remove(mi);
-
-            // if we're copying/moving a file across, we might also want to make a thumbnail or NFO for it
-            DownloadIdentifiersController di = new DownloadIdentifiersController();
-            TheActionList.Add(di.ProcessEpisode(mi.Episode, to));
 
             //If keep together is active then we may want to copy over related files too
             if (TVSettings.Instance.KeepTogether)
@@ -1299,11 +1545,7 @@ namespace TVRename
 
         public void RevertAction(Item item)
         {
-            if (!(item is Action revertAction))
-            {
-                return;
-            }
-            ItemMissing m2 = revertAction.UndoItemMissing;
+            ItemMissing? m2 = item.UndoItemMissing;
 
             if (m2 is null)
             {
@@ -1311,15 +1553,14 @@ namespace TVRename
             }
 
             TheActionList.Add(m2);
-            TheActionList.Remove(revertAction);
+            TheActionList.Remove(item);
 
             //We can remove any CopyMoveActions that are closely related too
-            if (!(revertAction is ActionCopyMoveRename))
+            if (!(item is ActionCopyMoveRename i2))
             {
                 return;
             }
 
-            ActionCopyMoveRename i2 = (ActionCopyMoveRename)item;
             List<Item> toRemove = new List<Item>();
 
             foreach (Item a in TheActionList)

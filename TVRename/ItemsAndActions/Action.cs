@@ -12,8 +12,6 @@ namespace TVRename
 {
     public abstract class Action : Item // Something we can do
     {
-        public ItemMissing? UndoItemMissing; //Item to revert to if we have to cancel this action
-
         public abstract string ProgressText { get; } // shortish text to display to user while task is running
 
         private double percent;
@@ -41,6 +39,8 @@ namespace TVRename
         public abstract ActionOutcome Go(TVRenameStats stats); // action the action.  do not return until done.  will be run in a dedicated thread.  if pause is set to true, stop working until it goes back to false        
 
         public abstract string Produces { get; } //What does this action produce? typically a filename
+
+        public virtual Item? Becomes() => null;
 
         public void ResetOutcome()
         {
